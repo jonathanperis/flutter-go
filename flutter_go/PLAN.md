@@ -539,3 +539,14 @@ The standing goal is now full API parity with Flutter 3.50.1's Dart layer
   change).
 - `rendering` still defines its own Offset/Size/Rect; moving it onto `ui`
   is the next P0/P1 step.
+- **ENGINE GAP filled in Go:** `RSuperellipse.contains` now ports the
+  engine's C++ (`lib/ui/painting/rsuperellipse.cc` and
+  `impeller/geometry/round_superellipse_param.cc`) in float32, including
+  `SafeNarrow`, `GetPositive` and the one step C++ computes in double. The
+  7 engine test cases pass, and grids over 6 shapes (~5,400 points each,
+  plus 25,600 points at 0.05 px over one corner) match the engine's native
+  `contains` run by `flutter test`, point for point. Mutations: 8 caught
+  (one, a lookup-table entry, only after adding the fine grid); 3 survivors
+  are equivalent or below what any grid can resolve (the all-corners-same
+  fast path, `seN < 2` where `seN` is 0 or ≥ 2, and `R` rounded to float
+  instead of double, a ~1e-6 px shift).

@@ -95,9 +95,6 @@ Each divergence is listed here when it is introduced.
 
 - `physics.NearEqual` takes `float64`, not `double?`: Dart's null case
   (`nearEqual(null, null) == true`) has no Go equivalent.
-- `RSuperellipse.Contains` is not ported yet: Dart calls into the engine
-  for it, and the prebuilt Impeller SDK has no superellipse API (ENGINE GAP
-  in PLAN.md).
 - Assertions are always on: where Dart asserts in debug mode (negative
   RRect radii, non-finite lerp inputs), Go panics in every build.
 - Equal widgets skip rebuilds (Go's stand-in for `const`), see PLAN.md G1.

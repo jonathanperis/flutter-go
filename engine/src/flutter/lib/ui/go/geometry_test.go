@@ -256,3 +256,77 @@ func TestInfinityLerp(t *testing.T) {
 		t.Errorf("lerp = %v, want (inf, inf)", r)
 	}
 }
+
+func checkPointWithOffset(t *testing.T, rse RSuperellipse, in, outward Offset) {
+	t.Helper()
+	if !rse.Contains(in) {
+		t.Errorf("%v should contain %v", rse, in)
+	}
+	if rse.Contains(in.Add(outward)) {
+		t.Errorf("%v should not contain %v", rse, in.Add(outward))
+	}
+}
+
+func TestRSuperellipseContainsNoCorners(t *testing.T) {
+	rse := NewRSuperellipseFromLTRBXY(-50, -50, 50, 50, 0, 0)
+	for o, want := range map[Offset]bool{{-50, -50}: true, {-50, 49.99}: true, {49.99, -50}: true, {49.99, 49.99}: true,
+		{-50.01, -50}: false, {-50, -50.01}: false, {-50.01, 50}: false, {-50, 50.01}: false,
+		{50.01, -50}: false, {50, -50.01}: false, {50.01, 50}: false, {50, 50.01}: false} {
+		check(t, "contains "+o.String(), rse.Contains(o), want)
+	}
+}
+
+func TestRSuperellipseContainsTinyCorners(t *testing.T) {
+	rse := NewRSuperellipseFromLTRBXY(-50, -50, 50, 50, 0.01, 0.01)
+	for _, o := range []Offset{{-50, -50}, {-50, 50}, {50, -50}, {50, 50}} {
+		check(t, "contains "+o.String(), rse.Contains(o), false)
+	}
+}
+
+func checkMirrors(t *testing.T, rse RSuperellipse, center Offset, points []Offset) {
+	t.Helper()
+	for _, g := range points {
+		p := g.Sub(center)
+		checkPointWithOffset(t, rse, Offset{p.Dx, p.Dy}.Add(center), Offset{0.02, 0.02})
+		checkPointWithOffset(t, rse, Offset{p.Dx, -p.Dy}.Add(center), Offset{0.02, -0.02})
+		checkPointWithOffset(t, rse, Offset{-p.Dx, p.Dy}.Add(center), Offset{-0.02, 0.02})
+		checkPointWithOffset(t, rse, Offset{-p.Dx, -p.Dy}.Add(center), Offset{-0.02, -0.02})
+	}
+}
+
+func TestRSuperellipseContainsUniformCorners(t *testing.T) {
+	checkMirrors(t, NewRSuperellipseFromLTRBXY(-50, -50, 50, 50, 5, 5), Offset{}, []Offset{
+		{0, 49.995}, {44.245, 49.95}, {45.72, 49.87}, {48.53, 48.53}, {49.87, 45.72}, {49.95, 44.245}, {49.995, 0}})
+}
+
+func TestRSuperellipseContainsUniformEllipticalCorners(t *testing.T) {
+	checkMirrors(t, NewRSuperellipseFromLTRBXY(-50, -50, 50, 50, 5, 10), Offset{}, []Offset{
+		{0, 49.995}, {44.245, 49.911}, {45.72, 49.75}, {48.51, 47.07}, {49.87, 41.44}, {49.95, 38.49}, {49.995, 0}})
+}
+
+func TestRSuperellipseContainsUnequalSides(t *testing.T) {
+	rse := NewRSuperellipseFromLTRBXY(0, 0, 50, 100, 23, 30)
+	checkMirrors(t, rse, rse.OuterRect().Center(), []Offset{{24.99, 99.99}, {29.99, 99.64}, {34.99, 98.06},
+		{39.99, 94.73}, {44.13, 89.99}, {48.46, 79.99}, {49.70, 69.99}, {49.97, 59.99}, {49.99, 49.99}})
+}
+
+func TestRSuperellipseContainsSlimDiagonal(t *testing.T) {
+	rse := NewRSuperellipseFromLTRBAndCorners(-50, -50, 50, 50, RRectCorners{TopLeft: NewRadiusCircular(1),
+		TopRight: NewRadiusCircular(99), BottomLeft: NewRadiusCircular(99), BottomRight: NewRadiusCircular(1)})
+	check(t, "center", rse.Contains(Offset{0, 0}), true)
+	for _, o := range []Offset{{-49.999, -49.999}, {-49.999, 49.999}, {49.999, 49.999}, {49.999, -49.999}} {
+		check(t, "contains "+o.String(), rse.Contains(o), false)
+	}
+	checkPointWithOffset(t, rse, Offset{-49.70, -49.70}, Offset{-0.02, -0.02})
+	checkPointWithOffset(t, rse, Offset{49.70, 49.70}, Offset{0.02, 0.02})
+	for _, p := range []Offset{{-40, -49.59}, {-20, -45.64}, {0, -37.01}, {20, -21.96}, {21.05, -20.92}, {40, 5.68}} {
+		checkPointWithOffset(t, rse, p, Offset{0.02, -0.02})
+		checkPointWithOffset(t, rse, p.Neg(), Offset{-0.02, 0.02})
+	}
+}
+
+func TestRSuperellipseContainsOutsideSharpCorner(t *testing.T) {
+	rse := NewRSuperellipseFromLTRBAndCorners(196, 0, 294, 28, RRectCorners{TopRight: NewRadiusCircular(3),
+		BottomRight: NewRadiusCircular(3)})
+	check(t, "outside", rse.Contains(Offset{147, 14}), false)
+}

@@ -43,7 +43,7 @@ func geometryCases() map[string]any {
 		NewRSTransformFromComponents(RSTransformComponents{Rotation: 0.7, Scale: 1.3, AnchorX: 2, AnchorY: 3, TranslateX: 10, TranslateY: -4})} {
 		ts = append(ts, t.Scos(), t.Ssin(), t.Tx(), t.Ty())
 	}
-	return map[string]any{
+	cases := map[string]any{
 		"offset.toString":            str(o),
 		"offset.neg":                 str(o.Neg()),
 		"offset.mod":                 str(o.Mod(2)),
@@ -101,6 +101,44 @@ func geometryCases() map[string]any {
 		"rse.lerp":                   str(*RSuperellipseLerp(&rse, nil, 0.5)),
 		"rstransform":                ts,
 	}
+	for name, rse := range map[string]RSuperellipse{
+		"uniform":    NewRSuperellipseFromLTRBXY(0, 0, 40, 30, 9, 9),
+		"elliptical": NewRSuperellipseFromLTRBXY(0, 0, 40, 30, 6, 13),
+		"mixed": NewRSuperellipseFromLTRBAndCorners(0, 0, 40, 30, RRectCorners{TopLeft: NewRadiusCircular(2),
+			TopRight: NewRadiusElliptical(15, 6), BottomRight: NewRadiusCircular(25), BottomLeft: RadiusZero}),
+		"inverted": NewRSuperellipseFromLTRBXY(40, 30, 0, 0, 7, 7),
+		"ratio27":  NewRSuperellipseFromLTRBXY(0, 0, 30, 30, 11, 11),
+		"ratio15":  NewRSuperellipseFromLTRBXY(0, 0, 40, 30, 2, 2),
+	} {
+		var rows []string
+		for y := -0.75; y <= 30.75; y += 0.5 {
+			row := ""
+			for x := -0.75; x <= 40.75; x += 0.5 {
+				if rse.Contains(NewOffset(x, y)) {
+					row += "1"
+				} else {
+					row += "0"
+				}
+			}
+			rows = append(rows, row)
+		}
+		cases["rse.contains."+name] = strings.Join(rows, "|")
+	}
+	fine := NewRSuperellipseFromLTRBXY(0, 0, 30, 30, 11, 11)
+	var rows []string
+	for j := 0; j < 160; j++ {
+		row := ""
+		for i := 0; i < 160; i++ {
+			if fine.Contains(NewOffset(22.025+float64(i)*0.05, 0.025+float64(j)*0.05)) {
+				row += "1"
+			} else {
+				row += "0"
+			}
+		}
+		rows = append(rows, row)
+	}
+	cases["rse.contains.ratio27.corner.fine"] = strings.Join(rows, "|")
+	return cases
 }
 
 func containsGrid(rr RRect) string {

@@ -619,11 +619,9 @@ func RRectLerp(a, b *RRect, t float64) *RRect {
 
 func (r RRect) String() string { return r.toString("RRect") }
 
-// RSuperellipse is an immutable rounded superellipse.
-//
-// ENGINE GAP: Dart's RSuperellipse.contains calls into the engine
-// (RSuperellipse::contains), which the prebuilt Impeller SDK does not
-// expose; Contains is not ported yet (see flutter_go/PLAN.md).
+// RSuperellipse is an immutable rounded superellipse. Its Contains is in
+// rsuperellipse_contains.go: a Go port of the engine's C++, because Dart
+// calls into the engine for it and the Impeller SDK doesn't expose it.
 type RSuperellipse struct{ rrectLike }
 
 var RSuperellipseZero = RSuperellipse{}

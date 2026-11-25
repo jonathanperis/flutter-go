@@ -8,11 +8,11 @@ the same name declares them. Members and parameters are not counted yet, so
 "exposed" is an upper bound on real parity. "Tested" means a Go test mentions
 the name.
 
-**Total: 74 / 2792 exposed (2.7%), 49 tested.**
+**Total: 74 / 2792 exposed (2.7%), 50 tested.**
 
 | Flutter library | Go package directory | Declarations | Exposed | Tested |
 |---|---|---:|---:|---:|
-| `dart:ui` | `engine/src/flutter/lib/ui/go` | 195 | 10 (5%) | 8 |
+| `dart:ui` | `engine/src/flutter/lib/ui/go` | 195 | 10 (5%) | 9 |
 | `foundation` | `packages/flutter/lib/src/foundation` | 137 | 0 (0%) | 0 |
 | `physics` | `packages/flutter/lib/src/physics` | 12 | 12 (100%) | 11 |
 | `scheduler` | `packages/flutter/lib/src/scheduler` | 16 | 0 (0%) | 0 |
@@ -28,7 +28,7 @@ the name.
 
 ## `dart:ui`
 
-**Exposed (10):** `Offset`, `OffsetBase` (untested), `RRect`, `RSTransform`, `RSuperellipse` (untested), `Radius`, `Rect`, `Size`, `clampDouble`, `lerpDouble`
+**Exposed (10):** `Offset`, `OffsetBase` (untested), `RRect`, `RSTransform`, `RSuperellipse`, `Radius`, `Rect`, `Size`, `clampDouble`, `lerpDouble`
 
 **Missing (185):** `AccessibilityFeatures`, `AppExitResponse`, `AppExitType`, `AppLifecycleState`, `BackdropFilterEngineLayer`, `BlendMode`, `BlurStyle`, `BoxHeightStyle`, `BoxWidthStyle`, `Brightness`, `CallbackHandle`, `Canvas`, `ChannelBuffers`, `ChannelCallback`, `CheckedState`, `Clip`, `ClipOp`, `ClipPathEngineLayer`, `ClipRRectEngineLayer`, `ClipRSuperellipseEngineLayer`, `ClipRectEngineLayer`, `Codec`, `Color`, `ColorFilter`, `ColorFilterEngineLayer`, `ColorSpace`, `DartPerformanceMode`, `DartPluginRegistrant`, `Display`, `DisplayCornerRadii`, `DisplayFeature`, `DisplayFeatureState`, `DisplayFeatureType`, `DrainChannelCallback`, `EngineLayer`, `ErrorCallback`, `FilterQuality`, `FlutterView`, `FontFeature`, `FontStyle`, `FontVariation`, `FontWeight`, `FragmentProgram`, `FragmentShader`, `FrameCallback`, `FrameData`, `FrameInfo`, `FramePhase`, `FrameTiming`, `Function`, `GestureSettings`, `GlyphInfo`, `Gradient`, `HitTestCallback`, `HitTestRequest`, `HitTestResponse`, `Hyphens`, `Image`, `ImageByteFormat`, `ImageDecoderCallback`, `ImageDescriptor`, `ImageEventCallback`, `ImageFilter`, `ImageFilterEngineLayer`, `ImageSamplerSlot`, `ImageShader`, `ImmutableBuffer`, `IsolateNameServer`, `KeyData`, `KeyDataCallback`, `KeyEventDeviceType`, `KeyEventType`, `LineMetrics`, `Locale`, `LocaleStringAttribute`, `MaskFilter`, `OffsetEngineLayer`, `OpacityEngineLayer`, `Paint`, `PaintingStyle`, `Paragraph`, `ParagraphBuilder`, `ParagraphConstraints`, `ParagraphStyle`, `Path`, `PathFillType`, `PathMetric`, `PathMetricIterator`, `PathMetrics`, `PathOperation`, `Picture`, `PictureEventCallback`, `PictureRasterizationException`, `PictureRecorder`, `PixelFormat`, `PlaceholderAlignment`, `PlatformDispatcher`, `PlatformMessageCallback`, `PlatformMessageResponseCallback`, `PluginUtilities`, `PointMode`, `PointerChange`, `PointerData`, `PointerDataPacket`, `PointerDataPacketCallback`, `PointerDataRespondCallback`, `PointerDeviceKind`, `PointerSignalKind`, `RootIsolateToken`, `Scene`, `SceneBuilder`, `SemanticsAction`, `SemanticsActionEvent`, `SemanticsActionEventCallback`, `SemanticsFlag`, `SemanticsFlags`, `SemanticsHitTestBehavior`, `SemanticsInputType`, `SemanticsRole`, `SemanticsUpdate`, `SemanticsUpdateBuilder`, `SemanticsValidationResult`, `Shader`, `ShaderMaskEngineLayer`, `Shadow`, `SingletonFlutterWindow`, `SpellOutStringAttribute`, `StringAttribute`, `StrokeCap`, `StrokeJoin`, `StrutStyle`, `SystemColor`, `SystemColorPalette`, `Tangent`, `TargetImageSize`, `TargetImageSizeCallback`, `TargetPixelFormat`, `TextAffinity`, `TextAlign`, `TextBaseline`, `TextBox`, `TextDecoration`, `TextDecorationStyle`, `TextDirection`, `TextHeightBehavior`, `TextLeadingDistribution`, `TextPosition`, `TextRange`, `TextStyle`, `TileMode`, `TimingsCallback`, `TransformEngineLayer`, `Tristate`, `UniformArray`, `UniformFloatSlot`, `UniformMat2Slot`, `UniformMat3Slot`, `UniformMat4Slot`, `UniformType`, `UniformVec2Slot`, `UniformVec3Slot`, `UniformVec4Slot`, `VertexMode`, `Vertices`, `ViewConstraints`, `ViewFocusChangeCallback`, `ViewFocusDirection`, `ViewFocusEvent`, `ViewFocusState`, `ViewPadding`, `VoidCallback`, `WindowPadding`, `channelBuffers`, `decodeImageFromList`, `decodeImageFromPixels`, `decodeImageFromPixelsSync`, `instantiateImageCodec`, `instantiateImageCodecFromBuffer`, `instantiateImageCodecWithSize`, `isRunningOnPlatformThread`, `kTextHeightNone`, `keepToString`, `loadFontFromList`, `runOnPlatformThread`, `window`
 

@@ -81,6 +81,26 @@ void main() {
         for (double y = 1.75; y <= 22.25; y += 0.5)
           <String>[for (double x = 0.75; x <= 11.25; x += 0.5) if (rr.contains(Offset(x, y))) '1' else '0'].join(),
       ].join('|'),
+      for (final MapEntry<String, RSuperellipse> e in <String, RSuperellipse>{
+        'uniform': RSuperellipse.fromLTRBXY(0, 0, 40, 30, 9, 9),
+        'elliptical': RSuperellipse.fromLTRBXY(0, 0, 40, 30, 6, 13),
+        'mixed': RSuperellipse.fromLTRBAndCorners(0, 0, 40, 30, topLeft: const Radius.circular(2),
+            topRight: const Radius.elliptical(15, 6), bottomRight: const Radius.circular(25), bottomLeft: Radius.zero),
+        'inverted': RSuperellipse.fromLTRBXY(40, 30, 0, 0, 7, 7),
+        'ratio27': RSuperellipse.fromLTRBXY(0, 0, 30, 30, 11, 11),
+        'ratio15': RSuperellipse.fromLTRBXY(0, 0, 40, 30, 2, 2),
+      }.entries)
+        'rse.contains.${e.key}': <String>[
+          for (double y = -0.75; y <= 30.75; y += 0.5)
+            <String>[for (double x = -0.75; x <= 40.75; x += 0.5) if (e.value.contains(Offset(x, y))) '1' else '0'].join(),
+        ].join('|'),
+      'rse.contains.ratio27.corner.fine': <String>[
+        for (int j = 0; j < 160; j++)
+          <String>[
+            for (int i = 0; i < 160; i++)
+              if (RSuperellipse.fromLTRBXY(0, 0, 30, 30, 11, 11).contains(Offset(22.025 + i * 0.05, 0.025 + j * 0.05))) '1' else '0',
+          ].join(),
+      ].join('|'),
       'rse.toString': '${RSuperellipse.fromRectAndCorners(r, topLeft: const Radius.circular(2))}',
       'rse.lerp': '${RSuperellipse.lerp(RSuperellipse.fromLTRBXY(0, 0, 10, 10, 2, 3), null, 0.5)}',
       'rstransform': <double>[
