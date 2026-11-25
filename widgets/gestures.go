@@ -20,9 +20,11 @@ const TouchSlop = 18.0
 //
 // Taps: like Flutter's gesture arena for nested tap recognizers, the deepest
 // GestureDetector under both the down and the up position wins.
-// Drags: a vertical move beyond TouchSlop scrolls the deepest list under the
-// down position and cancels the tap. As with DragStartBehavior.start, the
-// slop distance itself is not applied to the scroll.
+// Drags: the deepest list under the down position scrolls. If a tap
+// recognizer competes, the drag is accepted only after moving beyond
+// TouchSlop (cancelling the tap) and, as with DragStartBehavior.start,
+// begins where it was accepted; otherwise it is accepted on down. Release velocity comes from a port of
+// Flutter's VelocityTracker.
 type PointerRouter struct {
 	owner    *BuildOwner
 	down     []*r.RenderTapRegion
@@ -31,13 +33,14 @@ type PointerRouter struct {
 	start    r.Offset
 	last     r.Offset
 	dragging bool
-	// recent pointer positions during a drag, for release velocity
-	samples []sample
-	// Now returns the current time in seconds (for velocity estimation).
+	tracker  VelocityTracker
+	// Now returns the current pointer event's timestamp in seconds.
 	Now func() float64
+	// Clock returns the sampling clock in seconds (defaults to Now). Flutter
+	// separates the two: event timestamps for the fit, a clock to detect a
+	// pointer that stopped before lifting.
+	Clock func() float64
 }
-
-type sample struct{ t, y float64 }
 
 func NewPointerRouter(o *BuildOwner) *PointerRouter { return &PointerRouter{owner: o} }
 
@@ -59,8 +62,15 @@ func (p *PointerRouter) PointerDown(pos r.Offset) {
 	p.down, p.list = p.hit(pos)
 	p.isDown, p.dragging = true, false
 	p.start, p.last = pos, pos
-	p.samples = p.samples[:0]
+	p.tracker = VelocityTracker{}
 	p.record(pos)
+	// Gesture arena: with no tap recognizer competing, the drag is the only
+	// member and wins at once (Flutter resolves single-member arenas by
+	// default), so the whole movement scrolls. With a competitor, the drag
+	// must first move beyond TouchSlop.
+	if p.list != nil && len(p.down) == 0 {
+		p.dragging = true
+	}
 	if p.list != nil && p.list.Hold != nil && p.list.Hold() {
 		// Touching a scrolling list only stops it: like Flutter's
 		// IgnorePointer during scroll activities, items don't get the tap.
@@ -69,31 +79,33 @@ func (p *PointerRouter) PointerDown(pos r.Offset) {
 }
 
 func (p *PointerRouter) record(pos r.Offset) {
-	if p.Now != nil {
-		p.samples = append(p.samples, sample{p.Now(), pos.Y})
+	if p.Now == nil {
+		return
 	}
+	clock := p.Now
+	if p.Clock != nil {
+		clock = p.Clock
+	}
+	p.tracker.AddPosition(p.Now(), clock(), pos.Y)
 }
 
-// releaseVelocity estimates scroll velocity (px/s) from the last 100ms of
-// samples with a straight-line fit. Flutter's VelocityTracker uses a
-// least-squares polynomial; this simpler estimate is not Flutter-exact.
+// releaseVelocity is Flutter's VerticalDragGestureRecognizer.considerFling
+// followed by ScrollDragController.end: a fling needs more than
+// MinFlingVelocity and more than TouchSlop of distance in the samples; the
+// velocity is clamped to MaxFlingVelocity and negated (finger up = scroll down).
 func (p *PointerRouter) releaseVelocity() float64 {
-	if len(p.samples) < 2 {
+	if p.Now == nil {
 		return 0
 	}
-	last := p.samples[len(p.samples)-1]
-	first := last
-	for i := len(p.samples) - 1; i >= 0 && last.t-p.samples[i].t <= 0.1; i-- {
-		first = p.samples[i]
+	clock := p.Now
+	if p.Clock != nil {
+		clock = p.Clock
 	}
-	if last.t-first.t < 1e-3 {
+	vy, dy, ok := p.tracker.Estimate(clock())
+	if !ok || math.Abs(vy) <= MinFlingVelocity || math.Abs(dy) <= TouchSlop {
 		return 0
 	}
-	v := -(last.y - first.y) / (last.t - first.t) // finger up = content up = positive
-	if math.Abs(v) < MinFlingVelocity {
-		return 0
-	}
-	return math.Max(-MaxFlingVelocity, math.Min(MaxFlingVelocity, v))
+	return -math.Max(-MaxFlingVelocity, math.Min(MaxFlingVelocity, vy))
 }
 
 func (p *PointerRouter) PointerMove(pos r.Offset) {
@@ -106,15 +118,18 @@ func (p *PointerRouter) PointerMove(pos r.Offset) {
 			return
 		}
 		p.dragging = true
-		// Drag starts where the slop was exceeded.
-		p.last = r.Offset{X: pos.X, Y: p.start.Y + math.Copysign(TouchSlop, pos.Y-p.start.Y)}
+		// DragStartBehavior.start: the drag begins at the pointer position
+		// where it was accepted, so this move itself scrolls nothing.
+		p.last = pos
 	}
 	p.list.ScrollBy(p.last.Y - pos.Y)
 	p.last = pos
 }
 
 func (p *PointerRouter) PointerUp(pos r.Offset) {
-	p.PointerMove(pos)
+	if pos != p.last && p.isDown {
+		p.PointerMove(pos)
+	}
 	down, dragging, list := p.down, p.dragging, p.list
 	p.down, p.isDown, p.list, p.dragging = nil, false, nil, false
 	if dragging {

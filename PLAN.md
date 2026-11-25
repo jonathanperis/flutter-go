@@ -207,7 +207,7 @@ animations.
   flinging list only stops it, it does not tap the item underneath.**
   flutter-go now does the same. Flutter's extra frame to lift that
   `IgnorePointer` is allowed by the test rather than copied.
-- **Release velocity is not Flutter-exact yet.** flutter-go estimates it
+- **(Fixed in G3.) Release velocity was not Flutter-exact.** flutter-go estimates it
   with a straight line over the last 100 ms; Flutter's `VelocityTracker`
   uses a least-squares polynomial fit. The comparison therefore starts
   flings with fixed velocities (Flutter's `goBallistic`), and the gesture
@@ -329,4 +329,33 @@ accessibility. Tab focus traversal is not implemented.
   gave 2.3–3.2 ms. Single benchmark runs on this machine vary by ±30%.
 - **Scrolling** costs ~4 µs per frame (layout + compositing the root layer),
   up from ~1.4 µs without layers, still independent of item count.
+
+## G3 findings: drag velocity and the gesture arena (2026-11-25)
+
+- **Ported Flutter's `VelocityTracker` and `LeastSquaresSolver`**: 20-sample
+  ring buffer, 100 ms horizon, "pointer stopped" after 40 ms (measured on a
+  separate sampling clock, as Flutter's stopwatch is), quadratic
+  Gram–Schmidt fit, plus the vertical recognizer's fling rule (|v| > 50 px/s
+  *and* > 18 px covered by the samples, clamped to 8000 px/s).
+- **Ported flutter_test's `fling`** event by event (50 moves with synthetic
+  timestamps, a frame pumped per 16 ms of event time) and a timestamped
+  `DragTimed`, so both sides receive identical input.
+- **8 drag scenes match Flutter frame by frame** (≤ 3e-11 px): flings up
+  and down at several speeds, too slow to fling, a slow drag that fails the
+  minimum-distance rule, the 8000 px/s clamp, an accelerating drag, and a
+  list whose items compete for the tap. Five mutations each fail.
+- **The comparison exposed a wrong assumption from stage 7:** a drag on a
+  list whose items have no tap handlers scrolls the *full* distance. Flutter's
+  gesture arena resolves a single-member arena immediately, so the drag is
+  accepted on pointer-down; only when a tap competes does it wait for the
+  18 px slop, and then (DragStartBehavior.start) it starts where it was
+  accepted, not at start + 18 px. Both rules are now ported, and the
+  stage-7 unit test's expectation (`200 − 18`) was wrong; it is now 180.
+- **A scene that tested nothing:** the first "tappable items" scene used a
+  `SizedBox` child, which isn't hit-testable in either framework, so the
+  tap detector never joined the arena. Switching to `ColoredBox` made it
+  test the competing path (Flutter releases at 276 px = 300 − 24).
+- **A flaw in my own mutation harness:** one mutation left a variable
+  unused, the package didn't compile, and my filter (which looked only for
+  failing test lines) reported it as "not caught". Build failures now count.
 
