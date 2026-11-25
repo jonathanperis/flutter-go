@@ -501,3 +501,12 @@ The standing goal is now full API parity with Flutter 3.50.1's Dart layer
   root `README.md` can stay upstream's byte for byte.
 - Side effect to know about: upstream's `.claude/`, `.agents/` and
   `.gemini/` agent configuration is now live at the root.
+- **A bug in the sync script, found by running it end to end:** 56 upstream
+  files have spaces in their names (iOS golden PNGs), and the script split
+  `ls-tree` output on whitespace, so `--check` compared truncated paths on
+  both sides and couldn't see those files; a full re-sync then staged bogus
+  truncated paths. Now the path is split off only at the tab, the CRLF fix
+  restages just the blobs whose hash differs from upstream (a full sync
+  takes under a minute instead of many), and the script ends by verifying
+  the index against the tag. The committed tree was correct throughout;
+  only the check was blind.
