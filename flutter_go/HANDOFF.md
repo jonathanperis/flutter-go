@@ -15,14 +15,23 @@ Start here when continuing flutter-go in a new session.
   `./flutter_go/scripts/sync_upstream.sh --check`.
 - **Naming rules:** [docs/API_MAPPING.md](docs/API_MAPPING.md). Every
   divergence from Flutter's API gets listed there.
-- **Done:** P0 pin + upstream; `physics` fully ported. The original stages
-  0–10 and G1–G4 (see PLAN.md) are verified on 3.50.1.
-- **Next:** finish P0's split by library. `packages/flutter/lib/src/animation`
-  still holds scheduler code (port Flutter's `SchedulerBinding`/`Ticker` into
-  `packages/flutter/lib/src/scheduler`, on `flutter_go/async`), `widgets`
-  holds gestures code (`gestures.go`, `velocity.go`), `services` holds the
-  text-editing model under non-Flutter names, and `rendering` holds dart:ui
-  geometry. Then P1 (`ui` over Impeller).
+- **Done:** P0 pin, layout (upstream tree at the root, Go beside the Dart
+  it replaces) and `physics`; `flutter_go/async` (dart:async semantics);
+  dart:ui `math`, `lerp` and `geometry` (P1 started). Stages 0–10 and G1–G4
+  (see PLAN.md) are verified on 3.50.1. Parity: see flutter_go/docs/PARITY.md.
+- **Next, in order:**
+  1. `RSuperellipse.Contains`: port the engine's C++
+     (`engine/src/flutter/impeller/geometry/round_superellipse_param.cc`)
+     and the 7 skipped cases of `testing/dart/geometry_test.dart`.
+  2. Move `rendering`/`widgets` off their own Offset/Size/Rect onto `ui`.
+  3. foundation basics the scheduler needs (`BindingBase`, `FlutterError`
+     reporting, `ChangeNotifier`/`Listenable`), and a minimal
+     `ui.PlatformDispatcher` (frame scheduling, `AppLifecycleState`).
+  4. Port `SchedulerBinding`/`Ticker`/`TickerFuture` into
+     `packages/flutter/lib/src/scheduler` on `flutter_go/async`; move
+     `animation` onto it (it still holds the old scheduler).
+  5. Split `widgets` (gestures code) and `services` (text-editing model
+     under non-Flutter names) by library.
 
 ## Environment
 
