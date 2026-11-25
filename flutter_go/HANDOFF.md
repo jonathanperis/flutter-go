@@ -26,7 +26,12 @@ Start here when continuing flutter-go in a new session.
      BoxConstraints, EdgeInsets and Alignment still have flutter-go names:
      port them as `ui.Color`, `rendering.BoxConstraints`,
      `painting.EdgeInsets`/`painting.Alignment`.
-  3. foundation basics the scheduler needs (`BindingBase`, `FlutterError`
+  3. foundation: part 1 done (constants, object, platform, key,
+     basic_types, observer_list). Next: collections, bitfield, unicode,
+     print, serialization, stack_frame, persistent_hash_map, then
+     diagnostics + assertions (FlutterError.reportError) and binding. Also
+     port package:listen (ChangeNotifier...) and vector_math's Matrix4.
+     Then the rest of what the scheduler needs (`BindingBase`, `FlutterError`
      reporting, `ChangeNotifier`/`Listenable`), and a minimal
      `ui.PlatformDispatcher` (frame scheduling, `AppLifecycleState`).
   4. Port `SchedulerBinding`/`Ticker`/`TickerFuture` into

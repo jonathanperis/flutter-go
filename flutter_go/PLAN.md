@@ -592,3 +592,26 @@ The standing goal is now full API parity with Flutter 3.50.1's Dart layer
   ported).
 - `rendering.Color` is now dart:ui's `Color` (alias); the two unkeyed
   literals (different field order: RGBA vs ARGB) were rewritten as keyed.
+
+### foundation, part 1
+- Ported with Flutter's tests: constants (build tags for release/profile),
+  object (`objectRuntimeType`), platform (`TargetPlatform`,
+  `defaultTargetPlatform` from `runtime.GOOS`, android under
+  `FLUTTER_TEST` in debug, the debug override), key (`Key`, `LocalKey`,
+  `UniqueKey`, `ValueKey[T]`; Go `==` gives Dart's equality, including
+  "different type ⇒ different key"), basic_types (callback typedefs,
+  `CachingIterable` over `iter.Seq`, `Factory`, `lerpDuration`),
+  observer_list (`HashedObserverList` keeps Dart's insertion order, which a
+  Go map wouldn't). Partial: `FlutterError` (message only) and
+  `shortHash`/`describeIdentity` (Go has no identityHashCode; objects get a
+  stable id on first use).
+- Mutations: 6 caught; `lerpDuration` rounding was only caught after adding
+  half-microsecond cases (Flutter's tests never land on a fraction).
+- **Found: part of foundation's API lives in other packages.** At 3.50.1
+  `ChangeNotifier`, `Listenable`, `ValueListenable` and `ValueNotifier` come
+  from package:listen (re-exported), `Matrix4` from vector_math, and
+  `Characters` from characters. They are API a Flutter developer uses, so
+  they need their own items (apiparity doesn't count them yet).
+- **Design question for scheduler:** Dart's `Future` is an interface that
+  Flutter implements (`SynchronousFuture`, `TickerFuture`); `async.Future`
+  is a concrete struct. Resolve before porting those two.

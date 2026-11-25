@@ -86,8 +86,15 @@ literals of imported structs.
 | `Duration` | `time.Duration` |
 | `List<T>`, `Map<K,V>`, `Set<T>` | `[]T`, `map[K]V`, `map[T]struct{}` |
 | `VoidCallback`, `ValueChanged<T>` | `func()`, `func(T)` |
+| `Iterable<T>` | `iter.Seq[T]` (methods named `All()` return it) |
 | `Future<T>` | `*async.Future[T]`; `await f` is `f.Await()` inside `async.Async(func() T {...})` |
 | `Stream<T>` | `*async.Stream[T]` (not yet ported) |
+
+## Build modes
+
+`kReleaseMode` and `kProfileMode` come from build tags (`-tags
+flutter_release`, `-tags flutter_profile`); the default build is debug, as
+`flutter run` is.
 
 ## Known divergences
 
