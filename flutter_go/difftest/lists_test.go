@@ -29,7 +29,7 @@ func runListScene(t *testing.T, s ListScene) listResult {
 	for _, child := range list.Children() {
 		ro := child.RenderObject()
 		o, sz := r.GlobalOffset(ro), ro.Base().Size
-		items = append(items, [5]float64{float64(list.LazyIndex(child)), o.X, o.Y, sz.W, sz.H})
+		items = append(items, [5]float64{float64(list.LazyIndex(child)), o.Dx, o.Dy, sz.Width, sz.Height})
 	}
 	return listResult{c.Offset(), items}
 }

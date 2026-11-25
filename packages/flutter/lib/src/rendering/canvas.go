@@ -40,15 +40,17 @@ func (r *Recorder) add(f string, a ...any) { r.Ops = append(r.Ops, fmt.Sprintf(f
 func (r *Recorder) Save()                    { r.add("save") }
 func (r *Recorder) Restore()                 { r.add("restore") }
 func (r *Recorder) Translate(dx, dy float64) { r.add("translate(%g, %g)", dx, dy) }
-func (r *Recorder) ClipRect(x Rect)          { r.add("clipRect(%g, %g, %g, %g)", x.X, x.Y, x.W, x.H) }
+func (r *Recorder) ClipRect(x Rect) {
+	r.add("clipRect(%g, %g, %g, %g)", x.Left, x.Top, x.Width(), x.Height())
+}
 func (r *Recorder) DrawRect(x Rect, c Color) {
-	r.add("rect(%g, %g, %g, %g) %s", x.X, x.Y, x.W, x.H, hex(c))
+	r.add("rect(%g, %g, %g, %g) %s", x.Left, x.Top, x.Width(), x.Height(), hex(c))
 }
 func (r *Recorder) DrawRRect(x Rect, rad float64, c Color) {
-	r.add("rrect(%g, %g, %g, %g, r=%g) %s", x.X, x.Y, x.W, x.H, rad, hex(c))
+	r.add("rrect(%g, %g, %g, %g, r=%g) %s", x.Left, x.Top, x.Width(), x.Height(), rad, hex(c))
 }
 func (r *Recorder) DrawParagraph(p Paragraph, at Offset) {
-	r.add("text(%q at %g, %g)", p.Text(), at.X, at.Y)
+	r.add("text(%q at %g, %g)", p.Text(), at.Dx, at.Dy)
 }
 func (r *Recorder) String() string { return strings.Join(r.Ops, "\n") }
 
@@ -69,7 +71,7 @@ func (r *Recorder) DrawPicture(p Picture, at Offset) {
 	}
 	if at != (Offset{}) {
 		r.add("save")
-		r.add("translate(%g, %g)", at.X, at.Y)
+		r.add("translate(%g, %g)", at.Dx, at.Dy)
 	}
 	r.Ops = append(r.Ops, ops...)
 	if at != (Offset{}) {

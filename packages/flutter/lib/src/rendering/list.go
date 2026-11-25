@@ -2,6 +2,7 @@ package rendering
 
 import (
 	"fmt"
+	ui "github.com/jonathanperis/flutter-go/engine/src/flutter/lib/ui/go"
 	"math"
 )
 
@@ -106,10 +107,10 @@ func (r *RenderFixedExtentList) PerformLayout(c Constraints) Size {
 		panic(fmt.Sprintf("RenderFixedExtentList was given unbounded constraints %v; "+
 			"put it inside Expanded or a SizedBox (Flutter: \"Vertical viewport was given unbounded height\")", c))
 	}
-	size := Size{c.MaxW, c.MaxH}
-	r.maxScroll = math.Max(0, float64(r.itemCount)*r.itemExtent-size.H)
+	size := ui.NewSize(c.MaxW, c.MaxH)
+	r.maxScroll = math.Max(0, float64(r.itemCount)*r.itemExtent-size.Height)
 
-	first, last := r.indexRange(size.H)
+	first, last := r.indexRange(size.Height)
 	for i := range r.live {
 		if i < first || i > last {
 			delete(r.live, i)
@@ -128,20 +129,20 @@ func (r *RenderFixedExtentList) PerformLayout(c Constraints) Size {
 			r.live[i] = child
 		}
 		r.kids = append(r.kids, child)
-		Layout(child, Tight(Size{size.W, r.itemExtent}))
-		child.Base().Offset = Offset{0, float64(i)*r.itemExtent - r.offset}
+		Layout(child, Tight(ui.NewSize(size.Width, r.itemExtent)))
+		child.Base().Offset = ui.NewOffset(0, float64(i)*r.itemExtent-r.offset)
 	}
 	return size
 }
 
 func (r *RenderFixedExtentList) Paint(cv Canvas, offset Offset) {
 	cv.Save()
-	cv.ClipRect(RectFrom(offset, r.Size))
+	cv.ClipRect(offset.And(r.Size))
 	// Like RenderSliverMultiBoxAdaptor, paint only children that overlap
 	// the visible area; children in the cache extent are laid out, not painted.
 	for _, c := range r.kids {
-		y := c.Base().Offset.Y
-		if y+r.itemExtent > 0 && y < r.Size.H {
+		y := c.Base().Offset.Dy
+		if y+r.itemExtent > 0 && y < r.Size.Height {
 			PaintChild(cv, c, offset)
 		}
 	}
@@ -149,4 +150,4 @@ func (r *RenderFixedExtentList) Paint(cv Canvas, offset Offset) {
 }
 
 // ViewportExtent is the visible main-axis size.
-func (r *RenderFixedExtentList) ViewportExtent() float64 { return r.Size.H }
+func (r *RenderFixedExtentList) ViewportExtent() float64 { return r.Size.Height }

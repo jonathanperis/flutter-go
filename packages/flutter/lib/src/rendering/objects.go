@@ -1,5 +1,7 @@
 package rendering
 
+import ui "github.com/jonathanperis/flutter-go/engine/src/flutter/lib/ui/go"
+
 // Proxy-style objects: one optional child that gets the same constraints.
 
 func layoutProxy(child RenderBox, c Constraints) Size {
@@ -34,7 +36,7 @@ func (r *RenderDecoratedBox) PerformLayout(c Constraints) Size { return layoutPr
 func (r *RenderDecoratedBox) HitTestSelf(Offset) bool          { return true }
 
 func (r *RenderDecoratedBox) Paint(cv Canvas, offset Offset) {
-	rect := RectFrom(offset, r.Size)
+	rect := offset.And(r.Size)
 	if r.radius > 0 {
 		cv.DrawRRect(rect, r.radius, r.color)
 	} else {
@@ -148,17 +150,17 @@ func (r *RenderPositionedBox) PerformLayout(c Constraints) Size {
 		if shrinkH {
 			h = 0
 		}
-		return c.Constrain(Size{w, h})
+		return c.Constrain(ui.NewSize(w, h))
 	}
 	cs := Layout(r.child, c.Loosen())
 	w, h := Inf, Inf
 	if shrinkW {
-		w = cs.W * factor(r.widthFactor)
+		w = cs.Width * factor(r.widthFactor)
 	}
 	if shrinkH {
-		h = cs.H * factor(r.heightFactor)
+		h = cs.Height * factor(r.heightFactor)
 	}
-	size := c.Constrain(Size{w, h})
+	size := c.Constrain(ui.NewSize(w, h))
 	r.child.Base().Offset = r.alignment.Along(size, cs)
 	return size
 }
@@ -200,9 +202,9 @@ func NewView() *RenderView { return &RenderView{} }
 func (r *RenderView) PerformLayout(c Constraints) Size {
 	if r.child != nil {
 		r.child.Base().Offset = Offset{}
-		Layout(r.child, Tight(c.Constrain(Size{c.MaxW, c.MaxH})))
+		Layout(r.child, Tight(c.Constrain(ui.NewSize(c.MaxW, c.MaxH))))
 	}
-	return c.Constrain(Size{c.MaxW, c.MaxH})
+	return c.Constrain(ui.NewSize(c.MaxW, c.MaxH))
 }
 
 func (r *RenderView) Paint(cv Canvas, offset Offset) {

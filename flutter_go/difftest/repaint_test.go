@@ -3,6 +3,7 @@ package difftest
 import (
 	"encoding/json"
 	"fmt"
+	ui "github.com/jonathanperis/flutter-go/engine/src/flutter/lib/ui/go"
 	"os"
 	"reflect"
 	"testing"
@@ -19,7 +20,7 @@ type counter struct{ name string }
 func (c *counter) Paint(r.Canvas, r.Size) { paints[c.name]++ }
 
 func counted(name string, n *Notifier) Widget {
-	return CustomPaint{Painter: &counter{name}, Repaint: n, Size: r.Size{W: 10, H: 10}}
+	return CustomPaint{Painter: &counter{name}, Repaint: n, Size: ui.Size{Width: 10, Height: 10}}
 }
 
 func runRepaint(t *testing.T, w Widget, steps ...func()) []map[string]int {

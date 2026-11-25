@@ -1,5 +1,7 @@
 package rendering
 
+import ui "github.com/jonathanperis/flutter-go/engine/src/flutter/lib/ui/go"
+
 // Repaint boundaries and retained layers, after Flutter's PaintingContext,
 // OffsetLayer and PictureLayer.
 //
@@ -99,9 +101,9 @@ func (pc *paintingContext) state() (Offset, []Rect) {
 	for _, level := range pc.levels {
 		for _, o := range level {
 			if o.clip {
-				clips = append(clips, Rect{o.r.X + t.X, o.r.Y + t.Y, o.r.W, o.r.H})
+				clips = append(clips, ui.NewRectFromLTWH(o.r.Left+t.Dx, o.r.Top+t.Dy, o.r.Width(), o.r.Height()))
 			} else {
-				t = t.Add(Offset{o.dx, o.dy})
+				t = t.Add(ui.NewOffset(o.dx, o.dy))
 			}
 		}
 	}
@@ -193,7 +195,7 @@ func Composite(b RenderBox, cv Canvas, at Offset) int {
 		}
 		cv.Save()
 		for _, c := range it.clips {
-			cv.ClipRect(Rect{c.X + at.X, c.Y + at.Y, c.W, c.H})
+			cv.ClipRect(ui.NewRectFromLTWH(c.Left+at.Dx, c.Top+at.Dy, c.Width(), c.Height()))
 		}
 		repainted += Composite(it.child, cv, at.Add(it.at))
 		cv.Restore()

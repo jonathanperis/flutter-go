@@ -87,7 +87,7 @@ func (p *PointerRouter) record(pos r.Offset) {
 	if p.Clock != nil {
 		clock = p.Clock
 	}
-	p.tracker.AddPosition(p.Now(), clock(), pos.Y)
+	p.tracker.AddPosition(p.Now(), clock(), pos.Dy)
 }
 
 // releaseEstimate returns the finger's release velocity (px/s, positive =
@@ -114,7 +114,7 @@ func (p *PointerRouter) PointerMove(pos r.Offset) {
 	}
 	p.record(pos)
 	if !p.dragging {
-		if math.Abs(pos.Y-p.start.Y) <= TouchSlop {
+		if math.Abs(pos.Dy-p.start.Dy) <= TouchSlop {
 			return
 		}
 		p.dragging = true
@@ -125,9 +125,9 @@ func (p *PointerRouter) PointerMove(pos r.Offset) {
 		return
 	}
 	if p.list.DragUpdate != nil {
-		p.list.DragUpdate(pos.Y-p.last.Y, p.eventTime())
+		p.list.DragUpdate(pos.Dy-p.last.Dy, p.eventTime())
 	} else {
-		p.list.ScrollBy(p.last.Y - pos.Y)
+		p.list.ScrollBy(p.last.Dy - pos.Dy)
 	}
 	p.last = pos
 }

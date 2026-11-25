@@ -1,13 +1,14 @@
 package rendering
 
 import (
+	ui "github.com/jonathanperis/flutter-go/engine/src/flutter/lib/ui/go"
 	"strings"
 	"testing"
 )
 
 func f(v float64) *float64 { return &v }
 
-func sized(w, h float64) *RenderConstrainedBox { return NewConstrainedBox(Tight(Size{w, h})) }
+func sized(w, h float64) *RenderConstrainedBox { return NewConstrainedBox(Tight(ui.NewSize(w, h))) }
 
 func withChild[T interface {
 	RenderBox
@@ -28,11 +29,11 @@ func expanded(flexFactor int, r RenderBox) RenderBox {
 	return r
 }
 
-var screen = Tight(Size{800, 600})
+var screen = Tight(ui.NewSize(800, 600))
 
 func assertRect(t *testing.T, name string, r RenderBox, want Rect) {
 	t.Helper()
-	got := RectFrom(GlobalOffset(r), r.Base().Size)
+	got := GlobalOffset(r).And(r.Base().Size)
 	if got != want {
 		t.Errorf("%s: got %+v, want %+v", name, got, want)
 	}
@@ -44,9 +45,9 @@ func TestCenterPadding(t *testing.T) {
 	center := withChild(NewPositionedBox(Center, nil, nil), pad)
 	Layout(center, screen)
 
-	assertRect(t, "center", center, Rect{0, 0, 800, 600})
-	assertRect(t, "padding", pad, Rect{340, 265, 120, 70})
-	assertRect(t, "leaf", leaf, Rect{350, 275, 100, 50})
+	assertRect(t, "center", center, ui.NewRectFromLTWH(0, 0, 800, 600))
+	assertRect(t, "padding", pad, ui.NewRectFromLTWH(340, 265, 120, 70))
+	assertRect(t, "leaf", leaf, ui.NewRectFromLTWH(350, 275, 100, 50))
 }
 
 func TestAlignFactors(t *testing.T) {
@@ -54,17 +55,17 @@ func TestAlignFactors(t *testing.T) {
 	align := withChild(NewPositionedBox(BottomRight, f(2), f(1.5)), leaf)
 	root := withChild(NewPositionedBox(TopLeft, nil, nil), align)
 	Layout(root, screen)
-	assertRect(t, "align", align, Rect{0, 0, 200, 60})
-	assertRect(t, "leaf", leaf, Rect{100, 20, 100, 40})
+	assertRect(t, "align", align, ui.NewRectFromLTWH(0, 0, 200, 60))
+	assertRect(t, "leaf", leaf, ui.NewRectFromLTWH(100, 20, 100, 40))
 }
 
 func TestRowExpandedRatios(t *testing.T) {
 	a, b, c := sized(100, 20), NewConstrainedBox(Constraints{0, Inf, 0, Inf}), NewConstrainedBox(Constraints{0, Inf, 0, Inf})
 	row := flex(Horizontal, MainStart, CrossStart, MainMax, a, expanded(1, b), expanded(3, c))
 	Layout(row, screen)
-	assertRect(t, "fixed", a, Rect{0, 0, 100, 20})
-	assertRect(t, "flex1", b, Rect{100, 0, 175, 0})
-	assertRect(t, "flex3", c, Rect{275, 0, 525, 0})
+	assertRect(t, "fixed", a, ui.NewRectFromLTWH(0, 0, 100, 20))
+	assertRect(t, "flex1", b, ui.NewRectFromLTWH(100, 0, 175, 0))
+	assertRect(t, "flex3", c, ui.NewRectFromLTWH(275, 0, 525, 0))
 }
 
 func TestColumnSpaceBetweenStretch(t *testing.T) {
@@ -72,8 +73,8 @@ func TestColumnSpaceBetweenStretch(t *testing.T) {
 	col := flex(Vertical, MainSpaceBetween, CrossStretch, MainMax, a, b)
 	Layout(col, screen)
 	// Stretch forces width 800; the tight SizedBox(50) loses to the tight cross constraint.
-	assertRect(t, "a", a, Rect{0, 0, 800, 100})
-	assertRect(t, "b", b, Rect{0, 500, 800, 100})
+	assertRect(t, "a", a, ui.NewRectFromLTWH(0, 0, 800, 100))
+	assertRect(t, "b", b, ui.NewRectFromLTWH(0, 500, 800, 100))
 }
 
 func TestRowMinSizeCentered(t *testing.T) {
@@ -81,9 +82,9 @@ func TestRowMinSizeCentered(t *testing.T) {
 	row := flex(Horizontal, MainStart, CrossCenter, MainMin, a, b)
 	center := withChild(NewPositionedBox(Center, nil, nil), row)
 	Layout(center, screen)
-	assertRect(t, "row", row, Rect{360, 280, 80, 40})
-	assertRect(t, "a", a, Rect{360, 295, 30, 10})
-	assertRect(t, "b", b, Rect{390, 280, 50, 40})
+	assertRect(t, "row", row, ui.NewRectFromLTWH(360, 280, 80, 40))
+	assertRect(t, "a", a, ui.NewRectFromLTWH(360, 295, 30, 10))
+	assertRect(t, "b", b, ui.NewRectFromLTWH(390, 280, 50, 40))
 }
 
 func TestParagraphWrapsWithTestFont(t *testing.T) {
@@ -91,7 +92,7 @@ func TestParagraphWrapsWithTestFont(t *testing.T) {
 	box := withChild(NewConstrainedBox(Constraints{0, 60, 0, Inf}), p)
 	Layout(withChild(NewPositionedBox(TopLeft, nil, nil), box), screen)
 	// 11 glyphs × 10px = 110px unwrapped; at 60px wide that's 6 per line → 2 lines.
-	if got := p.Base().Size; got != (Size{60, 20}) {
+	if got := p.Base().Size; got != (ui.NewSize(60, 20)) {
 		t.Errorf("size = %+v", got)
 	}
 }
@@ -120,11 +121,11 @@ func TestHitTestDeepestFirst(t *testing.T) {
 	root := withChild(NewPositionedBox(Center, nil, nil), tap)
 	Layout(root, screen)
 
-	path := HitTest(root, Offset{400, 300})
+	path := HitTest(root, ui.NewOffset(400, 300))
 	if len(path) != 4 || path[0] != RenderBox(leaf) || path[2] != RenderBox(tap) {
 		t.Fatalf("unexpected path %T", path)
 	}
-	if HitTest(root, Offset{10, 10}) != nil {
+	if HitTest(root, ui.NewOffset(10, 10)) != nil {
 		t.Fatal("miss outside the box should not hit (Align is not hit itself)")
 	}
 }

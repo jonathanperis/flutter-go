@@ -69,7 +69,7 @@ func TestKeysMoveStateWithReorderedChildren(t *testing.T) {
 		t.Fatalf("unexpected lifecycle: %v", log)
 	}
 	// Render children follow the new order: y above x.
-	if tester.Rect(flutter_test.Text("y")).Y >= tester.Rect(flutter_test.Text("x")).Y {
+	if tester.Rect(flutter_test.Text("y")).Top >= tester.Rect(flutter_test.Text("x")).Top {
 		t.Fatal("render order did not follow reordered widgets")
 	}
 }
@@ -82,7 +82,7 @@ func TestExpandedParentDataReachesRenderObject(t *testing.T) {
 		Expanded{Flex: 2, Child: ColoredBox{Color: r.RGB(0x00ff00)}},
 	}})
 	boxes := tester.FindAll(flutter_test.ByType[ColoredBox]())
-	w := func(i int) float64 { return boxes[i].RenderObject().Base().Size.W }
+	w := func(i int) float64 { return boxes[i].RenderObject().Base().Size.Width }
 	if w(0) != 200 || w(1) != 400 {
 		t.Fatalf("expanded widths = %v, %v; want 200, 400", w(0), w(1))
 	}

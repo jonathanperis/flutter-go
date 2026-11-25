@@ -6,6 +6,7 @@ package perf
 
 import (
 	"fmt"
+	ui "github.com/jonathanperis/flutter-go/engine/src/flutter/lib/ui/go"
 	"os"
 	"runtime"
 	"runtime/debug"
@@ -100,7 +101,7 @@ func (h *harness) elements() int {
 // (or a no-op canvas, to separate framework cost from cgo cost).
 func (h *harness) frame(useImpeller bool) {
 	h.state.SetState(func() { h.state.tick++ })
-	size := r.Size{W: 800, H: 600}
+	size := ui.Size{Width: 800, Height: 600}
 	if !useImpeller {
 		h.owner.DrawFrame(size, nopCanvas{})
 		return
@@ -185,7 +186,7 @@ func BenchmarkScrollFrame(b *testing.B) {
 				ItemBuilder: func(_ *Element, i int) Widget {
 					return ColoredBox{Color: r.RGB(0xffffff), Child: Text{Text: fmt.Sprint("Row ", i)}}
 				}})
-			size := r.Size{W: 800, H: 600}
+			size := ui.Size{Width: 800, Height: 600}
 			owner.DrawFrame(size, nopCanvas{})
 			b.ReportAllocs()
 			b.ResetTimer()

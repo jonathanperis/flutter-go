@@ -1,6 +1,7 @@
 package rendering
 
 import (
+	ui "github.com/jonathanperis/flutter-go/engine/src/flutter/lib/ui/go"
 	"math"
 
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/services"
@@ -59,16 +60,16 @@ func (r *RenderEditable) PerformLayout(c Constraints) Size {
 	if w == Inf {
 		w = r.para.MaxIntrinsicWidth() + CursorWidth
 	}
-	size := c.Constrain(Size{w, r.lineHeight})
+	size := c.Constrain(ui.NewSize(w, r.lineHeight))
 	// Keep the caret (selection extent) visible.
 	caret := r.para.CaretX(r.value.Selection.Extent)
-	if caret-r.scrollX > size.W-CursorWidth {
-		r.scrollX = caret - size.W + CursorWidth
+	if caret-r.scrollX > size.Width-CursorWidth {
+		r.scrollX = caret - size.Width + CursorWidth
 	}
 	if caret < r.scrollX {
 		r.scrollX = caret
 	}
-	r.scrollX = math.Max(0, math.Min(r.scrollX, math.Max(0, r.para.MaxIntrinsicWidth()+CursorWidth-size.W)))
+	r.scrollX = math.Max(0, math.Min(r.scrollX, math.Max(0, r.para.MaxIntrinsicWidth()+CursorWidth-size.Width)))
 	return size
 }
 
@@ -77,22 +78,22 @@ func (r *RenderEditable) OffsetAt(local Offset) int {
 	if r.para == nil {
 		return 0
 	}
-	return r.para.OffsetAtX(local.X + r.scrollX)
+	return r.para.OffsetAtX(local.Dx + r.scrollX)
 }
 
 func (r *RenderEditable) Paint(cv Canvas, offset Offset) {
 	cv.Save()
-	cv.ClipRect(RectFrom(offset, r.Size))
-	origin := Offset{offset.X - r.scrollX, offset.Y}
+	cv.ClipRect(offset.And(r.Size))
+	origin := ui.NewOffset(offset.Dx-r.scrollX, offset.Dy)
 	sel := r.value.Selection
 	if r.focused && !sel.IsCollapsed() {
 		x0, x1 := r.para.CaretX(sel.Start()), r.para.CaretX(sel.End())
-		cv.DrawRect(Rect{origin.X + x0, origin.Y, x1 - x0, r.lineHeight}, r.SelectionColor)
+		cv.DrawRect(ui.NewRectFromLTWH(origin.Dx+x0, origin.Dy, x1-x0, r.lineHeight), r.SelectionColor)
 	}
 	cv.DrawParagraph(r.para, origin)
 	if r.focused && r.caretVisible && sel.IsCollapsed() {
 		x := r.para.CaretX(sel.Extent)
-		cv.DrawRect(Rect{origin.X + x, origin.Y, CursorWidth, r.lineHeight}, r.CaretColor)
+		cv.DrawRect(ui.NewRectFromLTWH(origin.Dx+x, origin.Dy, CursorWidth, r.lineHeight), r.CaretColor)
 	}
 	cv.Restore()
 }

@@ -550,3 +550,11 @@ The standing goal is now full API parity with Flutter 3.50.1's Dart layer
   are equivalent or below what any grid can resolve (the all-corners-same
   fast path, `seN < 2` where `seN` is 0 or ≥ 2, and `R` rounded to float
   instead of double, a ~1e-6 px shift).
+- **rendering and widgets now use dart:ui's Offset, Size and Rect.** The
+  old types had other field names and a different Rect (left, top, width,
+  height instead of Flutter's left, top, right, bottom). Fields were renamed
+  type-aware with `gopls rename` (Alignment also has X/Y fields, so text
+  replacement wasn't safe), `RectFrom(o, s)` became `o.And(s)` (Dart's
+  `offset & size`), and literals became constructors. All tests and
+  difftests pass unchanged. `rendering.Offset/Size/Rect` remain as aliases
+  for now (like Dart's re-export); remove them once callers import `ui`.

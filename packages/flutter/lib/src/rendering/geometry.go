@@ -6,6 +6,8 @@ package rendering
 import (
 	"fmt"
 	"math"
+
+	ui "github.com/jonathanperis/flutter-go/engine/src/flutter/lib/ui/go"
 )
 
 // Inf is an unbounded extent (Flutter's double.infinity).
@@ -13,18 +15,13 @@ var Inf = math.Inf(1)
 
 const epsilon = 1e-9
 
-type Offset struct{ X, Y float64 }
-
-func (o Offset) Add(p Offset) Offset { return Offset{o.X + p.X, o.Y + p.Y} }
-func (o Offset) Sub(p Offset) Offset { return Offset{o.X - p.X, o.Y - p.Y} }
-
-type Size struct{ W, H float64 }
-
-func (s Size) Contains(p Offset) bool { return p.X >= 0 && p.X < s.W && p.Y >= 0 && p.Y < s.H }
-
-type Rect struct{ X, Y, W, H float64 }
-
-func RectFrom(o Offset, s Size) Rect { return Rect{o.X, o.Y, s.W, s.H} }
+// Offset, Size and Rect are dart:ui's (rendering re-exports them in Flutter).
+// The aliases are transitional: callers should use the ui types.
+type (
+	Offset = ui.Offset
+	Size   = ui.Size
+	Rect   = ui.Rect
+)
 
 // Color is straight (non-premultiplied) RGBA in [0,1].
 type Color struct{ R, G, B, A float64 }
@@ -37,8 +34,8 @@ func RGB(hex uint32) Color {
 // Constraints are Flutter's BoxConstraints.
 type Constraints struct{ MinW, MaxW, MinH, MaxH float64 }
 
-func Tight(s Size) Constraints { return Constraints{s.W, s.W, s.H, s.H} }
-func Loose(s Size) Constraints { return Constraints{0, s.W, 0, s.H} }
+func Tight(s Size) Constraints { return Constraints{s.Width, s.Width, s.Height, s.Height} }
+func Loose(s Size) Constraints { return Constraints{0, s.Width, 0, s.Height} }
 
 func (c Constraints) String() string {
 	return fmt.Sprintf("BoxConstraints(%g<=w<=%g, %g<=h<=%g)", c.MinW, c.MaxW, c.MinH, c.MaxH)
@@ -51,12 +48,12 @@ func clamp(v, lo, hi float64) float64 { return math.Max(lo, math.Min(hi, v)) }
 func (c Constraints) ConstrainW(w float64) float64 { return clamp(w, c.MinW, c.MaxW) }
 func (c Constraints) ConstrainH(h float64) float64 { return clamp(h, c.MinH, c.MaxH) }
 func (c Constraints) Constrain(s Size) Size {
-	return Size{c.ConstrainW(s.W), c.ConstrainH(s.H)}
+	return ui.NewSize(c.ConstrainW(s.Width), c.ConstrainH(s.Height))
 }
-func (c Constraints) Smallest() Size { return Size{c.ConstrainW(0), c.ConstrainH(0)} }
+func (c Constraints) Smallest() Size { return ui.NewSize(c.ConstrainW(0), c.ConstrainH(0)) }
 
 func (c Constraints) IsSatisfiedBy(s Size) bool {
-	return s.W >= c.MinW-1e-6 && s.W <= c.MaxW+1e-6 && s.H >= c.MinH-1e-6 && s.H <= c.MaxH+1e-6
+	return s.Width >= c.MinW-1e-6 && s.Width <= c.MaxW+1e-6 && s.Height >= c.MinH-1e-6 && s.Height <= c.MaxH+1e-6
 }
 
 // Enforce clamps c into the range allowed by outer (Flutter's enforce).
@@ -79,8 +76,10 @@ type EdgeInsets struct{ Left, Top, Right, Bottom float64 }
 func All(v float64) EdgeInsets           { return EdgeInsets{v, v, v, v} }
 func Symmetric(h, v float64) EdgeInsets  { return EdgeInsets{h, v, h, v} }
 func LTRB(l, t, r, b float64) EdgeInsets { return EdgeInsets{l, t, r, b} }
-func (e EdgeInsets) TopLeft() Offset     { return Offset{e.Left, e.Top} }
-func (e EdgeInsets) Inflate(s Size) Size { return Size{s.W + e.Left + e.Right, s.H + e.Top + e.Bottom} }
+func (e EdgeInsets) TopLeft() Offset     { return ui.NewOffset(e.Left, e.Top) }
+func (e EdgeInsets) Inflate(s Size) Size {
+	return ui.NewSize(s.Width+e.Left+e.Right, s.Height+e.Top+e.Bottom)
+}
 
 // Alignment is Flutter's Alignment: (-1,-1) top-left, (0,0) center, (1,1)
 // bottom-right. The zero value is center, which is also Flutter's default.
@@ -99,6 +98,6 @@ var (
 
 // Along returns where a child of size child sits inside parent.
 func (a Alignment) Along(parent, child Size) Offset {
-	dx, dy := parent.W-child.W, parent.H-child.H
-	return Offset{dx * (a.X + 1) / 2, dy * (a.Y + 1) / 2}
+	dx, dy := parent.Width-child.Width, parent.Height-child.Height
+	return ui.NewOffset(dx*(a.X+1)/2, dy*(a.Y+1)/2)
 }

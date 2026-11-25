@@ -1,6 +1,7 @@
 package rendering
 
 import (
+	ui "github.com/jonathanperis/flutter-go/engine/src/flutter/lib/ui/go"
 	"math"
 	"strings"
 	"unicode/utf8"
@@ -154,7 +155,7 @@ func (r *RenderParagraph) PerformLayout(c Constraints) Size {
 	}
 	r.para = textEngine.Layout(r.text, r.style, c.MaxW)
 	// Flutter's TextWidthBasis.parent: unwrapped width clamped to constraints.
-	return c.Constrain(Size{r.para.MaxIntrinsicWidth(), r.para.Height()})
+	return c.Constrain(ui.NewSize(r.para.MaxIntrinsicWidth(), r.para.Height()))
 }
 
 func (r *RenderParagraph) Paint(cv Canvas, offset Offset) { cv.DrawParagraph(r.para, offset) }

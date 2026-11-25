@@ -2,6 +2,7 @@
 package app
 
 import (
+	ui "github.com/jonathanperis/flutter-go/engine/src/flutter/lib/ui/go"
 	"log"
 	"runtime"
 	"time"
@@ -105,7 +106,7 @@ func Run(root widgets.Widget, o Options) error {
 	router.Now = func() float64 { return time.Since(epoch).Seconds() }
 	owner.DevicePixelRatio = float64(layer.Scale())
 	ww, wh := win.GetSize()
-	owner.SetViewSize(r.Size{W: float64(ww), H: float64(wh)})
+	owner.SetViewSize(ui.Size{Width: float64(ww), Height: float64(wh)})
 	owner.RunApp(root)
 
 	// GLFW reports cursor positions in logical points, which is what layout uses.
@@ -114,7 +115,7 @@ func Run(root widgets.Widget, o Options) error {
 			return
 		}
 		x, y := w.GetCursorPos()
-		pos := r.Offset{X: x, Y: y}
+		pos := ui.Offset{Dx: x, Dy: y}
 		if a == glfw.Press {
 			router.PointerDown(pos)
 		} else if a == glfw.Release {
@@ -123,14 +124,14 @@ func Run(root widgets.Widget, o Options) error {
 	})
 	win.SetCursorPosCallback(func(w *glfw.Window, x, y float64) {
 		if w.GetMouseButton(glfw.MouseButtonLeft) == glfw.Press {
-			router.PointerMove(r.Offset{X: x, Y: y})
+			router.PointerMove(ui.Offset{Dx: x, Dy: y})
 		}
 	})
 	// Wheel/trackpad: GLFW reports lines (or fine trackpad deltas); positive y
 	// means "scroll up", i.e. move content down.
 	win.SetScrollCallback(func(w *glfw.Window, _, yoff float64) {
 		x, y := w.GetCursorPos()
-		router.Scroll(r.Offset{X: x, Y: y}, -yoff*WheelPixelsPerLine)
+		router.Scroll(ui.Offset{Dx: x, Dy: y}, -yoff*WheelPixelsPerLine)
 	})
 	win.SetSizeCallback(func(*glfw.Window, int, int) { needsFrame = true })
 	// The window system asks for a redraw when the window is first shown,
@@ -148,7 +149,7 @@ func Run(root widgets.Widget, o Options) error {
 			scale := layer.Scale()
 			b := impeller.NewDisplayListBuilder()
 			b.Scale(scale, scale)
-			owner.DrawFrameAt(start.Sub(epoch), r.Size{W: float64(w), H: float64(h)}, &impellerCanvas{b, paint})
+			owner.DrawFrameAt(start.Sub(epoch), ui.Size{Width: float64(w), Height: float64(h)}, &impellerCanvas{b, paint})
 			dl := b.Build()
 			b.Release()
 			cpu := time.Since(start)
@@ -162,7 +163,7 @@ func Run(root widgets.Widget, o Options) error {
 				o.OnFrame(frames, cpu)
 			}
 			if o.InjectScroll != 0 {
-				router.Scroll(r.Offset{X: float64(w) / 2, Y: float64(h) / 2}, o.InjectScroll)
+				router.Scroll(ui.Offset{Dx: float64(w) / 2, Dy: float64(h) / 2}, o.InjectScroll)
 				o.InjectScroll = 0
 			}
 			if o.InjectText != "" {
@@ -171,7 +172,7 @@ func Run(root widgets.Widget, o Options) error {
 			}
 			if o.InjectTaps > 0 {
 				o.InjectTaps--
-				pos := r.Offset{X: o.InjectTapAt[0], Y: o.InjectTapAt[1]}
+				pos := ui.Offset{Dx: o.InjectTapAt[0], Dy: o.InjectTapAt[1]}
 				router.PointerDown(pos)
 				router.PointerUp(pos)
 			}

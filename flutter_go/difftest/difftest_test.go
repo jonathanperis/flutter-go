@@ -23,7 +23,7 @@ func layout(t *testing.T, name string) [][5]float64 {
 	var out [][5]float64
 	r.Walk(root, func(b r.RenderBox, depth int) {
 		o, s := r.GlobalOffset(b), b.Base().Size
-		out = append(out, [5]float64{float64(depth), o.X, o.Y, s.W, s.H})
+		out = append(out, [5]float64{float64(depth), o.Dx, o.Dy, s.Width, s.Height})
 	})
 	return out
 }

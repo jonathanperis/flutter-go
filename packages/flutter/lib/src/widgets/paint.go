@@ -82,7 +82,7 @@ func (c *renderCustomPaint) PerformLayout(cs r.Constraints) r.Size {
 func (c *renderCustomPaint) Paint(cv r.Canvas, offset r.Offset) {
 	if c.painter != nil {
 		cv.Save()
-		cv.Translate(offset.X, offset.Y)
+		cv.Translate(offset.Dx, offset.Dy)
 		c.painter.Paint(cv, c.Base().Size)
 		cv.Restore()
 	}

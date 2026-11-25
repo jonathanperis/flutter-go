@@ -28,7 +28,7 @@ func color(c r.Color) impeller.Color {
 }
 
 func rect(x r.Rect) impeller.Rect {
-	return impeller.Rect{X: float32(x.X), Y: float32(x.Y), W: float32(x.W), H: float32(x.H)}
+	return impeller.Rect{X: float32(x.Left), Y: float32(x.Top), W: float32(x.Width()), H: float32(x.Height())}
 }
 
 func (c *impellerCanvas) Save()                    { c.b.Save() }
@@ -65,13 +65,13 @@ func (c *impellerCanvas) NewRecording() r.Recording {
 
 func (c *impellerCanvas) DrawPicture(p r.Picture, at r.Offset) {
 	c.b.Save()
-	c.b.Translate(float32(at.X), float32(at.Y))
+	c.b.Translate(float32(at.Dx), float32(at.Dy))
 	c.b.DrawDisplayList(p.(*impeller.DisplayList), 1)
 	c.b.Restore()
 }
 
 func (c *impellerCanvas) DrawParagraph(p r.Paragraph, at r.Offset) {
-	c.b.DrawParagraph(p.(*paragraph).p, float32(at.X), float32(at.Y))
+	c.b.DrawParagraph(p.(*paragraph).p, float32(at.Dx), float32(at.Dy))
 }
 
 // impellerText implements rendering.TextEngine with Impeller's typography.

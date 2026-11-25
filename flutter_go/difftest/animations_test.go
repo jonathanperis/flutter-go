@@ -32,7 +32,7 @@ func sampleBox(t *flutter_test.Tester) []float64 {
 			color = cb.Color
 		}
 	})
-	return []float64{size.W, size.H, color.R, color.G, color.B, color.A}
+	return []float64{size.Width, size.Height, color.R, color.G, color.B, color.A}
 }
 
 var animScenes = map[string]func(t *testing.T) [][]float64{

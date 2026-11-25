@@ -68,8 +68,8 @@ func TestListClampsToEnd(t *testing.T) {
 	if c.Offset() != 100*50-600 || c.MaxScrollExtent() != 4400 {
 		t.Fatalf("offset %v max %v", c.Offset(), c.MaxScrollExtent())
 	}
-	if got := tester.Rect(flutter_test.Text(itemText(99))); got.Y != 550 {
-		t.Fatalf("last item at y=%v, want 550", got.Y)
+	if got := tester.Rect(flutter_test.Text(itemText(99))); got.Top != 550 {
+		t.Fatalf("last item at y=%v, want 550", got.Top)
 	}
 }
 

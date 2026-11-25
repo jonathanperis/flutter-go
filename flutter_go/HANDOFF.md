@@ -20,10 +20,12 @@ Start here when continuing flutter-go in a new session.
   dart:ui `math`, `lerp` and `geometry` (P1 started). Stages 0–10 and G1–G4
   (see PLAN.md) are verified on 3.50.1. Parity: see flutter_go/docs/PARITY.md.
 - **Next, in order:**
-  1. `RSuperellipse.Contains`: port the engine's C++
-     (`engine/src/flutter/impeller/geometry/round_superellipse_param.cc`)
-     and the 7 skipped cases of `testing/dart/geometry_test.dart`.
-  2. Move `rendering`/`widgets` off their own Offset/Size/Rect onto `ui`.
+  1. Done: `RSuperellipse.Contains` (engine C++ ported to Go).
+  2. Done: `rendering`/`widgets` use `ui.Offset/Size/Rect` (aliases left in
+     `rendering/geometry.go`; switch callers to `ui` and drop them). Color,
+     BoxConstraints, EdgeInsets and Alignment still have flutter-go names:
+     port them as `ui.Color`, `rendering.BoxConstraints`,
+     `painting.EdgeInsets`/`painting.Alignment`.
   3. foundation basics the scheduler needs (`BindingBase`, `FlutterError`
      reporting, `ChangeNotifier`/`Listenable`), and a minimal
      `ui.PlatformDispatcher` (frame scheduling, `AppLifecycleState`).

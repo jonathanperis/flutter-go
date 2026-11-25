@@ -44,7 +44,7 @@ func TestButtonGeometry(t *testing.T) {
 	tester.PumpWidget(CounterApp{Title: "flutter-go"})
 	got := tester.Rect(flutter_test.ByType[IncrementButton]())
 	// 56×56 with 24px padding from the bottom-right of 800×600.
-	if got.X != 720 || got.Y != 520 || got.W != 56 || got.H != 56 {
+	if got.Left != 720 || got.Top != 520 || got.Width() != 56 || got.Height() != 56 {
 		t.Fatalf("button rect = %+v", got)
 	}
 }

@@ -1,6 +1,9 @@
 package rendering
 
-import "math"
+import (
+	ui "github.com/jonathanperis/flutter-go/engine/src/flutter/lib/ui/go"
+	"math"
+)
 
 type Axis int
 
@@ -72,23 +75,23 @@ func (r *RenderFlex) Set(d Axis, main MainAxisAlignment, cross CrossAxisAlignmen
 // Axis helpers: work in (main, cross) space and convert at the edges.
 func (r *RenderFlex) mc(s Size) (float64, float64) {
 	if r.direction == Horizontal {
-		return s.W, s.H
+		return s.Width, s.Height
 	}
-	return s.H, s.W
+	return s.Height, s.Width
 }
 
 func (r *RenderFlex) size(main, cross float64) Size {
 	if r.direction == Horizontal {
-		return Size{main, cross}
+		return ui.NewSize(main, cross)
 	}
-	return Size{cross, main}
+	return ui.NewSize(cross, main)
 }
 
 func (r *RenderFlex) offset(main, cross float64) Offset {
 	if r.direction == Horizontal {
-		return Offset{main, cross}
+		return ui.NewOffset(main, cross)
 	}
-	return Offset{cross, main}
+	return ui.NewOffset(cross, main)
 }
 
 func (r *RenderFlex) childConstraints(minMain, maxMain, maxCross float64) Constraints {
@@ -214,7 +217,7 @@ func (r *RenderFlex) Paint(cv Canvas, offset Offset) {
 	overflow := used > m+epsilon
 	if overflow {
 		cv.Save()
-		cv.ClipRect(RectFrom(offset, r.Size))
+		cv.ClipRect(offset.And(r.Size))
 	}
 	for _, c := range r.children {
 		PaintChild(cv, c, offset)
