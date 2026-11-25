@@ -1,54 +1,128 @@
-# flutter-go
+<a href="https://flutter.dev/">
+  <h1 align="center">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://docs.flutter.dev/logo_dark.png">
+      <img alt="Flutter" src="https://docs.flutter.dev/logo.png">
+    </picture>
+  </h1>
+</a>
 
-An experiment: Flutter's architecture (widgets → elements → render objects)
-written in Go, rendered by Flutter's own renderer, **Impeller**, through its
-[standalone C API](https://github.com/flutter/flutter/tree/master/engine/src/flutter/impeller/toolkit/interop).
+[![Flutter CI Status](https://flutter-dashboard.appspot.com/api/public/build-status-badge?repo=flutter)](https://flutter-dashboard.appspot.com/#/build?repo=flutter)
+[![Discord badge][]][Discord instructions]
+[![Twitter handle][]][Twitter badge]
+[![BlueSky badge][]][BlueSky handle]
+[![LFX Health Score](https://insights.linuxfoundation.org/api/badge/health-score?project=flutter)](https://insights.linuxfoundation.org/project/flutter)
+[![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/5631/badge)](https://bestpractices.coreinfrastructure.org/projects/5631)
+[![SLSA 1](https://slsa.dev/images/gh-badge-level1.svg)](https://slsa.dev)
 
-```
-Go framework  →  cgo  →  Impeller C API (libimpeller.dylib)  →  Metal
-```
+Flutter is Google's SDK for crafting beautiful, fast user experiences for
+mobile, web, and desktop from a single codebase. Flutter works with existing
+code, is used by developers and organizations around the world, and is free and
+open source.
 
-No Dart VM and no Flutter engine are involved.
+## Documentation
 
-## Status
+* [Install Flutter](https://docs.flutter.dev/get-started)
+* [Flutter documentation](https://docs.flutter.dev)
+* [Development wiki](./docs/README.md)
+* [Contributing to Flutter](https://github.com/flutter/flutter/blob/main/CONTRIBUTING.md)
 
-Stages 0–10 of [PLAN.md](PLAN.md) are done: a render tree, a widget/element
-layer with `setState`, taps, a headless widget tester, layout that matches
-real Flutter on 11 reference scenes, and frame-time measurements, a lazily built scrolling list with fling physics, animations that match Flutter frame by frame, and a text field whose editing behavior matches Flutter key for key.
-Findings and the recommendation are in [PLAN.md](PLAN.md#findings-2026-11-25).
+For release and other announcements, join the
+[flutter-announce](https://groups.google.com/g/flutter-announce)
+mailing list. Our documentation also tracks [breaking
+changes](https://docs.flutter.dev/release/breaking-changes) across releases.
 
-![counter](docs/counter.png) ![list](docs/list.png) ![animate](docs/animate.png)
+## Terms of service
 
-## Run (macOS)
+The Flutter tool may occasionally download resources from Google servers. By
+downloading or using the Flutter SDK, you agree to the Google Terms of Service:
+https://policies.google.com/terms
 
-```sh
-./scripts/fetch_impeller_sdk.sh   # downloads the SDK pinned in IMPELLER_SHA
-go run ./cmd/counter              # the classic counter app
-go run ./cmd/list                 # 1,000,000-row lazy list (wheel to scroll)
-go run ./cmd/animate              # implicit animation + animated scroll
-go run ./cmd/textfield            # to-do list with a text field
-go run ./cmd/hello                # step 0: raw Impeller from Go
-go test ./...                     # unit, widget and (if generated) diff tests
-FLUTTER=/path/to/flutter ./scripts/difftest.sh   # compare layout with real Flutter
-PERF=1 go test ./perf -v -run Budget   # frame-time percentiles (run alone)
-```
+For example, when installed from GitHub (as opposed to from a prepackaged
+archive), the Flutter tool will download the Dart SDK from Google servers
+immediately when first run, as it is used to execute the `flutter` tool itself.
+This will also occur when Flutter is upgraded (e.g. by running the `flutter
+upgrade` command).
 
-Requires Go 1.24+ and Xcode command-line tools.
+## About Flutter
 
-## Layout
+We think Flutter will help you create beautiful, fast apps, with a productive,
+extensible and open development model, whether you're targeting iOS or Android,
+web, Windows, macOS, Linux or embedding it as the UI toolkit for a platform of
+your choice.
 
-| Path | What |
-|---|---|
-| `rendering/` | Render tree: constraints, layout, paint, hit testing (pure Go) |
-| `widgets/` | Widgets, elements, State, BuildOwner, pointer routing |
-| `widgettest/` | Headless tester in the style of flutter_test |
-| `app/` | Runs a widget tree in a window with Impeller |
-| `difftest/` | Same scenes in Go and Dart; compares geometry |
-| `perf/` | Frame budget test and benchmarks |
-| `examples/counter/` | The counter app and its widget tests |
-| `impeller/` | Minimal Go binding to `impeller.h` |
-| `platform/metal/` | CAMetalLayer setup and presentation (the only Objective-C) |
-| `textedit/` | Text editing model and shortcuts (ported from Flutter) |
-| `animation/` | Scheduler, tickers, AnimationController, curves |
-| `cmd/` | `counter`, `list`, `animate`, `textfield` and `hello` executables |
-| `IMPELLER_SHA` | Flutter commit whose prebuilt Impeller SDK we use |
+### Beautiful user experiences
+
+We want to enable designers to deliver their full creative vision without being
+forced to water it down due to limitations of the underlying framework.
+Flutter's [layered architecture] gives you control over every pixel on the
+screen and its powerful compositing capabilities let you overlay and animate
+graphics, video, text, and controls without limitation. Flutter includes a full
+[set of widgets][widget catalog] that deliver pixel-perfect experiences whether
+you're building for iOS ([Cupertino]) or other platforms ([Material]), along with
+support for customizing or creating entirely new visual components.
+
+<p align="center"><img src="https://github.com/flutter/website/blob/main/sites/docs/web/assets/images/docs/homepage/reflectly-hero-600px.png?raw=true" alt="Reflectly hero image"></p>
+
+### Fast results
+
+Flutter is fast. It's powered by hardware-accelerated 2D graphics
+libraries like [Skia] (which underpins Chrome and Android) and
+[Impeller]. We architected Flutter to
+support glitch-free, jank-free graphics at the native speed of your device.
+
+Flutter code is powered by the world-class [Dart programming language], which enables
+compilation to 32-bit and 64-bit ARM machine code for iOS and Android,
+JavaScript and WebAssembly for the web, as well as Intel x64 and ARM
+for desktop devices.
+
+<p align="center"><img src="https://github.com/flutter/website/blob/main/sites/docs/web/assets/images/docs/homepage/dart-diagram-small.png?raw=true" alt="Dart diagram"></p>
+
+### Productive development
+
+Flutter offers [stateful hot reload][Hot reload], allowing you to make changes to your code
+and see the results instantly without restarting your app or losing its state.
+
+[![Hot reload animation][]][Hot reload]
+
+### Extensible and open model
+
+Flutter works with any development tool (or none at all), and also includes
+editor plug-ins for both [Visual Studio Code] and [IntelliJ / Android Studio].
+Flutter provides [tens of thousands of packages][Flutter packages] to speed your
+development, regardless of your target platform. And accessing other native code
+is easy, with support for both FFI ([on Android][Android FFI], [on iOS][iOS FFI],
+[on macOS][macOS FFI], [on Linux][Linux FFI], and [on Windows][Windows FFI]) as well as
+[platform-specific APIs][platform channels].
+
+Flutter is a fully open-source project, and we welcome contributions.
+Information on how to get started can be found in our
+[contributor guide](CONTRIBUTING.md).
+
+[flutter.dev]: https://flutter.dev
+[Discord instructions]: ./docs/contributing/Chat.md
+[Discord badge]: https://img.shields.io/discord/608014603317936148?logo=discord
+[Twitter handle]: https://img.shields.io/twitter/follow/flutterdev.svg?style=social&label=Follow
+[Twitter badge]: https://twitter.com/intent/follow?screen_name=flutterdev
+[BlueSky badge]: https://img.shields.io/badge/Bluesky-0285FF?logo=bluesky&logoColor=fff&label=Follow%20me%20on&color=0285FF
+[BlueSky handle]: https://bsky.app/profile/flutter.dev
+[layered architecture]: https://docs.flutter.dev/resources/inside-flutter
+[architectural overview]: https://docs.flutter.dev/resources/architectural-overview
+[widget catalog]: https://docs.flutter.dev/ui/widgets
+[Cupertino]: https://docs.flutter.dev/ui/widgets/cupertino
+[Material]: https://docs.flutter.dev/ui/widgets/material
+[Skia]: https://skia.org/
+[Dart programming language]: https://dart.dev/
+[Hot reload animation]: https://github.com/flutter/website/blob/main/sites/docs/web/assets/images/docs/tools/android-studio/hot-reload.gif?raw=true
+[Hot reload]: https://docs.flutter.dev/tools/hot-reload
+[Visual Studio Code]: https://marketplace.visualstudio.com/items?itemName=Dart-Code.flutter
+[IntelliJ / Android Studio]: https://plugins.jetbrains.com/plugin/9212-flutter
+[Flutter packages]: https://pub.dev/flutter
+[Android FFI]: https://docs.flutter.dev/platform-integration/android/c-interop
+[iOS FFI]: https://docs.flutter.dev/platform-integration/ios/c-interop
+[macOS FFI]: https://docs.flutter.dev/platform-integration/macos/c-interop
+[Linux FFI]: https://docs.flutter.dev/platform-integration/linux/building#integrate-with-linux
+[Windows FFI]: https://docs.flutter.dev/platform-integration/windows/building#integrating-with-windows
+[platform channels]: https://docs.flutter.dev/platform-integration/platform-channels
+[interop example]: https://github.com/flutter/flutter/tree/main/examples/platform_channel
+[Impeller]: https://docs.flutter.dev/perf/impeller
