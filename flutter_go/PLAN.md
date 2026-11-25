@@ -623,3 +623,10 @@ The standing goal is now full API parity with Flutter 3.50.1's Dart layer
   vs null cases added (a mutation dropping the nil check survived
   Flutter's tests). One mutation (merge-sort cutoff) is equivalent: a
   stable sort's output is unique.
+- foundation serialization (`WriteBuffer`/`ReadBuffer`, the byte layer of
+  platform-channel codecs): Flutter's tests ported, and a difftest where a
+  mixed sequence (alignment, both endiannesses, growth from capacity 1,
+  -0.0, infinities) produces the same 96 bytes as Flutter, which Go's
+  ReadBuffer then reads back. dart:typed_data maps to Go slices and
+  `binary.ByteOrder`. Mutations: 6 caught; the read-side alignment was
+  only caught once the difftest read Flutter's bytes back.

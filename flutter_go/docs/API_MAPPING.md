@@ -86,6 +86,9 @@ literals of imported structs.
 | `Duration` | `time.Duration` |
 | `List<T>`, `Map<K,V>`, `Set<T>` | `[]T`, `map[K]V`, `map[T]struct{}` |
 | `VoidCallback`, `ValueChanged<T>` | `func()`, `func(T)` |
+| `ByteData`, `Uint8List` | `[]byte` |
+| `Int32List`, `Int64List`, `Float32List`, `Float64List` | `[]int32`, `[]int64`, `[]float32`, `[]float64` |
+| `Endian` | `encoding/binary.ByteOrder` (omitted: the host's, as `Endian.host`) |
 | `Iterable<T>` | `iter.Seq[T]` (methods named `All()` return it) |
 | `Future<T>` | `*async.Future[T]`; `await f` is `f.Await()` inside `async.Async(func() T {...})` |
 | `Stream<T>` | `*async.Stream[T]` (not yet ported) |
