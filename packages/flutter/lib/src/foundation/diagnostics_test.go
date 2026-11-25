@@ -4,14 +4,10 @@ package foundation
 // 3.50.1), which tests diagnostics.dart. Goldens are copied from the Dart
 // test verbatim.
 //
+// "Stack trace test" (DiagnosticsStackTrace, from assertions.dart) is
+// TestStackTrace.
+//
 // Not ported:
-//   - "Stack trace test": DiagnosticsStackTrace is declared in
-//     assertions.dart, not ported yet.
-//   - FlutterError.fromParts(<DiagnosticsNode>[ErrorSummary(...)]) in the
-//     lazy-property tests becomes panic(NewFlutterError(...)): ErrorSummary
-//     and FlutterError.fromParts are assertions.dart, not ported yet. The
-//     property only sees the exception's runtime type (FlutterError), so the
-//     checks are the same.
 //   - `present.value equals onClick` (closure identity): Go funcs aren't
 //     comparable; the test checks the value is the non-nil func instead.
 
@@ -1009,7 +1005,9 @@ func TestUnsafeDoubleProperty(t *testing.T) {
 	equal(t, NewDoublePropertyLazy("name", func() *float64 { return nil }).String(), "name: null")
 	equal(t, NewDoublePropertyLazy("name", func() *float64 { return nil }).IsFiltered(DiagnosticLevelInfo), false)
 
-	throwingProperty := NewDoublePropertyLazy("name", func() float64 { panic(NewFlutterError("Invalid constraints")) })
+	throwingProperty := NewDoublePropertyLazy("name", func() float64 {
+		panic(NewFlutterErrorFromParts([]DiagnosticsNode{NewErrorSummary("Invalid constraints")}))
+	})
 	// TODO(jacobr): it would be better if throwingProperty.object threw an
 	// exception.
 	equal(t, throwingProperty.Value(), nil)
@@ -1237,7 +1235,9 @@ func TestLazyObjectProperty(t *testing.T) {
 	equal(t, hideName.String(), "small rect")
 	validatePropertyJsonSerialization(t, hideName)
 
-	throwingWithDescription := NewDiagnosticsPropertyLazy("name", func() any { panic(NewFlutterError("Property not available")) },
+	throwingWithDescription := NewDiagnosticsPropertyLazy("name", func() any {
+		panic(NewFlutterErrorFromParts([]DiagnosticsNode{NewErrorSummary("Property not available")}))
+	},
 		DiagnosticsPropertyOptions{Description: ptr("missing"), DefaultValue: Null})
 	equal(t, throwingWithDescription.Value(), nil)
 	_, isFlutterError := throwingWithDescription.Exception().(*FlutterError)
@@ -1246,7 +1246,9 @@ func TestLazyObjectProperty(t *testing.T) {
 	equal(t, throwingWithDescription.String(), "name: missing")
 	validatePropertyJsonSerialization(t, throwingWithDescription)
 
-	throwingProperty := NewDiagnosticsPropertyLazy("name", func() any { panic(NewFlutterError("Property not available")) },
+	throwingProperty := NewDiagnosticsPropertyLazy("name", func() any {
+		panic(NewFlutterErrorFromParts([]DiagnosticsNode{NewErrorSummary("Property not available")}))
+	},
 		DiagnosticsPropertyOptions{DefaultValue: Null})
 	equal(t, throwingProperty.Value(), nil)
 	_, isFlutterError = throwingProperty.Exception().(*FlutterError)
@@ -1446,6 +1448,27 @@ func TestIterableProperty(t *testing.T) {
 		ToStringDeep(DiagnosticableTreeToStringDeepOptions{WrapWidth: ptr(120)}),
 		"TestTree#00000\n"+
 			"   object: "+white+"\n", "single element")
+}
+
+func TestStackTrace(t *testing.T) {
+	stack := dart.StackTraceFromString(
+		"#0      someMethod  (file:///diagnostics_test.dart:42:19)\n" +
+			"#1      someMethod2  (file:///diagnostics_test.dart:12:3)\n" +
+			"#2      someMethod3  (file:///foo.dart:4:1)\n",
+	)
+
+	equalsIgnoringHashCodes(t, NewDiagnosticsStackTrace("Stack trace", stack).ToStringDeep(),
+		"Stack trace:\n"+
+			"#0      someMethod  (file:///diagnostics_test.dart:42:19)\n"+
+			"#1      someMethod2  (file:///diagnostics_test.dart:12:3)\n"+
+			"#2      someMethod3  (file:///foo.dart:4:1)\n", "stack trace")
+
+	equalsIgnoringHashCodes(t, NewDiagnosticsStackTrace("-- callback 2 --", stack,
+		DiagnosticsStackTraceOptions{ShowSeparator: ptr(false)}).ToStringDeep(),
+		"-- callback 2 --\n"+
+			"#0      someMethod  (file:///diagnostics_test.dart:42:19)\n"+
+			"#1      someMethod2  (file:///diagnostics_test.dart:12:3)\n"+
+			"#2      someMethod3  (file:///foo.dart:4:1)\n", "no separator")
 }
 
 func TestMessage(t *testing.T) {

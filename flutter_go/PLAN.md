@@ -691,3 +691,88 @@ The standing goal is now full API parity with Flutter 3.50.1's Dart layer
   became `panic(NewFlutterError(..))`, same runtime type), and the
   `.lazy` constructor's `defaultValue is T?` assert. Profile-mode branches
   are ported but untested.
+- foundation assertions, stack_frame and print (`FlutterError` and its
+  static reporting machinery, `FlutterErrorDetails`, the `Error*`
+  diagnostics, `DiagnosticsStackTrace`, stack filters, `debugPrintStack`,
+  `StackFrame`, `debugPrint*`, `debugWordWrap`, plus `ErrorToConsoleDumper`
+  from error_dumper.dart, which assertions.dart dumps through): ported in
+  full; all 22 missing top-level names are now exposed (foundation 77 → 99
+  of 137; total 153 → 175). The minimal `FlutterError{Message}` is gone:
+  `NewFlutterError(message)` now builds Flutter's summary + descriptions,
+  and `FlutterError` is a Go `error` and a `dart.AssertionFailure`.
+  `flutter_go/dart` gained the dart:core pieces this needs: `Print` /
+  `SetPrintHandler`, `AssertionError` / `SafeToString`, `Pattern`,
+  `StackTrace`, and the part of `Uri.parse` the frame parser reads
+  (ported from the SDK's uri.dart: dot segments, percent normalization).
+  `DiagnosticableNode` now calls `Builder()` through `self`, so
+  `_FlutterErrorDetailsNode` can override it as in Dart.
+- **Design (API_MAPPING "Errors and stack traces"):** exceptions are `any`;
+  Dart's `is AssertionError/String/num/Error` map to
+  `dart.AssertionFailure`/`string`/builtin numbers/`error`. Flutter reads
+  stack traces as text, so Go stacks (`dart.StackTraceCurrent`,
+  `dart.StackTraceFromPanic` in a deferred recover) are rendered in the
+  Dart VM's format with Dart-style names and URIs: flutter-go's packages
+  map to `package:flutter/...`, `flutter_go/async` to `dart:async` (so the
+  default filter elides it, like dart:async), other files to `file://`.
+  A real nil-dereference panic reported with `FlutterErrorReportError`
+  prints `The following errorString was thrown:` / the runtime message /
+  `#0      explode (package:flutter/src/foundation/assertions_test.go:780)`
+  / callers / `#6      tRunner (file:///usr/local/go/src/testing/testing.go:1792)`.
+  Differences: no columns, no async-suspension lines, runtime frames
+  dropped, stack overflow is fatal. Statics are `FlutterErrorOnError`,
+  `FlutterErrorPresentError`... Output goes through the `DebugPrint`
+  variable (tests replace it, as Flutter's do) and `dart.Print` (tests
+  capture it with `dart.SetPrintHandler`; global, not zone-scoped).
+- Flutter's tests: assertions_test 11/11, stack_frame_test 13/15 (not
+  ported: live stack overflow, fatal in Go; the ParallelWaitError test,
+  which needs `(f1, f2).wait`), print_test 3/3, error_reporting_test 7/7,
+  stack_trace_test 2/2 (assert-generated `_AssertionError`s are rebuilt
+  with the VM's toString; Go has no columns; Go frames replace Dart's
+  test-runner frames), plus diagnostics_test's skipped "Stack trace test".
+  Plus own tests for filters, reporting, Go panics, wrapping and the
+  throttle's limits.
+- **Found:** three typos in Flutter's stack_frame_test expected data
+  (`packagePath`), invisible because `StackFrame.==` ignores packagePath;
+  the Go test checks every field and lists them. My first stack mapping
+  used the function name's package; a closure inlined from flutter_go/async
+  is named after its caller, so `coroutine.go` showed up under
+  `package:flutter/src/foundation`. Locations now come from the file path.
+- Difftest (`difftest/assertions_test.go` + `flutter/test/assertions_test.dart`):
+  339 outputs compared exactly (hashes normalized): FlutterError
+  toString/toStringDeep/shallow/JSON, ErrorSummary/Hint/Spacer JSON,
+  malformed errors, 21 exception kinds (strings, numbers, AssertionError
+  variants, FlutterError, Exception/Error twins, plain objects, real Dart
+  asserts) × toString/summary/exceptionAsString/properties/dump/with-stack,
+  a full report with library, context, information collector, expandable
+  and truncatable nodes, dumpErrorToConsole sequences (Another exception,
+  forceReport, silent, null library), copyWith, propertiesTransformers,
+  custom stack filters, 30 StackFrame lines (VM, web debug, gaps, odd
+  URIs), the default filter and RepetitiveStackFrameFilter (incl.
+  overlapping and regex patterns), DiagnosticsStackTrace variants,
+  debugPrintStack, debugWordWrap of 12 texts × 10 widths + indent,
+  debugPrintSynchronously, and the debugPrintThrottled schedule in
+  fake_async (prints and debugPrintDone at each millisecond). All matched
+  on the first run.
+- Flutter quirks reproduced on purpose: a collapsed run of filtered
+  frames reports `index - start + 2` frames (4 frames print "(5 frames)");
+  `RepetitiveStackFrameFilter` never matches a run ending at the last
+  frame; the frame regex's greedy method makes `#13 paren (file:///dir
+  (copy)/x.dart:1:2)` the method `paren (file:///dir`; `debugWordWrap`
+  throws on a blank message at least as long as the width and when the
+  wrap indent makes the prefix longer than the message;
+  `_FlutterErrorDetailsNode` rebuilds (and re-transforms) its properties on
+  every access, with a sparse default style.
+- Mutations: 116 valid, 113 caught, 3 equivalent: `string` vs
+  `AssertionFailure` order in the error-name switch (a Go string can't
+  implement it), resuming `inWord` instead of `atBreak` after an early
+  break (the index is at a space, so it moves to atBreak at once), and
+  breaking at `>= width` (300k random inputs, panics included, give the
+  same lines; as in the diagnostics wrapper). Caught only after adding
+  tests or scenes: the `position > 2` boundary, dump wrapWidthProperties
+  (only visible on indented long lines: max(100, indent + 65)), the
+  truncation limit, the lazy-vs-greedy method regex, JavaScript `.` and
+  `\s` semantics (U+2028, NBSP), wrap fast path and UTF-16 length, first
+  vs last summary, overlapping repetitive filters, `new A.b.c`, the
+  throttle's stopwatch, and StackFrame equality fields.
+- Not ported: web-only and release/profile branches are ported but
+  untested (debug build only); `Uri.parse`'s errors (Go parses leniently).

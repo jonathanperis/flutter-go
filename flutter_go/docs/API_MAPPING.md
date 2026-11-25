@@ -142,6 +142,61 @@ through it. One pattern, everywhere:
   named `<Type><Method>Options` (or `<Method>Options` when only one type has
   the method): `node.ToStringDeep(DiagnosticsNodeToStringDeepOptions{WrapWidth: &w})`.
 
+## Errors and stack traces
+
+- **Exceptions** (Dart's `Object exception`) are `any`: a Go `error`, a
+  recovered panic value, a string... Dart's type tests map as: `is
+  AssertionError` → `dart.AssertionFailure` (an interface satisfied by
+  `*dart.AssertionError` and `*foundation.FlutterError`; Dart's `message`
+  getter is `AssertionMessage()`), `is String` → `string`, `is num` → a
+  builtin Go number, `is Error || is Exception` → `error`, anything else is
+  "an object". A Go error prints its `Error()`; its runtime type is the Go
+  type name (a nil dereference is `errorString`, as `runtime.Error`'s
+  concrete type is).
+- **`throw` / `catch`** are `panic` / `recover`. A failed Dart `assert(c,
+  m)` that Flutter relies on is `panic(dart.NewAssertionError(m))`
+  (`FlutterError.fromParts` does this for a missing summary).
+- **`StackTrace`** is `dart.StackTrace`, an interface whose `String()` is the
+  trace text; nil is null. `StackTrace.fromString(s)` is
+  `dart.StackTraceFromString(s)`, `StackTrace.current` is
+  `dart.StackTraceCurrent()`, and `catch (e, stack)` is `r := recover();
+  stack := dart.StackTraceFromPanic()` in the deferred function (the stack
+  starts at the function that panicked, as Dart's starts at the throw).
+- **Go stacks are rendered in the Dart VM's format**, because Flutter
+  parses traces as text (`StackFrame.fromStackString`, the default stack
+  filter, the "is this the framework's fault" check):
+  `#0      FlutterError.ToString (package:flutter/src/foundation/assertions.go:123)`.
+  Methods drop the package qualifier and pointer (`(*T).M` → `T.M`),
+  closures are `<anonymous closure>`; files of the Go packages that stand
+  for Dart libraries get those libraries' URIs (`packages/<pkg>/lib/...` →
+  `package:<pkg>/...`, `flutter_go/async` → `dart:async/...` so the default
+  filter elides it like dart:async, `flutter_go/dart` → `dart:core/...`,
+  dart:ui's `go/` → `dart:ui/...`), and every other file is a `file://`
+  URI. Differences from Dart: no column numbers (`uri:line`, parsed as
+  column -1), no `<asynchronous suspension>` lines, the goroutine header and
+  `runtime.goexit`/`runtime.main` are dropped, and a stack overflow is fatal
+  in Go (no trace).
+- **Statics** follow the statics rule: `FlutterError.onError` →
+  `foundation.FlutterErrorOnError`, `presentError` →
+  `FlutterErrorPresentError`, `reportError` → `FlutterErrorReportError`,
+  `demangleStackTrace` → `FlutterErrorDemangleStackTrace`,
+  `defaultStackFilter` → `FlutterErrorDefaultStackFilter`, `StackFrame.fromStackString`
+  → `StackFrameFromStackString`... Assign the variables to replace them.
+- **Console output**: Dart's `print` is `dart.Print`; tests capture it with
+  `dart.SetPrintHandler` (Go's stand-in for a Zone's `print`; unlike a zone,
+  it is global, so a timer firing after the capture ends prints to whatever
+  handler is current then). Flutter's own channel is `foundation.DebugPrint`,
+  a variable (`DebugPrintCallback`) tests replace, exactly as Flutter's
+  tests replace `debugPrint`; errors are dumped through it
+  (`ErrorToConsoleDumper.Dump`). Dart's nullable `String? message` is a Go
+  `string`: a null message prints `"null"` in every implementation, so
+  `"null"` stands for it. `DebugPrintThrottled` pauses on the current
+  `async.Loop`'s timers, so a program must run its loop for long output to
+  finish (as a Dart program's event loop must run).
+- `StackFrame` compares with `Equal` (Dart's `==`: number, package, line,
+  column, className, method and source only). `PartialStackFrame.package`
+  is a `dart.Pattern` (`dart.StringPattern("...")` or a `*regexp.Regexp`).
+
 ## Build modes
 
 `kReleaseMode` and `kProfileMode` come from build tags (`-tags
@@ -174,3 +229,10 @@ Each divergence is listed here when it is introduced.
   pointer).
 - diagnostics: a lazy property's compute callback that panics is recorded as
   the property's exception (Dart catches the throw).
+- assertions: `FlutterError` is a Go `error` and a `dart.AssertionFailure`;
+  its `message` getter is `Message()`. `DiagnosticsStackTrace.singleFrame`'s
+  required named `frame:` is positional. See "Errors and stack traces" for
+  exceptions, stack traces and `print`.
+- print: `DebugPrintCallback` is `func(message string, opts
+  ...DebugPrintOptions)`; Dart's null message is `"null"` (same output).
+  `debugWordWrap` returns `iter.Seq[string]`.

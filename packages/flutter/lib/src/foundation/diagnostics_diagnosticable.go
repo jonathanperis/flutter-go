@@ -88,6 +88,18 @@ func (n *DiagnosticableNode[T]) Builder() *DiagnosticPropertiesBuilder {
 	return n.cachedBuilder
 }
 
+// builder is Builder called through self, so a node type embedding
+// DiagnosticableNode can override it (as Dart's _FlutterErrorDetailsNode
+// overrides the builder getter).
+func (n *DiagnosticableNode[T]) builder() *DiagnosticPropertiesBuilder {
+	if b, ok := n.self.(interface {
+		Builder() *DiagnosticPropertiesBuilder
+	}); ok {
+		return b.Builder()
+	}
+	return n.Builder()
+}
+
 // Style is the given style, or the builder's default.
 func (n *DiagnosticableNode[T]) Style() DiagnosticsTreeStyle {
 	if KReleaseMode {
@@ -96,21 +108,21 @@ func (n *DiagnosticableNode[T]) Style() DiagnosticsTreeStyle {
 	if n.hasStyle {
 		return n.style
 	}
-	return n.Builder().DefaultDiagnosticsTreeStyle
+	return n.builder().DefaultDiagnosticsTreeStyle
 }
 
 func (n *DiagnosticableNode[T]) EmptyBodyDescription() *string {
 	if KReleaseMode || KProfileMode {
 		return strp("")
 	}
-	return n.Builder().EmptyBodyDescription
+	return n.builder().EmptyBodyDescription
 }
 
 func (n *DiagnosticableNode[T]) GetProperties() []DiagnosticsNode {
 	if KReleaseMode || KProfileMode {
 		return []DiagnosticsNode{}
 	}
-	return n.Builder().Properties
+	return n.builder().Properties
 }
 
 func (n *DiagnosticableNode[T]) GetChildren() []DiagnosticsNode { return []DiagnosticsNode{} }

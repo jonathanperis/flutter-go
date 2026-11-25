@@ -1,8 +1,8 @@
 package foundation
 
 // Partial port of debug.dart (Flutter 3.50.1): debugFormatDouble, which
-// diagnostics.dart uses. debugDoublePrecision (toStringAsPrecision) and the
-// debugPrint family are not ported yet.
+// diagnostics.dart uses. debugDoublePrecision (toStringAsPrecision) is not
+// ported yet; the debugPrint family is print.dart (print.go).
 
 import "github.com/jonathanperis/flutter-go/flutter_go/dart"
 
