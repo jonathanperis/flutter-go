@@ -12,9 +12,9 @@ No Dart VM and no Flutter engine are involved.
 
 ## Status
 
-Stages 0–8 of [PLAN.md](PLAN.md) are done: a render tree, a widget/element
+Stages 0–9 of [PLAN.md](PLAN.md) are done: a render tree, a widget/element
 layer with `setState`, taps, a headless widget tester, layout that matches
-real Flutter on 11 reference scenes, and frame-time measurements, a lazily built scrolling list, and animations that match Flutter frame by frame.
+real Flutter on 11 reference scenes, and frame-time measurements, a lazily built scrolling list with fling physics, and animations that match Flutter frame by frame.
 Findings and the recommendation are in [PLAN.md](PLAN.md#findings-2026-11-25).
 
 ![counter](docs/counter.png) ![list](docs/list.png) ![animate](docs/animate.png)

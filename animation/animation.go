@@ -178,6 +178,7 @@ type Controller struct {
 	from, to  float64
 	simDur    time.Duration
 	curve     Curve
+	sim       Simulation // set by AnimateWith; nil for interpolation
 	status    Status
 	listeners []func()
 	statusFns []func(Status)
@@ -231,6 +232,7 @@ func (c *Controller) scaledDuration(target float64) time.Duration {
 
 func (c *Controller) animate(target float64, d time.Duration, curve Curve, st Status) {
 	c.ticker.Stop()
+	c.sim = nil
 	c.from, c.to, c.simDur, c.curve = c.value, target, d, curve
 	c.setStatus(st)
 	if d == 0 || c.from == c.to {
@@ -243,6 +245,18 @@ func (c *Controller) animate(target float64, d time.Duration, curve Curve, st St
 }
 
 func (c *Controller) tick(elapsed time.Duration) {
+	if c.sim != nil {
+		secs := float64(elapsed.Microseconds()) / 1e6
+		c.value = math.Max(c.lower, math.Min(c.upper, c.sim.X(secs)))
+		done := c.sim.IsDone(secs)
+		if done {
+			c.ticker.Stop()
+			c.sim = nil
+			c.setStatus(Completed)
+		}
+		c.notify()
+		return
+	}
 	// Same arithmetic as Flutter's _InterpolationSimulation.
 	t := float64(elapsed.Microseconds()) / 1e6 / (float64(c.simDur.Microseconds()) / 1e6)
 	t = math.Max(0, math.Min(1, t))

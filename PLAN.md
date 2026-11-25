@@ -18,6 +18,7 @@ criterion. If a stage fails its criterion, stop and decide before going on.
 | 6 | Decision gate | — | Findings below ✅ — recommendation: continue, with two conditions |
 | 7 | Lazy scrolling list | Building during layout, element lifecycle off-screen, scroll input | `ListViewBuilder` (fixed item height) builds the same item indices as Flutter, with the same positions, after jumps, clamping, and inside a Column ✅ 6/6 scenes |
 | 8 | Animations | Frame scheduling, tickers, curves, implicit animations, animated scroll | `AnimationController`, Flutter's cubic curves, `AnimatedBox` (≈ `AnimatedContainer`) and `ScrollController.AnimateTo` produce the same values as Flutter frame by frame ✅ 4/4 scenes, max difference 5.6e-17 |
+| 9 | Fling physics | Ballistic scrolling after a drag, edge handling, interaction with taps | Flutter's `ClampingScrollSimulation` and `ClampingScrollPhysics` rules give the same offsets as Flutter every frame, and stop at the same frame ✅ 4/4 scenes, max difference 7e-12 px |
 
 ## Design rules
 
@@ -182,9 +183,37 @@ keep-alive, scrollbars, and scroll physics/animations.
 - **Another zero-value trap:** `Color{}` is transparent, so `Text` without
   a color was invisible. Unset text color now means opaque black.
 
-Not done: fling/ballistic scrolling and overscroll physics (they need
-Flutter's `ClampingScrollSimulation`/`BouncingScrollSimulation`, which
-are next on the list), explicit-animation widgets (`AnimatedBuilder`,
+Not done: bouncing overscroll physics (macOS/iOS), explicit-animation widgets (`AnimatedBuilder`,
 transitions), `Hero`, opacity (needs `saveLayer`), and staggered/sequenced
 animations.
+
+## Stage 9 findings: fling physics (2026-11-25)
+
+- **Ported from the fork's own source** (`scroll_simulation.dart`,
+  `scroll_physics.dart`, `scroll_activity.dart`): the Android-derived
+  `ClampingScrollSimulation`, the velocity tolerance `1/(0.05·dpr)`, "no
+  fling toward an edge you are already at", and stopping when the
+  simulation overscrolls. Offsets match Flutter to 7e-12 px over 70 frames
+  (Dart's and Go's `pow` differ in the last bits).
+- **Checking positions alone was not enough.** Removing the stop-at-edge
+  rule kept every position identical (the offset is clamped anyway) while
+  the animation kept running and burning frames. Recording whether a frame
+  is still scheduled made that mutation fail.
+- **That check surfaced two Flutter behaviors.** The overscroll glow keeps
+  frames running after a fling hits the edge (decoration, turned off on the
+  Flutter side since flutter-go has no glow). And Flutter puts an
+  `IgnorePointer` over the list during scroll activities: **a touch on a
+  flinging list only stops it, it does not tap the item underneath.**
+  flutter-go now does the same. Flutter's extra frame to lift that
+  `IgnorePointer` is allowed by the test rather than copied.
+- **Release velocity is not Flutter-exact yet.** flutter-go estimates it
+  with a straight line over the last 100 ms; Flutter's `VelocityTracker`
+  uses a least-squares polynomial fit. The comparison therefore starts
+  flings with fixed velocities (Flutter's `goBallistic`), and the gesture
+  path is covered by Go tests only (fast release flings, slow release
+  under 50 px/s does not).
+
+Not done: `BouncingScrollPhysics` (the macOS/iOS default, with overscroll
+and spring-back), Flutter's `VelocityTracker`, the overscroll glow, and
+scrollbars.
 

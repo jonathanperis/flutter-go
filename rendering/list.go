@@ -35,6 +35,11 @@ type RenderFixedExtentList struct {
 	first      int         // index of kids[0]
 	// OnScroll is called when the scroll offset changes.
 	OnScroll func(offset float64)
+	// Fling starts a ballistic scroll; Hold stops any scroll animation
+	// (a new pointer landing on the list) and reports whether one was
+	// running. Set by the widgets layer.
+	Fling func(velocity float64)
+	Hold  func() bool
 }
 
 func NewFixedExtentList(itemExtent float64, itemCount int, m ChildManager) *RenderFixedExtentList {

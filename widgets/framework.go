@@ -102,17 +102,18 @@ const (
 // Element is a widget's instantiation at a location in the tree. It doubles
 // as Flutter's BuildContext.
 type Element struct {
-	widget   Widget
-	kind     kind
-	parent   *Element
-	children []*Element
-	state    State
-	render   r.RenderBox      // own render object (kindRender and kindLazy)
-	lazy     map[int]*Element // live items by index (kindLazy only)
-	owner    *BuildOwner
-	depth    int
-	dirty    bool
-	mounted  bool
+	widget    Widget
+	kind      kind
+	parent    *Element
+	children  []*Element
+	state     State
+	render    r.RenderBox       // own render object (kindRender and kindLazy)
+	lazy      map[int]*Element  // live items by index (kindLazy only)
+	ownScroll *ScrollController // used when a ListViewBuilder has none
+	owner     *BuildOwner
+	depth     int
+	dirty     bool
+	mounted   bool
 }
 
 func (e *Element) Widget() Widget   { return e.widget }
@@ -450,6 +451,9 @@ type BuildOwner struct {
 	// Builds counts Build calls, for tests and benchmarks.
 	Builds int
 	sched  *animation.Scheduler
+	// DevicePixelRatio is physical pixels per logical pixel (sets scroll
+	// physics tolerances). 0 means 1.
+	DevicePixelRatio float64
 	// pendingRoot is a RunApp widget waiting for the next build phase.
 	pendingRoot *rootWidget
 }

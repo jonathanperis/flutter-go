@@ -68,6 +68,8 @@ func Run(root widgets.Widget, o Options) error {
 	owner := &widgets.BuildOwner{OnNeedsFrame: func() { needsFrame = true }}
 	epoch := time.Now() // frame timestamps are measured from here
 	router := widgets.NewPointerRouter(owner)
+	router.Now = func() float64 { return time.Since(epoch).Seconds() }
+	owner.DevicePixelRatio = float64(layer.Scale())
 	owner.RunApp(root)
 
 	// GLFW reports cursor positions in logical points, which is what layout uses.
