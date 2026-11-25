@@ -150,15 +150,62 @@ func (w Flexible) ApplyParentData(b *r.Box) {
 	b.Flex, b.Fit = max(w.Flex, 1), r.FitLoose
 }
 
-// Text displays a string in a single style.
+// Text displays a string in a single style. Unset style fields come from
+// the nearest DefaultTextStyle (like Flutter's Text, which builds a RichText
+// with the merged style).
 type Text struct {
 	Text  string
 	Style r.TextStyle
 }
 
-func (w Text) CreateRenderObject() r.RenderBox { return r.NewParagraph(w.Text, w.Style) }
-func (w Text) UpdateRenderObject(ro r.RenderBox) {
+func (w Text) Build(ctx *Element) Widget {
+	style := w.Style
+	if d, ok := DependOn[DefaultTextStyle](ctx); ok {
+		style = d.Style.Merge(w.Style)
+	}
+	return RichText{Text: w.Text, Style: style}
+}
+
+// RichText paints text in exactly the given style (no inheritance).
+type RichText struct {
+	Text  string
+	Style r.TextStyle
+}
+
+func (w RichText) CreateRenderObject() r.RenderBox { return r.NewParagraph(w.Text, w.Style) }
+func (w RichText) UpdateRenderObject(ro r.RenderBox) {
 	ro.(*r.RenderParagraph).Set(w.Text, w.Style)
+}
+
+// DefaultTextStyle sets the text style for Text widgets below it.
+type DefaultTextStyle struct {
+	Style r.TextStyle
+	Child Widget
+}
+
+func (w DefaultTextStyle) ChildWidget() Widget { return w.Child }
+func (w DefaultTextStyle) UpdateShouldNotify(old Widget) bool {
+	return old.(DefaultTextStyle).Style != w.Style
+}
+
+// MediaQuery describes the view: its logical size and pixel density. The
+// framework puts one at the root.
+type MediaQuery struct {
+	Size             r.Size
+	DevicePixelRatio float64
+	Child            Widget
+}
+
+func (w MediaQuery) ChildWidget() Widget { return w.Child }
+func (w MediaQuery) UpdateShouldNotify(old Widget) bool {
+	o := old.(MediaQuery)
+	return o.Size != w.Size || o.DevicePixelRatio != w.DevicePixelRatio
+}
+
+// MediaQueryOf returns the nearest MediaQuery and rebuilds ctx when it changes.
+func MediaQueryOf(ctx *Element) MediaQuery {
+	m, _ := DependOn[MediaQuery](ctx)
+	return m
 }
 
 // GestureDetector calls OnTap when its subtree is tapped. OnTapAt also gets

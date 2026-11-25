@@ -97,7 +97,8 @@ const (
 	kindStateful
 	kindRender
 	kindParentData
-	kindLazy // ListViewBuilder: children built on demand during layout
+	kindLazy      // ListViewBuilder: children built on demand during layout
+	kindInherited // InheritedWidget: provides data to descendants
 )
 
 // Element is a widget's instantiation at a location in the tree. It doubles
@@ -111,10 +112,16 @@ type Element struct {
 	render    r.RenderBox       // own render object (kindRender and kindLazy)
 	lazy      map[int]*Element  // live items by index (kindLazy only)
 	ownScroll *ScrollController // used when a ListViewBuilder has none
-	owner     *BuildOwner
-	depth     int
-	dirty     bool
-	mounted   bool
+	// inherited maps each InheritedWidget type to the nearest ancestor
+	// element providing it (shared with the parent unless e provides one).
+	inherited map[reflect.Type]*Element
+	// dependents of an inherited element; dependencies of any element.
+	dependents   map[*Element]struct{}
+	dependencies map[*Element]struct{}
+	owner        *BuildOwner
+	depth        int
+	dirty        bool
+	mounted      bool
 }
 
 func (e *Element) Widget() Widget   { return e.widget }
@@ -141,6 +148,8 @@ func kindOf(w Widget) kind {
 	switch w.(type) {
 	case ListViewBuilder:
 		return kindLazy
+	case InheritedWidget:
+		return kindInherited
 	case StatelessWidget:
 		return kindStateless
 	case StatefulWidget:
@@ -177,6 +186,15 @@ func inflate(w Widget, parent *Element, owner *BuildOwner) *Element {
 	e := &Element{widget: w, kind: kindOf(w), parent: parent, owner: owner}
 	if parent != nil {
 		e.depth = parent.depth + 1
+		e.inherited = parent.inherited
+	}
+	if e.kind == kindInherited {
+		m := make(map[reflect.Type]*Element, len(e.inherited)+1)
+		for k, v := range e.inherited {
+			m[k] = v
+		}
+		m[reflect.TypeOf(w)] = e
+		e.inherited = m
 	}
 	e.mount()
 	return e
@@ -203,6 +221,8 @@ func (e *Element) mount() {
 		e.children = []*Element{e.updateChild(nil, e.widget.(ParentDataWidget).ChildWidget())}
 	case kindLazy:
 		e.mountLazy()
+	case kindInherited:
+		e.children = []*Element{e.updateChild(nil, e.widget.(InheritedWidget).ChildWidget())}
 	}
 }
 
@@ -227,7 +247,24 @@ func (e *Element) update(w Widget) {
 		e.nearestRenderAncestor().syncRenderChildren()
 	case kindLazy:
 		e.updateLazy(old.(ListViewBuilder))
+	case kindInherited:
+		if w.(InheritedWidget).UpdateShouldNotify(old) {
+			for d := range e.dependents {
+				d.didChangeDependencies()
+			}
+		}
+		e.children = []*Element{e.updateChild(e.children[0], w.(InheritedWidget).ChildWidget())}
+		if ra := e.nearestRenderAncestor(); ra != nil {
+			ra.syncRenderChildren()
+		}
 	}
+}
+
+func (e *Element) didChangeDependencies() {
+	if s, ok := e.state.(interface{ DidChangeDependencies() }); ok {
+		s.DidChangeDependencies()
+	}
+	e.MarkNeedsBuild()
 }
 
 // rebuild re-runs Build for component (stateless/stateful) elements.
@@ -259,6 +296,20 @@ func (e *Element) rebuild() {
 	}
 }
 
+// sameWidget reports whether a and b are equal values. It is flutter-go's
+// stand-in for Flutter's identical(child.widget, newWidget) check (which
+// const widgets and the `widget.child` pattern rely on): Go structs have no
+// identity, but comparable ones have equality. Widgets holding slices, maps
+// or funcs are not comparable and always update.
+func sameWidget(a, b Widget) (same bool) {
+	defer func() {
+		if recover() != nil {
+			same = false // a field (e.g. a Child) holds an uncomparable value
+		}
+	}()
+	return reflect.TypeOf(a).Comparable() && a == b
+}
+
 // updateChild is Flutter's Element.updateChild.
 func (e *Element) updateChild(old *Element, w Widget) *Element {
 	if w == nil {
@@ -266,6 +317,9 @@ func (e *Element) updateChild(old *Element, w Widget) *Element {
 			old.unmount()
 		}
 		return nil
+	}
+	if old != nil && !old.dirty && sameWidget(old.widget, w) {
+		return old // nothing to do: same configuration, not dirty
 	}
 	if old != nil && canUpdate(old.widget, w) {
 		old.update(w)
@@ -312,7 +366,9 @@ func (e *Element) updateChildList(ws []Widget) {
 		}
 		if fast {
 			for i, c := range e.children {
-				c.update(ws[i])
+				if c.dirty || !sameWidget(c.widget, ws[i]) {
+					c.update(ws[i])
+				}
 			}
 			return
 		}
@@ -424,6 +480,10 @@ func (e *Element) unmount() {
 	for _, c := range e.children {
 		c.unmount()
 	}
+	for p := range e.dependencies {
+		delete(p.dependents, e)
+	}
+	e.dependencies = nil
 	if s, ok := e.state.(disposer); ok {
 		s.Dispose()
 	}
@@ -460,6 +520,8 @@ type BuildOwner struct {
 	// Clipboard backs copy/cut/paste; nil disables them.
 	Clipboard textedit.Clipboard
 	focus     KeyTarget
+	app       Widget
+	viewSize  r.Size
 	// pendingRoot is a RunApp widget waiting for the next build phase.
 	pendingRoot *rootWidget
 }
@@ -503,7 +565,8 @@ func (o *BuildOwner) RunApp(w Widget) {
 			}
 		})
 	}
-	root := rootWidget{child: w, render: o.rootRender}
+	o.app = w
+	root := o.rootFor(w)
 	if o.root == nil {
 		// First mount builds synchronously, like Flutter's attachRootWidget.
 		o.root = inflate(root, nil, o)
@@ -516,6 +579,20 @@ func (o *BuildOwner) RunApp(w Widget) {
 		o.OnNeedsFrame()
 	}
 }
+
+// rootFor wraps the app in a MediaQuery describing the view, as Flutter's
+// View widget does.
+func (o *BuildOwner) rootFor(app Widget) rootWidget {
+	dpr := o.DevicePixelRatio
+	if dpr == 0 {
+		dpr = 1
+	}
+	return rootWidget{child: MediaQuery{Size: o.viewSize, DevicePixelRatio: dpr, Child: app}, render: o.rootRender}
+}
+
+// SetViewSize sets the logical size of the view before the first frame,
+// so the first build already sees the right MediaQuery.
+func (o *BuildOwner) SetViewSize(size r.Size) { o.viewSize = size }
 
 // NeedsBuild reports whether any element is dirty.
 func (o *BuildOwner) NeedsBuild() bool { return len(o.dirty) > 0 || o.pendingRoot != nil }
@@ -548,6 +625,14 @@ func (o *BuildOwner) DrawFrame(size r.Size, cv r.Canvas) {
 func (o *BuildOwner) DrawFrameAt(ts time.Duration, size r.Size, cv r.Canvas) {
 	s := o.Scheduler()
 	s.BeginFrame(ts)
+	if size != o.viewSize {
+		// The view changed size: update MediaQuery; its dependents rebuild.
+		o.viewSize = size
+		if o.root != nil && o.app != nil && o.pendingRoot == nil {
+			root := o.rootFor(o.app)
+			o.pendingRoot = &root
+		}
+	}
 	o.BuildScope()
 	r.Layout(o.rootRender, r.Tight(size))
 	o.rootRender.Paint(cv, r.Offset{})
@@ -567,3 +652,41 @@ func (w rootWidget) ChildWidget() Widget             { return w.child }
 // StateOfElement returns the State of a stateful element (Flutter's
 // tester.state), or nil.
 func StateOfElement(e *Element) State { return e.state }
+
+// InheritedWidget provides data to descendants that depend on it with
+// DependOn. When it is rebuilt with UpdateShouldNotify(old) true, its
+// dependents rebuild, even if the widgets in between don't.
+type InheritedWidget interface {
+	ChildWidget() Widget
+	UpdateShouldNotify(old Widget) bool
+}
+
+// DependOn returns the nearest ancestor InheritedWidget of type T and
+// registers ctx to rebuild when it changes (Flutter's
+// dependOnInheritedWidgetOfExactType).
+func DependOn[T InheritedWidget](ctx *Element) (T, bool) {
+	var zero T
+	p, ok := ctx.inherited[reflect.TypeOf(zero)]
+	if !ok {
+		return zero, false
+	}
+	if p.dependents == nil {
+		p.dependents = map[*Element]struct{}{}
+	}
+	p.dependents[ctx] = struct{}{}
+	if ctx.dependencies == nil {
+		ctx.dependencies = map[*Element]struct{}{}
+	}
+	ctx.dependencies[p] = struct{}{}
+	return p.widget.(T), true
+}
+
+// Find returns the nearest ancestor InheritedWidget of type T without
+// registering a dependency (Flutter's getInheritedWidgetOfExactType).
+func Find[T InheritedWidget](ctx *Element) (T, bool) {
+	var zero T
+	if p, ok := ctx.inherited[reflect.TypeOf(zero)]; ok {
+		return p.widget.(T), true
+	}
+	return zero, false
+}

@@ -31,9 +31,11 @@ func TestOnlyTheStatefulSubtreeRebuilds(t *testing.T) {
 	tester.Tap(widgettest.Text("+"))
 	tester.Pump()
 
-	// One rebuild of counterState plus the IncrementButton below it.
-	if got := tester.Owner.Builds - before; got != 2 {
-		t.Fatalf("builds per tap = %d, want 2", got)
+	// counterState, the Text showing the count (its value changed), and
+	// IncrementButton (it holds a func, so it can't be compared and always
+	// updates). The other Text widgets are equal to before and are skipped.
+	if got := tester.Owner.Builds - before; got != 3 {
+		t.Fatalf("builds per tap = %d, want 3", got)
 	}
 }
 

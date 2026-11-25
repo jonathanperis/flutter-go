@@ -67,6 +67,10 @@ var Scenes = map[string]Widget{
 		Children: []Widget{box(10, 10), box(20, 20), box(30, 30)},
 	},
 	"text_center": Center{Child: Text{Text: "hello", Style: r.TextStyle{FontSize: 20}}},
+	"default_text_style": DefaultTextStyle{
+		Style: r.TextStyle{FontSize: 20},
+		Child: Center{Child: Text{Text: "hello"}},
+	},
 	"text_wrap": Align{
 		Alignment: r.TopLeft,
 		Child:     SizedBox{Width: F(100), Child: Text{Text: "hello wrapping world", Style: r.TextStyle{FontSize: 10}}},

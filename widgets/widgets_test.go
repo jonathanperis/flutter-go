@@ -62,7 +62,10 @@ func TestKeysMoveStateWithReorderedChildren(t *testing.T) {
 	if after[1] != stateX {
 		t.Fatal("keyed element for x should have moved, not been recreated")
 	}
-	if len(log) != 4 { // init x, init y, update x->x, update y->y
+	// The reordered widgets are equal to the old ones, so flutter-go moves the
+	// elements without updating them (Flutter would call didUpdateWidget on
+	// new instances). No state was recreated either.
+	if len(log) != 2 || log[0] != "init x" || log[1] != "init y" {
 		t.Fatalf("unexpected lifecycle: %v", log)
 	}
 	// Render children follow the new order: y above x.
