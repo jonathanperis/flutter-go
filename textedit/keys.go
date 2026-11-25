@@ -33,6 +33,7 @@ type Platform int
 const (
 	Android Platform = iota // also Linux, Windows, Fuchsia
 	MacOS
+	IOS
 )
 
 // Clipboard is the system clipboard.
@@ -45,7 +46,7 @@ type Clipboard interface {
 func HandleKey(v Value, ev KeyEvent, p Platform, clip Clipboard) (Value, bool) {
 	word, line := ev.Ctrl, false // modifier for word moves / line moves
 	command := ev.Ctrl           // select all, copy, paste...
-	if p == MacOS {
+	if p == MacOS || p == IOS {
 		word, line, command = ev.Alt, ev.Meta, ev.Meta
 	}
 	extend := ev.Shift
@@ -71,8 +72,8 @@ func HandleKey(v Value, ev KeyEvent, p Platform, clip Clipboard) (Value, bool) {
 	case KeyUp, KeyDown:
 		return MoveVertically(v, ev.Key == KeyDown, !extend), true
 	case KeyHome, KeyEnd:
-		if p == MacOS {
-			return v, false // on macOS Home/End scroll; they don't move the caret
+		if p == MacOS || p == IOS {
+			return v, false // on Apple platforms Home/End scroll; they don't move the caret
 		}
 		return Move(v, ev.Key == KeyEnd, ByLine, !extend), true
 	case KeyA:

@@ -59,7 +59,12 @@ func TestListClampsToEnd(t *testing.T) {
 	tester := widgettest.New(t)
 	tester.PumpWidget(textList(100, c, &built))
 	c.JumpTo(1e9)
-	tester.Pump()
+	// Like Flutter's jumpTo, an out-of-range jump lands there and the physics
+	// then spring back into range.
+	if c.Offset() != 1e9 {
+		t.Fatalf("jump should land out of range first, offset %v", c.Offset())
+	}
+	tester.PumpAndSettle()
 	if c.Offset() != 100*50-600 || c.MaxScrollExtent() != 4400 {
 		t.Fatalf("offset %v max %v", c.Offset(), c.MaxScrollExtent())
 	}

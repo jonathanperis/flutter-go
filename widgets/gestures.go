@@ -70,6 +70,7 @@ func (p *PointerRouter) PointerDown(pos r.Offset) {
 	// must first move beyond TouchSlop.
 	if p.list != nil && len(p.down) == 0 {
 		p.dragging = true
+		p.startDrag()
 	}
 	if p.list != nil && p.list.Hold != nil && p.list.Hold() {
 		// Touching a scrolling list only stops it: like Flutter's
@@ -89,23 +90,22 @@ func (p *PointerRouter) record(pos r.Offset) {
 	p.tracker.AddPosition(p.Now(), clock(), pos.Y)
 }
 
-// releaseVelocity is Flutter's VerticalDragGestureRecognizer.considerFling
-// followed by ScrollDragController.end: a fling needs more than
-// MinFlingVelocity and more than TouchSlop of distance in the samples; the
-// velocity is clamped to MaxFlingVelocity and negated (finger up = scroll down).
-func (p *PointerRouter) releaseVelocity() float64 {
+// releaseEstimate returns the finger's release velocity (px/s, positive =
+// moving down) and the distance its samples covered; the scroll physics
+// decide whether that is a fling.
+func (p *PointerRouter) releaseEstimate() (velocity, distance float64) {
 	if p.Now == nil {
-		return 0
+		return 0, 0
 	}
 	clock := p.Now
 	if p.Clock != nil {
 		clock = p.Clock
 	}
 	vy, dy, ok := p.tracker.Estimate(clock())
-	if !ok || math.Abs(vy) <= MinFlingVelocity || math.Abs(dy) <= TouchSlop {
-		return 0
+	if !ok {
+		return 0, 0
 	}
-	return -math.Max(-MaxFlingVelocity, math.Min(MaxFlingVelocity, vy))
+	return vy, dy
 }
 
 func (p *PointerRouter) PointerMove(pos r.Offset) {
@@ -121,9 +121,28 @@ func (p *PointerRouter) PointerMove(pos r.Offset) {
 		// DragStartBehavior.start: the drag begins at the pointer position
 		// where it was accepted, so this move itself scrolls nothing.
 		p.last = pos
+		p.startDrag()
+		return
 	}
-	p.list.ScrollBy(p.last.Y - pos.Y)
+	if p.list.DragUpdate != nil {
+		p.list.DragUpdate(pos.Y-p.last.Y, p.eventTime())
+	} else {
+		p.list.ScrollBy(p.last.Y - pos.Y)
+	}
 	p.last = pos
+}
+
+func (p *PointerRouter) eventTime() float64 {
+	if p.Now == nil {
+		return 0
+	}
+	return p.Now()
+}
+
+func (p *PointerRouter) startDrag() {
+	if p.list.DragStart != nil {
+		p.list.DragStart(p.eventTime())
+	}
 }
 
 func (p *PointerRouter) PointerUp(pos r.Offset) {
@@ -133,8 +152,9 @@ func (p *PointerRouter) PointerUp(pos r.Offset) {
 	down, dragging, list := p.down, p.dragging, p.list
 	p.down, p.isDown, p.list, p.dragging = nil, false, nil, false
 	if dragging {
-		if v := p.releaseVelocity(); v != 0 && list.Fling != nil {
-			list.Fling(v)
+		if list.DragEnd != nil {
+			vy, dy := p.releaseEstimate()
+			list.DragEnd(vy, dy)
 		}
 		return // a drag is not a tap
 	}
@@ -158,6 +178,10 @@ func (p *PointerRouter) PointerUp(pos r.Offset) {
 // deepest list under pos.
 func (p *PointerRouter) Scroll(pos r.Offset, dy float64) {
 	if _, list := p.hit(pos); list != nil {
-		list.ScrollBy(dy)
+		if list.PointerScroll != nil {
+			list.PointerScroll(dy)
+		} else {
+			list.ScrollBy(dy)
+		}
 	}
 }

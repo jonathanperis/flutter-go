@@ -359,3 +359,37 @@ accessibility. Tab focus traversal is not implemented.
   unused, the package didn't compile, and my filter (which looked only for
   failing test lines) reported it as "not caught". Build failures now count.
 
+## G4 findings: bouncing physics and scroll positions (2026-11-25)
+
+- **Scrolling now goes through physics, like Flutter's `ScrollPosition`**,
+  instead of clamping inside the render object. A `ScrollController` owns
+  the position and its physics (picked by platform: clamping on Android,
+  bouncing on iOS, bouncing with "fast" deceleration on macOS): boundary
+  conditions on `setPixels`, rubber-band friction on user drags while
+  overscrolled, iOS's 3.5 px drag-start threshold, ballistic activities that
+  stop when the physics refuse a position, and settling (`goBallistic(0)`)
+  after every activity ends. The mouse wheel always clamps.
+- **Ported simulations:** `FrictionSimulation` (including its constant
+  deceleration and the 10-iteration Newton solve, whose non-converging case
+  is reproduced on purpose), all three spring solutions,
+  `ScrollSpringSimulation` and `BouncingScrollSimulation`.
+- **8 scenes match Flutter on iOS and macOS** (≤ 3e-13 px): flings within
+  range and overshooting either end, an out-of-range jump rubber-banding
+  back, and drags pulled past the top (every move, then the spring back).
+  Five mutations each fail.
+- **One mismatch, then a missed override:** only the macOS overshoot
+  differed, and only after the spring took over. macOS's "fast" bouncing
+  physics replaces the spring (mass 0.3, stiffness 75, ratio 1.3); the iOS
+  spring had been used for both.
+- **`jumpTo` now matches Flutter:** an out-of-range jump lands there and
+  animates back (on clamping physics too, with Flutter's spring). Stage 7's
+  list scenes now settle on both sides, and the immediate-clamp divergence
+  noted in stage 7 is gone.
+- **An ordering detail that matters:** Flutter applies a simulation's final
+  value before firing "completed" (which triggers the settle). The Go
+  controller fired the status first; fixed.
+- **Not ported:** iOS's and macOS's own velocity trackers
+  (`IOSScrollViewFlingVelocityTracker`, `MacOSScrollViewFlingVelocityTracker`;
+  the scenes release with zero velocity so all trackers agree), carried
+  momentum between consecutive flings, overscroll glow, and scrollbars.
+

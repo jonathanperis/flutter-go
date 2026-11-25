@@ -22,7 +22,7 @@ func runListScene(t *testing.T, s ListScene) listResult {
 	tester := widgettest.New(t)
 	tester.PumpWidget(s.Widget(c))
 	c.JumpTo(s.JumpTo)
-	tester.Pump()
+	tester.PumpAndSettle() // out-of-range jumps animate back, as in Flutter
 
 	list := tester.FindAll(widgettest.ByType[widgets.ListViewBuilder]())[0]
 	var items [][5]float64

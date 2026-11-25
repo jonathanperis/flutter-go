@@ -316,9 +316,13 @@ func (c *Controller) tick(elapsed time.Duration) {
 		if done {
 			c.ticker.Stop()
 			c.sim = nil
+		}
+		// Flutter notifies value listeners before the status change (and
+		// the TickerFuture completion that scroll activities wait for).
+		c.notify()
+		if done {
 			c.setStatus(Completed)
 		}
-		c.notify()
 		return
 	}
 	// Same arithmetic as Flutter's _InterpolationSimulation.

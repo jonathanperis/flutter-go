@@ -35,11 +35,16 @@ type RenderFixedExtentList struct {
 	first      int         // index of kids[0]
 	// OnScroll is called when the scroll offset changes.
 	OnScroll func(offset float64)
-	// Fling starts a ballistic scroll; Hold stops any scroll animation
-	// (a new pointer landing on the list) and reports whether one was
-	// running. Set by the widgets layer.
-	Fling func(velocity float64)
-	Hold  func() bool
+	// Input hooks, set by the widgets layer (Flutter's ScrollPosition):
+	// Hold stops any scroll animation (a pointer landed) and reports whether
+	// one was running; drags report finger deltas and timestamps (seconds);
+	// DragEnd gets the raw release velocity and the distance its samples
+	// covered; PointerScroll is a mouse wheel delta.
+	Hold          func() bool
+	DragStart     func(ts float64)
+	DragUpdate    func(delta, ts float64)
+	DragEnd       func(velocity, distance float64)
+	PointerScroll func(delta float64)
 }
 
 func NewFixedExtentList(itemExtent float64, itemCount int, m ChildManager) *RenderFixedExtentList {
@@ -59,11 +64,9 @@ func (r *RenderFixedExtentList) MaxScrollExtent() float64    { return r.maxScrol
 func (r *RenderFixedExtentList) HitTestSelf(Offset) bool     { return true }
 func (r *RenderFixedExtentList) LiveIndices() (first, n int) { return r.first, len(r.kids) }
 
-// SetScrollOffset jumps to v, clamped to the scrollable range once known.
+// SetScrollOffset sets the offset as is (Flutter's forcePixels); scroll
+// physics in the widgets layer decide whether out-of-range is allowed.
 func (r *RenderFixedExtentList) SetScrollOffset(v float64) {
-	if r.laidOut {
-		v = clamp(v, 0, r.maxScroll)
-	}
 	if v != r.offset {
 		r.offset = v
 		MarkNeedsLayout(r)
@@ -105,7 +108,6 @@ func (r *RenderFixedExtentList) PerformLayout(c Constraints) Size {
 	}
 	size := Size{c.MaxW, c.MaxH}
 	r.maxScroll = math.Max(0, float64(r.itemCount)*r.itemExtent-size.H)
-	r.offset = clamp(r.offset, 0, r.maxScroll)
 
 	first, last := r.indexRange(size.H)
 	for i := range r.live {
@@ -145,3 +147,6 @@ func (r *RenderFixedExtentList) Paint(cv Canvas, offset Offset) {
 	}
 	cv.Restore()
 }
+
+// ViewportExtent is the visible main-axis size.
+func (r *RenderFixedExtentList) ViewportExtent() float64 { return r.Size.H }

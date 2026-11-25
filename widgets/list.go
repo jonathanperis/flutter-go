@@ -1,11 +1,7 @@
 package widgets
 
 import (
-	"math"
 	"sort"
-	"time"
-
-	"github.com/jonathanperis/flutter-go/animation"
 
 	r "github.com/jonathanperis/flutter-go/rendering"
 )
@@ -20,110 +16,6 @@ type ListViewBuilder struct {
 	ItemExtent  float64
 	ItemBuilder func(ctx *Element, index int) Widget
 	Controller  *ScrollController
-}
-
-// ScrollController reads and sets a list's scroll offset.
-type ScrollController struct {
-	list    *r.RenderFixedExtentList
-	initial float64
-	sched   *animation.Scheduler
-	anim    *animation.Controller
-	// DevicePixelRatio sets the fling velocity tolerance (Flutter's
-	// toleranceFor). flutter_test uses 3; 0 means 1.
-	DevicePixelRatio float64
-}
-
-// AnimateTo scrolls to offset over d with curve, like Flutter's
-// ScrollPosition.animateTo (a DrivenScrollActivity on an unbounded
-// controller). The offset is clamped each frame.
-func (c *ScrollController) AnimateTo(offset float64, d time.Duration, curve animation.Curve) {
-	if c.list == nil || c.sched == nil {
-		c.JumpTo(offset)
-		return
-	}
-	if c.anim != nil {
-		c.anim.Dispose()
-	}
-	c.anim = animation.NewUnboundedController(c.sched, c.list.ScrollOffset())
-	a := c.anim
-	a.AddListener(func() { c.list.SetScrollOffset(a.Value()) })
-	a.AnimateTo(offset, d, curve)
-}
-
-// Fling starts a ballistic scroll at velocity (logical px/s, positive scrolls
-// content up), using Flutter's ClampingScrollPhysics: below the velocity
-// tolerance nothing happens, and the fling stops when it reaches an edge.
-func (c *ScrollController) Fling(velocity float64) {
-	if c.list == nil || c.sched == nil {
-		return
-	}
-	if c.anim != nil {
-		c.anim.Dispose()
-		c.anim = nil
-	}
-	pos, max := c.list.ScrollOffset(), c.list.MaxScrollExtent()
-	tolerance := 1.0 / (0.050 * c.dpr())
-	if math.Abs(velocity) < tolerance || (velocity > 0 && pos >= max) || (velocity < 0 && pos <= 0) {
-		return
-	}
-	a := animation.NewUnboundedController(c.sched, pos)
-	c.anim = a
-	a.AddListener(func() {
-		v := a.Value()
-		c.list.SetScrollOffset(v)
-		// Flutter's BallisticScrollActivity goes idle when setPixels overscrolls.
-		if v < 0 || v > c.list.MaxScrollExtent() {
-			a.Stop()
-		}
-	})
-	a.AnimateWith(animation.NewClampingScrollSimulation(pos, velocity))
-}
-
-func (c *ScrollController) dpr() float64 {
-	if c.DevicePixelRatio > 0 {
-		return c.DevicePixelRatio
-	}
-	return 1
-}
-
-// IsAnimating reports whether an AnimateTo is in progress.
-func (c *ScrollController) IsAnimating() bool { return c.anim != nil && c.anim.IsAnimating() }
-
-// NewScrollController starts at initialOffset (clamped on first layout).
-func NewScrollController(initialOffset float64) *ScrollController {
-	return &ScrollController{initial: initialOffset}
-}
-
-func (c *ScrollController) attach(l *r.RenderFixedExtentList) {
-	if c.list == nil {
-		l.SetScrollOffset(c.initial)
-	} else {
-		l.SetScrollOffset(c.list.ScrollOffset())
-	}
-	c.list = l
-}
-
-func (c *ScrollController) Offset() float64 {
-	if c.list == nil {
-		return c.initial
-	}
-	return c.list.ScrollOffset()
-}
-
-func (c *ScrollController) MaxScrollExtent() float64 {
-	if c.list == nil {
-		return 0
-	}
-	return c.list.MaxScrollExtent()
-}
-
-// JumpTo moves to offset immediately, clamped to the scrollable range.
-func (c *ScrollController) JumpTo(offset float64) {
-	if c.list == nil {
-		c.initial = offset
-		return
-	}
-	c.list.SetScrollOffset(offset)
 }
 
 // listManager implements rendering.ChildManager for a lazy element.
@@ -176,18 +68,12 @@ func (e *Element) attachController(c *ScrollController) {
 		c.DevicePixelRatio = e.owner.DevicePixelRatio
 	}
 	c.attach(list)
-	list.Fling = c.Fling
+	c.platform = e.owner.Platform
 	list.Hold = c.Hold
-}
-
-// Hold stops any running scroll animation and reports whether one was
-// running.
-func (c *ScrollController) Hold() bool {
-	if c.anim != nil && c.anim.IsAnimating() {
-		c.anim.Stop()
-		return true
-	}
-	return false
+	list.DragStart = c.dragStart
+	list.DragUpdate = c.dragUpdate
+	list.DragEnd = c.dragEnd
+	list.PointerScroll = c.pointerScroll
 }
 
 // updateLazy applies a new ListViewBuilder: live items are rebuilt with the

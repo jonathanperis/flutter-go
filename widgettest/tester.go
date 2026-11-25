@@ -253,3 +253,38 @@ func (t *Tester) DragTimed(f Finder, moves []TimedMove) {
 	}
 	t.router.PointerUp(pos)
 }
+
+// Gesture is a pointer controlled step by step with explicit event
+// timestamps, like flutter_test's TestGesture.
+type Gesture struct {
+	t     *Tester
+	start r.Offset
+	pos   r.Offset
+}
+
+// StartGesture presses at the center of f at event time 0.
+func (t *Tester) StartGesture(f Finder) *Gesture {
+	t.t.Helper()
+	rc := t.Rect(f)
+	g := &Gesture{t: t, start: r.Offset{X: rc.X + rc.W/2, Y: rc.Y + rc.H/2}}
+	g.pos = g.start
+	t.eventTime = 0
+	t.router.PointerDown(g.pos)
+	t.eventTime = -1
+	return g
+}
+
+// MoveTo moves the pointer to start + (0, dy) at event time at.
+func (g *Gesture) MoveTo(dy float64, at time.Duration) {
+	g.t.eventTime = at.Seconds()
+	g.pos = r.Offset{X: g.start.X, Y: g.start.Y + dy}
+	g.t.router.PointerMove(g.pos)
+	g.t.eventTime = -1
+}
+
+// Up releases the pointer at event time at.
+func (g *Gesture) Up(at time.Duration) {
+	g.t.eventTime = at.Seconds()
+	g.t.router.PointerUp(g.pos)
+	g.t.eventTime = -1
+}
