@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jonathanperis/flutter-go/textedit"
+
 	r "github.com/jonathanperis/flutter-go/rendering"
 	"github.com/jonathanperis/flutter-go/widgets"
 )
@@ -29,6 +31,8 @@ func New(t testing.TB) *Tester {
 	o := &widgets.BuildOwner{DevicePixelRatio: 3}
 	tt := &Tester{t: t, Owner: o, router: widgets.NewPointerRouter(o), Size: r.Size{W: 800, H: 600}}
 	tt.router.Now = func() float64 { return tt.Now.Seconds() }
+	o.Clipboard = &MemoryClipboard{}
+	o.Scheduler().Clock = func() time.Duration { return tt.Now }
 	return tt
 }
 
@@ -45,6 +49,7 @@ func (t *Tester) Pump(d ...time.Duration) {
 	if len(d) > 0 {
 		t.Now += d[0]
 	}
+	t.Owner.Scheduler().RunTimers(t.Now) // fake-async timers fire as time passes
 	t.Owner.DrawFrameAt(t.Now, t.Size, t.Canvas)
 }
 
@@ -163,4 +168,23 @@ func (t *Tester) FlingGesture(f Finder, dy float64, duration time.Duration) {
 func (t *Tester) TapAt(x, y float64) {
 	t.router.PointerDown(r.Offset{X: x, Y: y})
 	t.router.PointerUp(r.Offset{X: x, Y: y})
+}
+
+// MemoryClipboard is an in-memory clipboard for tests.
+type MemoryClipboard struct{ Text string }
+
+func (c *MemoryClipboard) Get() string  { return c.Text }
+func (c *MemoryClipboard) Set(s string) { c.Text = s }
+
+// SendKey sends a key to the focused widget and pumps a frame.
+func (t *Tester) SendKey(ev textedit.KeyEvent) {
+	t.Owner.DispatchKey(ev)
+	t.Pump()
+}
+
+// EnterText types s into the focused widget (replacing the selection, as a
+// keyboard does) and pumps a frame.
+func (t *Tester) EnterText(s string) {
+	t.Owner.DispatchText(s)
+	t.Pump()
 }

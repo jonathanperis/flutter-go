@@ -18,6 +18,70 @@ type Scheduler struct {
 	nextID    int
 	// RequestFrame is called when a callback is scheduled.
 	RequestFrame func()
+	// Clock returns the current time on the frame timeline (defaults to
+	// the last frame's timestamp). Timers are measured against it.
+	Clock  func() time.Duration
+	timers []timer
+}
+
+type timer struct {
+	at time.Duration
+	id int
+	fn func()
+}
+
+func (s *Scheduler) clock() time.Duration {
+	if s.Clock != nil {
+		return s.Clock()
+	}
+	return s.now
+}
+
+// AfterFunc runs fn once d has passed (Flutter uses dart:async Timers for
+// things like the cursor blink, so idle apps don't draw frames).
+func (s *Scheduler) AfterFunc(d time.Duration, fn func()) int {
+	s.nextID++
+	s.timers = append(s.timers, timer{s.clock() + d, s.nextID, fn})
+	return s.nextID
+}
+
+func (s *Scheduler) CancelTimer(id int) {
+	for i, t := range s.timers {
+		if t.id == id {
+			s.timers = append(s.timers[:i], s.timers[i+1:]...)
+			return
+		}
+	}
+}
+
+// RunTimers runs every timer due at or before now, in deadline order.
+func (s *Scheduler) RunTimers(now time.Duration) {
+	for {
+		best := -1
+		for i, t := range s.timers {
+			if t.at <= now && (best < 0 || t.at < s.timers[best].at) {
+				best = i
+			}
+		}
+		if best < 0 {
+			return
+		}
+		t := s.timers[best]
+		s.timers = append(s.timers[:best], s.timers[best+1:]...)
+		t.fn()
+	}
+}
+
+// NextTimer returns the earliest pending deadline.
+func (s *Scheduler) NextTimer() (time.Duration, bool) {
+	if len(s.timers) == 0 {
+		return 0, false
+	}
+	next := s.timers[0].at
+	for _, t := range s.timers[1:] {
+		next = min(next, t.at)
+	}
+	return next, true
 }
 
 func NewScheduler() *Scheduler { return &Scheduler{callbacks: map[int]func(time.Duration){}} }

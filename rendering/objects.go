@@ -175,6 +175,8 @@ type RenderTapRegion struct {
 	Box
 	SingleChild
 	OnTap func()
+	// OnTapAt, if set, also receives the tap position in global coordinates.
+	OnTapAt func(global Offset)
 }
 
 func NewTapRegion(onTap func()) *RenderTapRegion { return &RenderTapRegion{OnTap: onTap} }

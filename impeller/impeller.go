@@ -172,3 +172,36 @@ func (b *DisplayListBuilder) DrawParagraph(p *Paragraph, x, y float32) {
 func (b *DisplayListBuilder) Build() *DisplayList {
 	return &DisplayList{C.ImpellerDisplayListBuilderCreateDisplayListNew(b.h)}
 }
+
+// GlyphCluster describes one grapheme cluster: its UTF-16 code unit range and
+// its bounds in paragraph coordinates.
+type GlyphCluster struct {
+	Begin, End int
+	Bounds     Rect
+	OK         bool
+}
+
+func glyphCluster(info C.ImpellerGlyphInfo) GlyphCluster {
+	if info == nil {
+		return GlyphCluster{}
+	}
+	defer C.ImpellerGlyphInfoRelease(info)
+	var r C.ImpellerRect
+	C.ImpellerGlyphInfoGetGraphemeClusterBounds(info, &r)
+	return GlyphCluster{
+		Begin:  int(C.ImpellerGlyphInfoGetGraphemeClusterCodeUnitRangeBegin(info)),
+		End:    int(C.ImpellerGlyphInfoGetGraphemeClusterCodeUnitRangeEnd(info)),
+		Bounds: Rect{float32(r.x), float32(r.y), float32(r.width), float32(r.height)},
+		OK:     true,
+	}
+}
+
+// ClusterAt returns the grapheme cluster containing UTF-16 index i.
+func (p *Paragraph) ClusterAt(i int) GlyphCluster {
+	return glyphCluster(C.ImpellerParagraphCreateGlyphInfoAtCodeUnitIndexNew(p.h, C.size_t(i)))
+}
+
+// ClusterAtPoint returns the grapheme cluster nearest to (x, y).
+func (p *Paragraph) ClusterAtPoint(x, y float64) GlyphCluster {
+	return glyphCluster(C.ImpellerParagraphCreateGlyphInfoAtParagraphCoordinatesNew(p.h, C.double(x), C.double(y)))
+}

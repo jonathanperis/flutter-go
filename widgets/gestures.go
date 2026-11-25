@@ -127,6 +127,9 @@ func (p *PointerRouter) PointerUp(pos r.Offset) {
 	for _, d := range down { // deepest first
 		for _, u := range up {
 			if d == u {
+				if d.OnTapAt != nil {
+					d.OnTapAt(pos)
+				}
 				if d.OnTap != nil {
 					d.OnTap()
 				}

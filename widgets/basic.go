@@ -161,16 +161,23 @@ func (w Text) UpdateRenderObject(ro r.RenderBox) {
 	ro.(*r.RenderParagraph).Set(w.Text, w.Style)
 }
 
-// GestureDetector calls OnTap when its subtree is tapped.
+// GestureDetector calls OnTap when its subtree is tapped. OnTapAt also gets
+// the tap position (global coordinates).
 type GestureDetector struct {
-	OnTap func()
-	Child Widget
+	OnTap   func()
+	OnTapAt func(global r.Offset)
+	Child   Widget
 }
 
-func (w GestureDetector) ChildWidget() Widget             { return w.Child }
-func (w GestureDetector) CreateRenderObject() r.RenderBox { return r.NewTapRegion(w.OnTap) }
+func (w GestureDetector) ChildWidget() Widget { return w.Child }
+func (w GestureDetector) CreateRenderObject() r.RenderBox {
+	t := r.NewTapRegion(w.OnTap)
+	t.OnTapAt = w.OnTapAt
+	return t
+}
 func (w GestureDetector) UpdateRenderObject(ro r.RenderBox) {
-	ro.(*r.RenderTapRegion).OnTap = w.OnTap
+	t := ro.(*r.RenderTapRegion)
+	t.OnTap, t.OnTapAt = w.OnTap, w.OnTapAt
 }
 
 // KeyedSubtree attaches a key to a child, for list reconciliation.
