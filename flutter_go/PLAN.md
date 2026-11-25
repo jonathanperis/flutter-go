@@ -630,3 +630,10 @@ The standing goal is now full API parity with Flutter 3.50.1's Dart layer
   ReadBuffer then reads back. dart:typed_data maps to Go slices and
   `binary.ByteOrder`. Mutations: 6 caught; the read-side alignment was
   only caught once the difftest read Flutter's bytes back.
+- foundation `PersistentHashMap` (the trie behind inherited-widget lookup):
+  ported node for node; keys hash with `maphash.Comparable` or their own
+  `HashCode()` (Flutter's tests force collisions that way). Flutter's tests
+  ported, plus one that re-reads every intermediate map: a mutation that
+  broke persistence in the collision path survived Flutter's tests. The
+  16-entry inflation threshold is a performance detail (an equivalent
+  mutation).
