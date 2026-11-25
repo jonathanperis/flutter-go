@@ -18,10 +18,10 @@ func (a point32) add(b point32) point32 { return point32{a.x + b.x, a.y + b.y} }
 func (a point32) div(b point32) point32 { return point32{a.x / b.x, a.y / b.y} }
 func (a point32) scale(s f32) point32   { return point32{a.x * s, a.y * s} }
 func (a point32) abs() point32          { return point32{abs32(a.x), abs32(a.y)} }
-func (a point32) length() f32           { return sqrt32(a.x*a.x + a.y*a.y) }
+func (a point32) length() f32           { return sqrt32(float32(a.x*a.x) + float32(a.y*a.y)) }
 func (a point32) distanceSquared(b point32) f32 {
 	d := a.sub(b)
-	return d.x*d.x + d.y*d.y
+	return float32(d.x*d.x) + float32(d.y*d.y)
 }
 func (a point32) normalize() point32 {
 	l := a.length()
@@ -31,8 +31,8 @@ func (a point32) normalize() point32 {
 	return point32{a.x / l, a.y / l}
 }
 func (a point32) angleTo(b point32) f32 {
-	cross := a.x*b.y - a.y*b.x
-	dot := a.x*b.x + a.y*b.y
+	cross := float32(a.x*b.y) - float32(a.y*b.x)
+	dot := float32(a.x*b.x) + float32(a.y*b.y)
 	return f32(math.Atan2(float64(cross), float64(dot)))
 }
 
@@ -89,7 +89,7 @@ func split(left, right, ratioLeft, ratioRight f32) f32 {
 	if ratioLeft == 0 && ratioRight == 0 {
 		return (left + right) / 2
 	}
-	return (left*ratioRight + right*ratioLeft) / (ratioLeft + ratioRight)
+	return (float32(left*ratioRight) + float32(right*ratioLeft)) / (ratioLeft + ratioRight)
 }
 
 var kPrecomputedVariables = [...][2]f32{
@@ -120,8 +120,8 @@ const (
 func computeNAndXj(ratio f32) (f32, f32) {
 	last := kPrecomputedVariables[len(kPrecomputedVariables)-1]
 	if ratio > kSecondMaxRatio {
-		n := kThirdNSlope*(ratio-kSecondMaxRatio) + last[0]
-		kxj := kThirdKxjSlope*(ratio-kSecondMaxRatio) + last[1]
+		n := float32(kThirdNSlope*(ratio-kSecondMaxRatio)) + last[0]
+		kxj := float32(kThirdKxjSlope*(ratio-kSecondMaxRatio)) + last[1]
 		return n, 1 - 1/kxj
 	}
 	ratio = clamp32(ratio, kMinRatio, kSecondMaxRatio)
@@ -129,7 +129,7 @@ func computeNAndXj(ratio f32) (f32, f32) {
 	if ratio < kFirstMaxRatio {
 		steps = (ratio - kMinRatio) * kFirstStepInverse
 	} else {
-		steps = (ratio-kFirstMaxRatio)*kSecondStepInverse + kFirstNumRecords - 1
+		steps = float32((ratio-kFirstMaxRatio)*kSecondStepInverse) + kFirstNumRecords - 1
 	}
 	left := int(math.Floor(float64(steps)))
 	if left < 0 { // size_t clamp: a negative floor wraps to a huge value in C++
@@ -139,8 +139,8 @@ func computeNAndXj(ratio f32) (f32, f32) {
 		left = len(kPrecomputedVariables) - 2
 	}
 	frac := steps - f32(left)
-	n := (1-frac)*kPrecomputedVariables[left][0] + frac*kPrecomputedVariables[left+1][0]
-	kxj := (1-frac)*kPrecomputedVariables[left][1] + frac*kPrecomputedVariables[left+1][1]
+	n := float32((1-frac)*kPrecomputedVariables[left][0]) + float32(frac*kPrecomputedVariables[left+1][0])
+	kxj := float32((1-frac)*kPrecomputedVariables[left][1]) + float32(frac*kPrecomputedVariables[left+1][1])
 	return n, 1 - 1/kxj
 }
 
@@ -149,7 +149,7 @@ func findCircleCenter(a, b point32, r f32) point32 {
 	m := a.add(b).scale(0.5)
 	cToM := point32{-aToB.y, aToB.x}
 	distanceAM := aToB.length() / 2
-	distanceCM := sqrt32(r*r - distanceAM*distanceAM)
+	distanceCM := sqrt32(float32(r*r) - float32(distanceAM*distanceAM))
 	return m.sub(cToM.normalize().scale(distanceCM))
 }
 
@@ -164,7 +164,7 @@ func computeOctant(center point32, a, radius f32) seOctant {
 	yJ := pow32(1-pow32(xjRatio, n), 1/n) * a
 	maxTheta := asin32(pow32(xjRatio, n/2))
 	tanPhiJ := pow32(xJ/yJ, n-1)
-	d := (xJ - tanPhiJ*yJ) / (1 - tanPhiJ)
+	d := (xJ - float32(tanPhiJ*yJ)) / (1 - tanPhiJ)
 	R := f32(float64(a-d-g) * math.Sqrt(2)) // C++: Scalar * sqrt(2) is a double product
 	pointM := point32{a - g, a - g}
 	pointJ := point32{xJ, yJ}

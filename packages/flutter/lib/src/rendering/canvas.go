@@ -80,5 +80,5 @@ func (r *Recorder) DrawPicture(p Picture, at Offset) {
 }
 
 func hex(c Color) string {
-	return fmt.Sprintf("#%02x%02x%02x", int(c.R*255+0.5), int(c.G*255+0.5), int(c.B*255+0.5))
+	return fmt.Sprintf("#%02x%02x%02x", int(float64(c.R*255)+0.5), int(float64(c.G*255)+0.5), int(float64(c.B*255)+0.5))
 }

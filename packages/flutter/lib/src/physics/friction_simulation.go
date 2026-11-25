@@ -1,6 +1,7 @@
 package physics
 
 import (
+	"github.com/jonathanperis/flutter-go/flutter_go/dart"
 	"math"
 
 	"github.com/jonathanperis/flutter-go/engine/src/flutter/lib/ui/go"
@@ -53,11 +54,11 @@ func (s *FrictionSimulation) init(drag, position, velocity float64, opts ...Fric
 	if o.Tolerance != nil {
 		s.SimulationBase = NewSimulationBase(*o.Tolerance)
 	}
-	s.drag, s.dragLog, s.x, s.v = drag, math.Log(drag), position, velocity
+	s.drag, s.dragLog, s.x, s.v = drag, dart.Log(drag), position, velocity
 	s.constantDeceleration = o.ConstantDeceleration * sign(velocity)
 	s.finalTime = math.Inf(1) // must be infinite while Newton's method calls Dx
 	s.finalTime = newtonsMethod(0, 0, s.Dx, func(t float64) float64 {
-		return (s.v * math.Pow(s.drag, t) * s.dragLog) - s.constantDeceleration
+		return float64((s.v * dart.Pow(s.drag, t) * s.dragLog)) - s.constantDeceleration
 	}, 10)
 }
 
@@ -76,21 +77,21 @@ func NewFrictionSimulationThrough(startPosition, endPosition, startVelocity, end
 func ptr[T any](v T) *T { return &v }
 
 func dragFor(startPosition, endPosition, startVelocity, endVelocity float64) float64 {
-	return math.Pow(math.E, (startVelocity-endVelocity)/(startPosition-endPosition))
+	return dart.Pow(math.E, (startVelocity-endVelocity)/(startPosition-endPosition))
 }
 
 func (s *FrictionSimulation) X(t float64) float64 {
 	if t > s.finalTime {
 		return s.FinalX()
 	}
-	return s.x + s.v*math.Pow(s.drag, t)/s.dragLog - s.v/s.dragLog - ((s.constantDeceleration / 2) * t * t)
+	return s.x + s.v*dart.Pow(s.drag, t)/s.dragLog - s.v/s.dragLog - float64(((s.constantDeceleration / 2) * t * t))
 }
 
 func (s *FrictionSimulation) Dx(t float64) float64 {
 	if t > s.finalTime {
 		return 0
 	}
-	return s.v*math.Pow(s.drag, t) - s.constantDeceleration*t
+	return float64(s.v*dart.Pow(s.drag, t)) - float64(s.constantDeceleration*t)
 }
 
 // FinalX is where the particle comes to rest.

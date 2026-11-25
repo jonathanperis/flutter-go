@@ -36,7 +36,7 @@ func (s *SimulationBase) SetTolerance(t Tolerance) { s.tolerance = t }
 
 // powE is Dart's math.pow(math.e, x), which Flutter uses instead of exp; the
 // two can differ in the last bit, and the difftests compare exactly.
-func powE(x float64) float64 { return math.Pow(math.E, x) }
+func powE(x float64) float64 { return dart.Pow(math.E, x) }
 
 func dartDouble(v float64) string { return dart.DoubleToString(v) }
 func fixed1(v float64) string     { return dart.ToStringAsFixed(v, 1) }

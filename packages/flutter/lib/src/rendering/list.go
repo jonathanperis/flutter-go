@@ -108,7 +108,7 @@ func (r *RenderFixedExtentList) PerformLayout(c Constraints) Size {
 			"put it inside Expanded or a SizedBox (Flutter: \"Vertical viewport was given unbounded height\")", c))
 	}
 	size := ui.NewSize(c.MaxW, c.MaxH)
-	r.maxScroll = math.Max(0, float64(r.itemCount)*r.itemExtent-size.Height)
+	r.maxScroll = math.Max(0, float64(float64(r.itemCount)*r.itemExtent)-size.Height)
 
 	first, last := r.indexRange(size.Height)
 	for i := range r.live {
@@ -130,7 +130,7 @@ func (r *RenderFixedExtentList) PerformLayout(c Constraints) Size {
 		}
 		r.kids = append(r.kids, child)
 		Layout(child, Tight(ui.NewSize(size.Width, r.itemExtent)))
-		child.Base().Offset = ui.NewOffset(0, float64(i)*r.itemExtent-r.offset)
+		child.Base().Offset = ui.NewOffset(0, float64(float64(i)*r.itemExtent)-r.offset)
 	}
 	return size
 }

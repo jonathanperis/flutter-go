@@ -1,6 +1,7 @@
 package physics
 
 import (
+	"github.com/jonathanperis/flutter-go/flutter_go/dart"
 	"math"
 	"time"
 )
@@ -25,7 +26,7 @@ func NewSpringDescriptionWithDurationAndBounce(duration time.Duration, bounce fl
 	}
 	durationInSeconds := float64(duration.Milliseconds()) / 1000
 	const mass = 1.0
-	stiffness := (4 * math.Pi * math.Pi * mass) / math.Pow(durationInSeconds, 2)
+	stiffness := (4 * math.Pi * math.Pi * mass) / dart.Pow(durationInSeconds, 2)
 	dampingRatio := 1 / (bounce + 1)
 	if bounce > 0 {
 		dampingRatio = 1.0 - bounce
@@ -159,47 +160,49 @@ type springSolution interface {
 }
 
 func newSpringSolution(spring SpringDescription, initialPosition, initialVelocity float64) springSolution {
-	cmk := spring.Damping*spring.Damping - 4*spring.Mass*spring.Stiffness
+	cmk := float64(spring.Damping*spring.Damping) - float64(4*spring.Mass*spring.Stiffness)
 	switch {
 	case cmk > 0.0:
 		r1 := (-spring.Damping - math.Sqrt(cmk)) / (2.0 * spring.Mass)
 		r2 := (-spring.Damping + math.Sqrt(cmk)) / (2.0 * spring.Mass)
-		c2 := (initialVelocity - r1*initialPosition) / (r2 - r1)
+		c2 := (initialVelocity - float64(r1*initialPosition)) / (r2 - r1)
 		return overdampedSolution{r1, r2, initialPosition - c2, c2}
 	case cmk < 0.0:
-		w := math.Sqrt(4.0*spring.Mass*spring.Stiffness-spring.Damping*spring.Damping) / (2.0 * spring.Mass)
+		w := math.Sqrt(float64(4.0*spring.Mass*spring.Stiffness)-float64(spring.Damping*spring.Damping)) / (2.0 * spring.Mass)
 		r := -(spring.Damping / 2.0 / spring.Mass)
-		return underdampedSolution{w, r, initialPosition, (initialVelocity - r*initialPosition) / w}
+		return underdampedSolution{w, r, initialPosition, (initialVelocity - float64(r*initialPosition)) / w}
 	}
 	r := -spring.Damping / (2.0 * spring.Mass)
-	return criticalSolution{r, initialPosition, initialVelocity - (r * initialPosition)}
+	return criticalSolution{r, initialPosition, initialVelocity - float64((r * initialPosition))}
 }
 
 type criticalSolution struct{ r, c1, c2 float64 }
 
-func (s criticalSolution) x(t float64) float64 { return (s.c1 + s.c2*t) * powE(s.r*t) }
+func (s criticalSolution) x(t float64) float64 { return (s.c1 + float64(s.c2*t)) * powE(s.r*t) }
 func (s criticalSolution) dx(t float64) float64 {
 	p := powE(s.r * t)
-	return s.r*(s.c1+s.c2*t)*p + s.c2*p
+	return float64(s.r*(s.c1+float64(s.c2*t))*p) + float64(s.c2*p)
 }
 func (criticalSolution) springType() SpringType { return SpringTypeCriticallyDamped }
 
 type overdampedSolution struct{ r1, r2, c1, c2 float64 }
 
-func (s overdampedSolution) x(t float64) float64 { return s.c1*powE(s.r1*t) + s.c2*powE(s.r2*t) }
+func (s overdampedSolution) x(t float64) float64 {
+	return float64(s.c1*powE(s.r1*t)) + float64(s.c2*powE(s.r2*t))
+}
 func (s overdampedSolution) dx(t float64) float64 {
-	return s.c1*s.r1*powE(s.r1*t) + s.c2*s.r2*powE(s.r2*t)
+	return float64(s.c1*s.r1*powE(s.r1*t)) + float64(s.c2*s.r2*powE(s.r2*t))
 }
 func (overdampedSolution) springType() SpringType { return SpringTypeOverDamped }
 
 type underdampedSolution struct{ w, r, c1, c2 float64 }
 
 func (s underdampedSolution) x(t float64) float64 {
-	return powE(s.r*t) * (s.c1*math.Cos(s.w*t) + s.c2*math.Sin(s.w*t))
+	return powE(s.r*t) * (float64(s.c1*dart.Cos(s.w*t)) + float64(s.c2*dart.Sin(s.w*t)))
 }
 func (s underdampedSolution) dx(t float64) float64 {
-	p, c, sn := powE(s.r*t), math.Cos(s.w*t), math.Sin(s.w*t)
-	return p*(s.c2*s.w*c-s.c1*s.w*sn) + s.r*p*(s.c2*sn+s.c1*c)
+	p, c, sn := powE(s.r*t), dart.Cos(s.w*t), dart.Sin(s.w*t)
+	return float64(p*(float64(s.c2*s.w*c)-float64(s.c1*s.w*sn))) + float64(s.r*p*(float64(s.c2*sn)+float64(s.c1*c)))
 }
 func (underdampedSolution) springType() SpringType { return SpringTypeUnderDamped }
 

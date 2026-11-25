@@ -136,12 +136,16 @@ type ClampingScrollSimulationOptions struct {
 	Tolerance          *physics.Tolerance
 }
 
-var kDecelerationRate = math.Log(0.78) / math.Log(0.9)
+var kDecelerationRate = dart.Log(0.78) / dart.Log(0.9)
 
-const (
-	kInflexion    = 0.35
-	physicalCoeff = 9.80665 * 39.37 * 160.0 * 0.84
-)
+const kInflexion = 0.35
+
+// physicalCoeff is computed step by step in float64, as Dart evaluates its
+// const: a Go constant expression would be exact and round only once.
+var physicalCoeff = func() float64 {
+	g, inch, px, tune := 9.80665, 39.37, 160.0, 0.84
+	return g * inch * px * tune
+}()
 
 func NewClampingScrollSimulation(o ClampingScrollSimulationOptions) *ClampingScrollSimulation {
 	s := &ClampingScrollSimulation{SimulationBase: physics.NewSimulationBase(),
@@ -153,7 +157,7 @@ func NewClampingScrollSimulation(o ClampingScrollSimulationOptions) *ClampingScr
 		s.SimulationBase = physics.NewSimulationBase(*o.Tolerance)
 	}
 	referenceVelocity := s.Friction * physicalCoeff / kInflexion
-	androidDuration := math.Pow(math.Abs(s.Velocity)/referenceVelocity, 1/(kDecelerationRate-1.0))
+	androidDuration := dart.Pow(math.Abs(s.Velocity)/referenceVelocity, 1/(kDecelerationRate-1.0))
 	s.duration = kDecelerationRate * kInflexion * androidDuration
 	s.distance = s.Velocity * s.duration / kDecelerationRate
 	return s
@@ -161,12 +165,12 @@ func NewClampingScrollSimulation(o ClampingScrollSimulationOptions) *ClampingScr
 
 func (s *ClampingScrollSimulation) X(time float64) float64 {
 	t := ui.ClampDouble(time/s.duration, 0, 1)
-	return s.Position + s.distance*(1.0-math.Pow(1.0-t, kDecelerationRate))
+	return s.Position + float64(s.distance*(1.0-dart.Pow(1.0-t, kDecelerationRate)))
 }
 
 func (s *ClampingScrollSimulation) Dx(time float64) float64 {
 	t := ui.ClampDouble(time/s.duration, 0, 1)
-	return s.Velocity * math.Pow(1.0-t, kDecelerationRate-1.0)
+	return s.Velocity * dart.Pow(1.0-t, kDecelerationRate-1.0)
 }
 
 func (s *ClampingScrollSimulation) IsDone(time float64) bool { return time >= s.duration }

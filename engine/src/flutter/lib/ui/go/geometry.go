@@ -42,7 +42,7 @@ func NewOffsetFromDirection(direction float64, distance ...float64) Offset {
 	if len(distance) > 0 {
 		d = distance[0]
 	}
-	return Offset{d * math.Cos(direction), d * math.Sin(direction)}
+	return Offset{d * dart.Cos(direction), d * dart.Sin(direction)}
 }
 
 func (o Offset) components() (float64, float64) { return o.Dx, o.Dy }
@@ -53,9 +53,9 @@ func (o Offset) LessEq(b OffsetBase) bool       { x, y := b.components(); return
 func (o Offset) Greater(b OffsetBase) bool      { x, y := b.components(); return o.Dx > x && o.Dy > y }
 func (o Offset) GreaterEq(b OffsetBase) bool    { x, y := b.components(); return o.Dx >= x && o.Dy >= y }
 
-func (o Offset) Distance() float64        { return math.Sqrt(o.Dx*o.Dx + o.Dy*o.Dy) }
-func (o Offset) DistanceSquared() float64 { return o.Dx*o.Dx + o.Dy*o.Dy }
-func (o Offset) Direction() float64       { return math.Atan2(o.Dy, o.Dx) }
+func (o Offset) Distance() float64        { return math.Sqrt(float64(o.Dx*o.Dx) + float64(o.Dy*o.Dy)) }
+func (o Offset) DistanceSquared() float64 { return float64(o.Dx*o.Dx) + float64(o.Dy*o.Dy) }
+func (o Offset) Direction() float64       { return dart.Atan2(o.Dy, o.Dx) }
 
 func (o Offset) Scale(scaleX, scaleY float64) Offset { return Offset{o.Dx * scaleX, o.Dy * scaleY} }
 func (o Offset) Translate(translateX, translateY float64) Offset {
@@ -440,8 +440,8 @@ func (r rrectLike) SafeInnerRect() Rect {
 	topRadius := math.Max(r.TlRadiusY, r.TrRadiusY)
 	rightRadius := math.Max(r.TrRadiusX, r.BrRadiusX)
 	bottomRadius := math.Max(r.BrRadiusY, r.BlRadiusY)
-	return Rect{r.Left + leftRadius*kInsetFactor, r.Top + topRadius*kInsetFactor,
-		r.Right - rightRadius*kInsetFactor, r.Bottom - bottomRadius*kInsetFactor}
+	return Rect{r.Left + float64(leftRadius*kInsetFactor), r.Top + float64(topRadius*kInsetFactor),
+		r.Right - float64(rightRadius*kInsetFactor), r.Bottom - float64(bottomRadius*kInsetFactor)}
 }
 
 func (r rrectLike) MiddleRect() Rect {
@@ -601,7 +601,7 @@ func (r RRect) Contains(point Offset) bool {
 	}
 	x /= radiusX
 	y /= radiusY
-	return !(x*x+y*y > 1.0)
+	return !(float64(x*x)+float64(y*y) > 1.0)
 }
 
 // RRectLerp is RRect.lerp; nil stands for Dart's null.
@@ -679,10 +679,10 @@ type RSTransformComponents struct {
 }
 
 func NewRSTransformFromComponents(c RSTransformComponents) RSTransform {
-	scos := math.Cos(c.Rotation) * c.Scale
-	ssin := math.Sin(c.Rotation) * c.Scale
-	tx := c.TranslateX + -scos*c.AnchorX + ssin*c.AnchorY
-	ty := c.TranslateY + -ssin*c.AnchorX - scos*c.AnchorY
+	scos := dart.Cos(c.Rotation) * c.Scale
+	ssin := dart.Sin(c.Rotation) * c.Scale
+	tx := c.TranslateX + float64(-scos*c.AnchorX) + float64(ssin*c.AnchorY)
+	ty := c.TranslateY + float64(-ssin*c.AnchorX) - float64(scos*c.AnchorY)
 	return NewRSTransform(scos, ssin, tx, ty)
 }
 

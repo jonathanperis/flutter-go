@@ -62,8 +62,8 @@ Start here when continuing flutter-go in a new session.
 ## Gotchas
 
 - zsh: never name a shell variable `path` (it is tied to `PATH`).
-- Go's `math.Pow` isn't C's `pow`: compare with Flutter to ~1e-12 relative,
-  not bit for bit.
+- Bit-exact parity with Flutter is achievable (physics, scroll simulations,
+  geometry and color are exact); see the exactness rules above.
 - Window screenshots (`screencapture -l`) stopped working on this machine;
   environmental.
 - Benchmarks vary about ±30% between runs here.

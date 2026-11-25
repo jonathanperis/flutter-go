@@ -558,3 +558,35 @@ The standing goal is now full API parity with Flutter 3.50.1's Dart layer
   `offset & size`), and literals became constructors. All tests and
   difftests pass unchanged. `rendering.Offset/Size/Rect` remain as aliases
   for now (like Dart's re-export); remove them once callers import `ui`.
+
+### dart:ui Color; matching Dart's floating point bit for bit
+- `painting.go` starts dart:ui's painting.dart with `Color` and
+  `ColorSpace` (deprecated 8-bit accessors included), ported with the
+  engine's color tests (except Paint, subclass and 1<<1000000 cases) and a
+  21-case difftest compared **exactly**. Flutter quirks kept:
+  `_ClampTransform` never calls its child transform (extended sRGB →
+  Display P3 only clamps), and the identity transform keeps the source
+  color space label (sRGB → extended sRGB stays tagged sRGB).
+- **Why exact was hard, and the three rules that fixed it** (each found by
+  a failing bit, not assumed):
+  1. *Dart's math is libm's, plus VM special cases.* `math.pow` calls C's
+     `pow` (Go's `math.Pow` differs in the last bit), except that the VM
+     returns `x*x*x` for exponent 3, `x*x` for 2, `sqrt` for 0.5 and so on
+     (pow(0.3, 3.0) is 0.027 in Dart, 0.026999999999999996 in C). Same for
+     exp/log/sin/cos/atan2: `flutter_go/dart` wraps libm through cgo with
+     those special cases, verified value by value against Dart.
+  2. *Go fuses multiply-adds on arm64; Dart never does.* `a*b + c` can
+     become one FMA instruction (one rounding instead of two), and whether
+     it does depends on inlining, so the same function gave different bits
+     at two call sites. `flutter_go/cmd/fmacheck` lists every fusable float
+     expression in the ports and `-fix` wraps the product in `float64(...)`
+     (the spec's way to forbid fusion). 53 sites fixed.
+  3. *Go constant expressions are exact; Dart's consts round each step.*
+     `9.80665 * 39.37 * 160.0 * 0.84` folded exactly in Go differed from
+     Dart's double arithmetic; fmacheck now also flags float constant
+     expressions whose exact value differs from step-by-step float64.
+- **Result:** physics (15 scenes) and the scroll simulations (11 scenes)
+  now match Flutter with **zero** difference, down from 4.5e-13 and
+  2.7e-12; the difftests compare them exactly. The drag-fling scenes still
+  differ by up to 2.6e-11 (velocity tracker; to be fixed when gestures is
+  ported).

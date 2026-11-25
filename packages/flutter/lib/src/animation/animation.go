@@ -190,7 +190,7 @@ type Cubic struct{ A, B, C, D float64 }
 const cubicErrorBound = 0.001
 
 func evaluateCubic(a, b, m float64) float64 {
-	return 3*a*(1-m)*(1-m)*m + 3*b*(1-m)*m*m + m*m*m
+	return float64(3*a*(1-m)*(1-m)*m) + float64(3*b*(1-m)*m*m) + float64(m*m*m)
 }
 
 func (c Cubic) Transform(t float64) float64 {
@@ -336,7 +336,7 @@ func (c *Controller) tick(elapsed time.Duration) {
 	case 1:
 		c.value = c.to
 	default:
-		c.value = c.from + (c.to-c.from)*c.curve.Transform(t)
+		c.value = c.from + float64((c.to-c.from)*c.curve.Transform(t))
 	}
 	c.notify()
 	if t == 1 {
@@ -376,4 +376,4 @@ func (c *Controller) Dispose() { c.ticker.Stop(); c.listeners, c.statusFns = nil
 
 // LerpDouble is dart:ui's lerpDouble, a*(1-t) + b*t. Flutter uses this form
 // for sizes and colors; the rounding differs slightly from a + (b-a)*t.
-func LerpDouble(a, b, t float64) float64 { return a*(1-t) + b*t }
+func LerpDouble(a, b, t float64) float64 { return float64(a*(1-t)) + float64(b*t) }

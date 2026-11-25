@@ -1,6 +1,7 @@
 package widgets
 
 import (
+	"github.com/jonathanperis/flutter-go/flutter_go/dart"
 	"math"
 	"time"
 
@@ -27,7 +28,7 @@ const (
 var (
 	defaultSpring         = physics.NewSpringDescriptionWithDampingRatio(0.5, 100.0, 1.1)
 	fastSpring            = physics.NewSpringDescriptionWithDampingRatio(0.3, 75.0, 1.3) // BouncingScrollPhysics.spring, fast deceleration
-	rubberBandLambda      = math.Log(2) / 0.07
+	rubberBandLambda      = dart.Log(2) / 0.07
 	rubberBandSpring      = physics.SpringDescription{Mass: 1.0, Stiffness: 1e5 * rubberBandLambda * rubberBandLambda, Damping: (1e5 + 1) * rubberBandLambda}
 	motionStartThreshold  = 3.5   // BouncingScrollPhysics.dragStartDistanceMotionThreshold
 	motionStoppedDuration = 0.050 // ScrollDragController.motionStoppedDurationThreshold (s)
@@ -155,7 +156,7 @@ func (c *ScrollController) applyPhysicsToUserOffset(offset float64) float64 {
 	if c.physics() == BouncingFastPhysics {
 		factor = 0.26
 	}
-	friction := func(frac float64) float64 { return math.Pow(1-frac, 2) * factor }
+	friction := func(frac float64) float64 { return dart.Pow(1-frac, 2) * factor }
 	viewport := c.list.ViewportExtent()
 	var gamma float64
 	if easing {

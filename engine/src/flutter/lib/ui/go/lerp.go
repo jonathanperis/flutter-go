@@ -28,8 +28,8 @@ func LerpDouble(a, b *float64, t float64) *float64 {
 	if !isFinite(t) {
 		panic("ui: t must be finite when interpolating between values")
 	}
-	r := av*(1.0-t) + bv*t
+	r := float64(av*(1.0-t)) + float64(bv*t) // no FMA, as in Dart
 	return &r
 }
 
-func lerpDouble(a, b, t float64) float64 { return a*(1.0-t) + b*t }
+func lerpDouble(a, b, t float64) float64 { return float64(a*(1.0-t)) + float64(b*t) } // no FMA, as in Dart

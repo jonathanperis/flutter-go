@@ -60,11 +60,12 @@ type physicsRef struct {
 	String  string             `json:"string"`
 }
 
-// closeTo allows a few ULPs: Go's math.Pow is not the C library's pow that
-// Dart calls, so the last bits can differ.
-func closeTo(a, b float64) bool {
-	return a == b || math.Abs(a-b) <= 1e-12*math.Max(1, math.Max(math.Abs(a), math.Abs(b)))
-}
+// closeTo is exact equality: with dart.Pow/Log/Exp/... (the same libm
+// calls and special cases as the Dart VM), no fused multiply-adds
+// (fmacheck) and step-by-step constants, these values match Flutter bit for
+// bit. It is kept as a function so a tolerance could be reintroduced in one
+// place if a platform's libm ever differed.
+func closeTo(a, b float64) bool { return a == b || (a != a && b != b) }
 
 func TestPhysicsMatchesFlutter(t *testing.T) {
 	data, err := os.ReadFile("flutter/build/physics.json")
