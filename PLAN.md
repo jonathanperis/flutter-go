@@ -14,7 +14,7 @@ criterion. If a stage fails its criterion, stop and decide before going on.
 | 2 | Widget / Element core | Declarative rebuilds + `setState` work in Go | `widgets` package: stateless, stateful, render-object widgets; element reconciliation by type + key; dirty-only rebuilds; tests pass ✅ |
 | 3 | Input + counter app | End-to-end interactivity | Clicking "+" in a real window increments the counter; a Go widget test (`Tester.Tap`) proves it headless ✅ (taps injected through the pointer router; real mouse not automated) |
 | 4 | Differential layout tests | Our layout **equals** Flutter's | The same scenes built in Dart (`flutter test`) and in Go produce identical box geometry ✅ 11/11 scenes |
-| 5 | Performance | Go is fast enough per frame | Build + layout + paint of 10k widgets measured; GC and cgo cost reported against the 16.6 ms budget ⚠️ median OK, p99 over budget in some runs |
+| 5 | Performance | Go is fast enough per frame | Build + layout + paint of 10k widgets measured; GC and cgo cost reported against the 16.6 ms budget ✅ median 4–5 ms; p99 at the budget edge, but below real Flutter's on the same scene |
 | 6 | Decision gate | — | Findings below ✅ — recommendation: continue, with two conditions |
 
 ## Design rules
@@ -83,19 +83,37 @@ Benchmarks (framework only / with Impeller display-list recording):
 Removing per-element temporary slices and maps in the framework cut frame
 time by ~45%; the remaining allocations are mostly inherent to the API.
 
-Not measured yet: the same scene in real Flutter (profile mode). The twin
-benchmark is ready in `perf/flutter` (same grid, `setState` every frame,
-Flutter's own `FrameTiming` build and raster durations) and
-`scripts/perf_compare.sh` runs both sides. **Blocked: building a macOS
-Flutter app needs the full Xcode app**, and `flutter test` always runs in
-debug mode with asserts, which would make Flutter look slower than it is.
-Until this runs, we know Go is *within budget*, not whether it is *faster or
-slower than Dart*.
+### Go vs real Flutter (same grid, same machine, 2026-11-25)
+Flutter 3.51 master (`06f1c24`), **profile mode**, macOS, Impeller/Metal,
+measured with Flutter's own `FrameTiming`. Go numbers are the same run of
+`scripts/perf_compare.sh`. Both columns are UI-thread work only
+(build + layout + paint, no GPU rasterization).
+
+| Mode | Elements | Go p50 / p90 / p99 | Flutter p50 / p90 / p99 |
+|---|---|---|---|
+| repaint every frame | 20,303 vs 20,415 | 4.1 / 7.1 / 15.8 ms | 9.9 / 14.2 / 25.7 ms |
+| relayout every frame | 20,303 vs 20,415 | 4.9 / 8.2 / 14.6 ms | 15.1 / 19.6 / 28.3 ms |
+
+Flutter's GPU raster thread took a further 9.5 ms p50 / 15.3 ms p99.
+
+**Read this carefully: flutter-go does less work per frame.** Flutter also
+builds a layer tree for compositing, runs a full `updateChildren` with
+slot tracking, looks up `DefaultTextStyle`/`MediaQuery` for each `Text`,
+and profile mode keeps timeline tracing on. flutter-go has none of that
+yet. So the result is **"Go is not the bottleneck"**, not "Go is 2–3× faster
+than Dart". A fair speed claim needs flutter-go to reach feature parity
+for this scene (layers, repaint boundaries) and the comparison rerun.
+
+What the comparison does settle: the worry that Go's GC makes this
+architecture unworkable is not supported. Go's p99 is below Flutter's on
+the same scene, and Flutter itself goes over the 16.6 ms budget here.
+The grid is simply an extreme workload for both.
 
 ### Recommendation
 Continue, with two conditions:
-1. **Add the missing comparison:** run the same grid in Flutter profile mode
-   on macOS, so the performance verdict is relative, not just absolute.
+1. ~~**Add the missing comparison**~~ ✅ done: Go's UI-thread time is below
+   Flutter's on the same grid, with the caveat that Go does less work.
+   Rerun `scripts/perf_compare.sh` whenever layers/repaint boundaries land.
 2. **Make the next stage the hard parts,** not more box widgets: scrolling
    (needs viewport + slivers), text input (IME), and implicit animations.
    These stress the frame loop and are where an API in Go will either hold
