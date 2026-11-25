@@ -393,3 +393,43 @@ accessibility. Tab focus traversal is not implemented.
   the scenes release with zero velocity so all trackers agree), carried
   momentum between consecutive flings, overscroll glow, and scrollbars.
 
+
+## Goal: Flutter 3.50.1 with Go in place of Dart (from 2026-11-25)
+
+The standing goal is now full API parity with Flutter 3.50.1's Dart layer
+(see GOAL.md). Progress is measured by `docs/PARITY.md`.
+
+### P0: pin and measure
+- **Pinned to the 3.50.1 release tag** (ae9b586; engine 4d35714). The
+  local clone had drifted 12 commits past the old pin, which HANDOFF.md
+  wrongly described as matching. All 55 difftest scenes, regenerated with
+  Flutter 3.50.1, still match.
+- **upstream/** holds the 9,677 non-Dart files of 3.50.1. Three of them are
+  stored upstream with CRLF line endings, and `git add` would have
+  normalized them under upstream's own `* text=auto`, changing their blob
+  hashes. The sync script stages upstream's exact blobs; `--check`
+  compares hashes, not just file contents.
+- **Size of the job:** 2,792 public top-level declarations at 3.50.1
+  (widgets 949, material 524, rendering 312, dart:ui 195), about 321k lines
+  of Dart excluding comments. flutter-go exposed 46 before this goal.
+
+### physics (P2, done early as the first fully ported library)
+- All 12 declarations, ported from 3.50.1 (identical to master for this
+  library). The Dart→Go rules in docs/API_MAPPING.md were fixed while doing
+  it: `Simulation` is an interface plus an embeddable `SimulationBase` for
+  the mutable tolerance; optional named arguments are a variadic options
+  struct with pointers where "unset" differs from zero.
+- **Flutter's own tests ported** (all of test/physics/, except
+  `nearEqual`'s null cases, a documented divergence, and the
+  `BouncingScrollSimulation` cases, which belong to widgets).
+- **Difftest:** 15 scenes sampled every 50 ms for 7 s plus `finalX`,
+  `timeAtX`, spring type and `toString`; max difference 4.5e-13.
+- **The difftest was needed:** Flutter's tests use loose tolerances, so two
+  key rules survived mutation with them alone: the 10-iteration Newton solve
+  for `finalTime` (9 passed) and `BoundedFrictionSimulation`'s lower bound.
+  Both are caught now. Also found: `ScrollSpringSimulation.toString` prints
+  its own type name (debug-mode `objectRuntimeType`).
+- **Not caught, by design:** `math.Exp(x)` instead of Dart's
+  `pow(e, x)` differs only in the last bits, inside the comparison's 1e-12
+  relative tolerance. Go's `math.Pow` is not the C library's `pow` that
+  Dart uses, so exact bit equality is not a goal.
