@@ -16,6 +16,7 @@ criterion. If a stage fails its criterion, stop and decide before going on.
 | 4 | Differential layout tests | Our layout **equals** Flutter's | The same scenes built in Dart (`flutter test`) and in Go produce identical box geometry ✅ 11/11 scenes |
 | 5 | Performance | Go is fast enough per frame | Build + layout + paint of 10k widgets measured; GC and cgo cost reported against the 16.6 ms budget ✅ median 4–5 ms; p99 at the budget edge, but below real Flutter's on the same scene |
 | 6 | Decision gate | — | Findings below ✅ — recommendation: continue, with two conditions |
+| 7 | Lazy scrolling list | Building during layout, element lifecycle off-screen, scroll input | `ListViewBuilder` (fixed item height) builds the same item indices as Flutter, with the same positions, after jumps, clamping, and inside a Column ✅ 6/6 scenes |
 
 ## Design rules
 
@@ -114,7 +115,8 @@ Continue, with two conditions:
 1. ~~**Add the missing comparison**~~ ✅ done: Go's UI-thread time is below
    Flutter's on the same grid, with the caveat that Go does less work.
    Rerun `scripts/perf_compare.sh` whenever layers/repaint boundaries land.
-2. **Make the next stage the hard parts,** not more box widgets: scrolling
+2. **Make the next stage the hard parts** (scrolling ✅ stage 7; text input
+   and animations still to do), not more box widgets: scrolling
    (needs viewport + slivers), text input (IME), and implicit animations.
    These stress the frame loop and are where an API in Go will either hold
    up or not.
@@ -122,3 +124,33 @@ Continue, with two conditions:
 Gaps that remain: InheritedWidget, repaint boundaries/layers, relayout
 boundaries, baseline alignment, RTL, accessibility, Retina scale detection
 (the window reported scale 1.0), and every platform except macOS.
+
+## Stage 7 findings: lazy scrolling (2026-11-25)
+
+- **Building during layout works in Go.** The render object asks a
+  `ChildManager` for items while it lays out; the element layer builds
+  them on demand. This is the same inversion Flutter uses
+  (`invokeLayoutCallback`), and it needed one new element kind, ~150 lines.
+- **Matches Flutter on 6 list scenes**: same set of built indices (visible
+  plus the 250 px cache on each side), same positions, same final offset,
+  including fractional item heights, a list inside `Column`/`Expanded`, a
+  list shorter than the viewport, and jumping past the end. Changing the
+  cache extent to 200 px makes 5 of the 6 scenes fail, so the test really
+  checks the laziness rule.
+- **A behavior difference the test surfaced:** Flutter's `jumpTo` accepts
+  out-of-range offsets and *animates* back with the scroll physics; flutter-go
+  clamps immediately. The comparison uses Flutter's settled state. Scroll
+  physics (fling, overscroll, the bounce on macOS) need an animation system,
+  which flutter-go does not have yet.
+- **Item state** is disposed when an item leaves the cache area and created
+  again when it comes back, as in Flutter without keep-alive.
+- **Drag** starts after an 18 px slop that is not applied to the scroll
+  (Flutter's `DragStartBehavior.start`) and cancels taps. This is unit
+  tested in Go but not yet compared with Flutter's gesture arena.
+- **Cost is independent of item count:** ~1.4 µs per scroll frame (layout
+  only, no paint) for both 1,000 and 1,000,000 items.
+
+Not done: variable-height items (Flutter's `RenderSliverList`, which must
+estimate extents), horizontal lists, slivers in general (`CustomScrollView`),
+keep-alive, scrollbars, and scroll physics/animations.
+

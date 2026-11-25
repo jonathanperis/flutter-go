@@ -163,3 +163,28 @@ func TestFrameBudget(t *testing.T) {
 		}
 	}
 }
+
+// BenchmarkScrollFrame scrolls a 1,000,000-item list by 7px per frame. The
+// cost should depend on the number of visible items, not the item count.
+func BenchmarkScrollFrame(b *testing.B) {
+	for _, count := range []int{1_000, 1_000_000} {
+		b.Run(fmt.Sprintf("items=%d", count), func(b *testing.B) {
+			r.SetTextEngine(r.FixedTextEngine{})
+			c := NewScrollController(0)
+			owner := &BuildOwner{}
+			owner.RunApp(ListViewBuilder{ItemCount: count, ItemExtent: 56, Controller: c,
+				ItemBuilder: func(_ *Element, i int) Widget {
+					return ColoredBox{Color: r.RGB(0xffffff), Child: Text{Text: fmt.Sprint("Row ", i)}}
+				}})
+			size := r.Size{W: 800, H: 600}
+			owner.DrawFrame(size, nopCanvas{})
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				off := float64(i*7) - float64(i*7/50_000)*50_000 // wrap within the first 50k px
+				c.JumpTo(off)
+				owner.DrawFrame(size, nopCanvas{})
+			}
+		})
+	}
+}

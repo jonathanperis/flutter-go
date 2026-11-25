@@ -90,3 +90,30 @@ func (t *Tester) one(f Finder) *widgets.Element {
 	}
 	return all[0]
 }
+
+// Drag presses at the center of the element matched by f, moves by dy in
+// steps of at most 10px, and releases.
+func (t *Tester) Drag(f Finder, dy float64) {
+	t.t.Helper()
+	rc := t.Rect(f)
+	p := r.Offset{X: rc.X + rc.W/2, Y: rc.Y + rc.H/2}
+	t.router.PointerDown(p)
+	for moved := 0.0; moved != dy; {
+		step := dy - moved
+		if step > 10 {
+			step = 10
+		} else if step < -10 {
+			step = -10
+		}
+		moved += step
+		t.router.PointerMove(r.Offset{X: p.X, Y: p.Y + moved})
+	}
+	t.router.PointerUp(r.Offset{X: p.X, Y: p.Y + dy})
+}
+
+// Scroll sends a mouse-wheel delta at the center of the element matched by f.
+func (t *Tester) Scroll(f Finder, dy float64) {
+	t.t.Helper()
+	rc := t.Rect(f)
+	t.router.Scroll(r.Offset{X: rc.X + rc.W/2, Y: rc.Y + rc.H/2}, dy)
+}
