@@ -14,6 +14,19 @@ type TextStyle struct {
 	Bold     bool
 }
 
+// Merge returns base (s) overridden by the set fields of o. Go has no
+// "unset" for bool, so Bold can be turned on by o but not off.
+func (s TextStyle) Merge(o TextStyle) TextStyle {
+	if o.FontSize != 0 {
+		s.FontSize = o.FontSize
+	}
+	if o.Color != (Color{}) {
+		s.Color = o.Color
+	}
+	s.Bold = s.Bold || o.Bold
+	return s
+}
+
 // TextColor returns the color to draw with: an unset (zero) Color would be
 // fully transparent, so it means opaque black instead.
 func (s TextStyle) TextColor() Color {

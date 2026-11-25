@@ -30,6 +30,7 @@ func New(t testing.TB) *Tester {
 	// flutter_test's default view: 800×600 logical pixels at DPR 3.
 	o := &widgets.BuildOwner{DevicePixelRatio: 3}
 	tt := &Tester{t: t, Owner: o, router: widgets.NewPointerRouter(o), Size: r.Size{W: 800, H: 600}}
+	o.SetViewSize(tt.Size)
 	tt.router.Now = func() float64 { return tt.Now.Seconds() }
 	o.Clipboard = &MemoryClipboard{}
 	o.Scheduler().Clock = func() time.Duration { return tt.Now }

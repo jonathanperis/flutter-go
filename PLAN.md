@@ -262,3 +262,36 @@ Also: multi-line fields, mouse drag-selection, double-click word select,
 selection handles/toolbar, undo/redo, password obscuring, and
 accessibility. Tab focus traversal is not implemented.
 
+## G1 findings: InheritedWidget (2026-11-25)
+
+- **`InheritedWidget` with dependency tracking**, as in Flutter: each element
+  carries a map from inherited type to the providing ancestor (copied only
+  where a provider adds itself), `DependOn[T](ctx)` registers a dependency,
+  and a provider rebuilt with `UpdateShouldNotify` true marks exactly its
+  dependents dirty, even when everything in between is skipped.
+  `MediaQuery` (view size and pixel ratio, updated on resize) and
+  `DefaultTextStyle` are built on it; `Text` is now a stateless widget that
+  merges the inherited style, like Flutter's.
+- **Rebuilds match Flutter step by step** (which widgets build, in order)
+  for a value change, a parent rebuild without a change, and re-pumping the
+  same subtree. Three mutations (always notify, never notify, no rebuild
+  skipping) each fail.
+- **Go's stand-in for `const`: value equality.** Flutter skips a subtree when
+  the new widget is *identical* to the old one, which const widgets and the
+  `widget.child` pattern produce. Go structs have no identity, but
+  comparable ones have `==`, so flutter-go skips a child whose widget is
+  equal to the previous one. Widgets holding slices, maps or funcs can't be
+  compared and always update. This **diverges from Flutter on purpose**:
+  a *new but equal* subtree rebuilds in Flutter and doesn't in flutter-go;
+  the test asserts that divergence explicitly. It relies on the same
+  contract Flutter's identity check does: `Build` depends only on the
+  widget's fields and on inherited widgets.
+- **The test found a framework bug:** the allocation-free fast path in list
+  reconciliation called `update` directly and bypassed the skip.
+- **Effect on performance:** the grid benchmark went from 3.1 ms to 2.2 ms
+  per frame (framework only), because unchanged widgets such as the row
+  labels no longer rebuild. This answers part of the earlier finding
+  "No const widgets".
+- **Another zero-value limit:** `TextStyle.Merge` can't let a child turn
+  `Bold` off, because Go has no "unset" for `bool`.
+

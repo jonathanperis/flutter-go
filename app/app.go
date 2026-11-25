@@ -104,6 +104,8 @@ func Run(root widgets.Widget, o Options) error {
 	})
 	router.Now = func() float64 { return time.Since(epoch).Seconds() }
 	owner.DevicePixelRatio = float64(layer.Scale())
+	ww, wh := win.GetSize()
+	owner.SetViewSize(r.Size{W: float64(ww), H: float64(wh)})
 	owner.RunApp(root)
 
 	// GLFW reports cursor positions in logical points, which is what layout uses.

@@ -83,6 +83,10 @@ final Map<String, Widget> scenes = <String, Widget>{
     children: <Widget>[box(10, 10), box(20, 20), box(30, 30)],
   ),
   'text_center': const Center(child: Text('hello', style: TextStyle(fontSize: 20))),
+  'default_text_style': const DefaultTextStyle(
+    style: TextStyle(fontSize: 20),
+    child: Center(child: Text('hello')),
+  ),
   'text_wrap': const Align(
     alignment: Alignment.topLeft,
     child: SizedBox(width: 100, child: Text('hello wrapping world', style: TextStyle(fontSize: 10))),
