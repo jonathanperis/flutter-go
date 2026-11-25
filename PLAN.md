@@ -83,8 +83,13 @@ Benchmarks (framework only / with Impeller display-list recording):
 Removing per-element temporary slices and maps in the framework cut frame
 time by ~45%; the remaining allocations are mostly inherent to the API.
 
-Not measured yet: the same scene in real Flutter (release/profile mode).
-Without that we know Go is *within budget*, not whether it is *faster or
+Not measured yet: the same scene in real Flutter (profile mode). The twin
+benchmark is ready in `perf/flutter` (same grid, `setState` every frame,
+Flutter's own `FrameTiming` build and raster durations) and
+`scripts/perf_compare.sh` runs both sides. **Blocked: building a macOS
+Flutter app needs the full Xcode app**, and `flutter test` always runs in
+debug mode with asserts, which would make Flutter look slower than it is.
+Until this runs, we know Go is *within budget*, not whether it is *faster or
 slower than Dart*.
 
 ### Recommendation
