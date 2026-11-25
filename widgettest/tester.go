@@ -25,8 +25,11 @@ type Tester struct {
 // New creates a tester with Flutter's default test surface (800×600).
 func New(t testing.TB) *Tester {
 	r.SetTextEngine(r.FixedTextEngine{})
-	o := &widgets.BuildOwner{}
-	return &Tester{t: t, Owner: o, router: widgets.NewPointerRouter(o), Size: r.Size{W: 800, H: 600}}
+	// flutter_test's default view: 800×600 logical pixels at DPR 3.
+	o := &widgets.BuildOwner{DevicePixelRatio: 3}
+	tt := &Tester{t: t, Owner: o, router: widgets.NewPointerRouter(o), Size: r.Size{W: 800, H: 600}}
+	tt.router.Now = func() float64 { return tt.Now.Seconds() }
+	return tt
 }
 
 // PumpWidget mounts w as the root and draws a frame.
@@ -136,4 +139,28 @@ func (t *Tester) Scroll(f Finder, dy float64) {
 	t.t.Helper()
 	rc := t.Rect(f)
 	t.router.Scroll(r.Offset{X: rc.X + rc.W/2, Y: rc.Y + rc.H/2}, dy)
+}
+
+// FlingGesture drags by dy over duration in 16ms steps (pumping a frame each
+// step, so time passes) and releases, like flutter_test's tester.fling.
+func (t *Tester) FlingGesture(f Finder, dy float64, duration time.Duration) {
+	t.t.Helper()
+	rc := t.Rect(f)
+	p := r.Offset{X: rc.X + rc.W/2, Y: rc.Y + rc.H/2}
+	steps := int(duration / (16 * time.Millisecond))
+	if steps < 1 {
+		steps = 1
+	}
+	t.router.PointerDown(p)
+	for i := 1; i <= steps; i++ {
+		t.Pump(16 * time.Millisecond)
+		t.router.PointerMove(r.Offset{X: p.X, Y: p.Y + dy*float64(i)/float64(steps)})
+	}
+	t.router.PointerUp(r.Offset{X: p.X, Y: p.Y + dy})
+}
+
+// TapAt presses and releases at a global position.
+func (t *Tester) TapAt(x, y float64) {
+	t.router.PointerDown(r.Offset{X: x, Y: y})
+	t.router.PointerUp(r.Offset{X: x, Y: y})
 }

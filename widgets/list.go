@@ -1,6 +1,7 @@
 package widgets
 
 import (
+	"math"
 	"sort"
 	"time"
 
@@ -25,6 +26,9 @@ type ScrollController struct {
 	initial float64
 	sched   *animation.Scheduler
 	anim    *animation.Controller
+	// DevicePixelRatio sets the fling velocity tolerance (Flutter's
+	// toleranceFor). flutter_test uses 3; 0 means 1.
+	DevicePixelRatio float64
 }
 
 // AnimateTo scrolls to offset over d with curve, like Flutter's
@@ -42,6 +46,42 @@ func (c *ScrollController) AnimateTo(offset float64, d time.Duration, curve anim
 	a := c.anim
 	a.AddListener(func() { c.list.SetScrollOffset(a.Value()) })
 	a.AnimateTo(offset, d, curve)
+}
+
+// Fling starts a ballistic scroll at velocity (logical px/s, positive scrolls
+// content up), using Flutter's ClampingScrollPhysics: below the velocity
+// tolerance nothing happens, and the fling stops when it reaches an edge.
+func (c *ScrollController) Fling(velocity float64) {
+	if c.list == nil || c.sched == nil {
+		return
+	}
+	if c.anim != nil {
+		c.anim.Dispose()
+		c.anim = nil
+	}
+	pos, max := c.list.ScrollOffset(), c.list.MaxScrollExtent()
+	tolerance := 1.0 / (0.050 * c.dpr())
+	if math.Abs(velocity) < tolerance || (velocity > 0 && pos >= max) || (velocity < 0 && pos <= 0) {
+		return
+	}
+	a := animation.NewUnboundedController(c.sched, pos)
+	c.anim = a
+	a.AddListener(func() {
+		v := a.Value()
+		c.list.SetScrollOffset(v)
+		// Flutter's BallisticScrollActivity goes idle when setPixels overscrolls.
+		if v < 0 || v > c.list.MaxScrollExtent() {
+			a.Stop()
+		}
+	})
+	a.AnimateWith(animation.NewClampingScrollSimulation(pos, velocity))
+}
+
+func (c *ScrollController) dpr() float64 {
+	if c.DevicePixelRatio > 0 {
+		return c.DevicePixelRatio
+	}
+	return 1
 }
 
 // IsAnimating reports whether an AnimateTo is in progress.
@@ -116,10 +156,36 @@ func (e *Element) mountLazy() {
 	e.lazy = map[int]*Element{}
 	list := r.NewFixedExtentList(w.ItemExtent, w.ItemCount, listManager{e})
 	e.render = list
-	if w.Controller != nil {
-		w.Controller.sched = e.Scheduler()
-		w.Controller.attach(list)
+	e.attachController(w.Controller)
+}
+
+// attachController connects c (or an internal controller when c is nil,
+// as Flutter's Scrollable does) to the list and its fling/hold hooks.
+func (e *Element) attachController(c *ScrollController) {
+	if c == nil {
+		if e.ownScroll == nil {
+			e.ownScroll = NewScrollController(0)
+		}
+		c = e.ownScroll
 	}
+	list := e.render.(*r.RenderFixedExtentList)
+	c.sched = e.Scheduler()
+	if c.DevicePixelRatio == 0 {
+		c.DevicePixelRatio = e.owner.DevicePixelRatio
+	}
+	c.attach(list)
+	list.Fling = c.Fling
+	list.Hold = c.Hold
+}
+
+// Hold stops any running scroll animation and reports whether one was
+// running.
+func (c *ScrollController) Hold() bool {
+	if c.anim != nil && c.anim.IsAnimating() {
+		c.anim.Stop()
+		return true
+	}
+	return false
 }
 
 // updateLazy applies a new ListViewBuilder: live items are rebuilt with the
@@ -127,9 +193,8 @@ func (e *Element) mountLazy() {
 func (e *Element) updateLazy(old ListViewBuilder) {
 	w := e.widget.(ListViewBuilder)
 	list := e.render.(*r.RenderFixedExtentList)
-	if w.Controller != nil && w.Controller != old.Controller {
-		w.Controller.sched = e.Scheduler()
-		w.Controller.attach(list)
+	if w.Controller != old.Controller {
+		e.attachController(w.Controller)
 	}
 	list.Set(w.ItemExtent, w.ItemCount)
 	for _, i := range e.lazyIndices() {

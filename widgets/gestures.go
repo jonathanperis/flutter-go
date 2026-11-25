@@ -6,6 +6,12 @@ import (
 	r "github.com/jonathanperis/flutter-go/rendering"
 )
 
+// Fling velocity limits (Flutter's kMinFlingVelocity and kMaxFlingVelocity).
+const (
+	MinFlingVelocity = 50.0
+	MaxFlingVelocity = 8000.0
+)
+
 // TouchSlop is how far a pointer must move before a drag starts
 // (Flutter's kTouchSlop).
 const TouchSlop = 18.0
@@ -25,7 +31,13 @@ type PointerRouter struct {
 	start    r.Offset
 	last     r.Offset
 	dragging bool
+	// recent pointer positions during a drag, for release velocity
+	samples []sample
+	// Now returns the current time in seconds (for velocity estimation).
+	Now func() float64
 }
+
+type sample struct{ t, y float64 }
 
 func NewPointerRouter(o *BuildOwner) *PointerRouter { return &PointerRouter{owner: o} }
 
@@ -47,12 +59,48 @@ func (p *PointerRouter) PointerDown(pos r.Offset) {
 	p.down, p.list = p.hit(pos)
 	p.isDown, p.dragging = true, false
 	p.start, p.last = pos, pos
+	p.samples = p.samples[:0]
+	p.record(pos)
+	if p.list != nil && p.list.Hold != nil && p.list.Hold() {
+		// Touching a scrolling list only stops it: like Flutter's
+		// IgnorePointer during scroll activities, items don't get the tap.
+		p.down = nil
+	}
+}
+
+func (p *PointerRouter) record(pos r.Offset) {
+	if p.Now != nil {
+		p.samples = append(p.samples, sample{p.Now(), pos.Y})
+	}
+}
+
+// releaseVelocity estimates scroll velocity (px/s) from the last 100ms of
+// samples with a straight-line fit. Flutter's VelocityTracker uses a
+// least-squares polynomial; this simpler estimate is not Flutter-exact.
+func (p *PointerRouter) releaseVelocity() float64 {
+	if len(p.samples) < 2 {
+		return 0
+	}
+	last := p.samples[len(p.samples)-1]
+	first := last
+	for i := len(p.samples) - 1; i >= 0 && last.t-p.samples[i].t <= 0.1; i-- {
+		first = p.samples[i]
+	}
+	if last.t-first.t < 1e-3 {
+		return 0
+	}
+	v := -(last.y - first.y) / (last.t - first.t) // finger up = content up = positive
+	if math.Abs(v) < MinFlingVelocity {
+		return 0
+	}
+	return math.Max(-MaxFlingVelocity, math.Min(MaxFlingVelocity, v))
 }
 
 func (p *PointerRouter) PointerMove(pos r.Offset) {
 	if !p.isDown || p.list == nil {
 		return
 	}
+	p.record(pos)
 	if !p.dragging {
 		if math.Abs(pos.Y-p.start.Y) <= TouchSlop {
 			return
@@ -67,9 +115,12 @@ func (p *PointerRouter) PointerMove(pos r.Offset) {
 
 func (p *PointerRouter) PointerUp(pos r.Offset) {
 	p.PointerMove(pos)
-	down, dragging := p.down, p.dragging
+	down, dragging, list := p.down, p.dragging, p.list
 	p.down, p.isDown, p.list, p.dragging = nil, false, nil, false
 	if dragging {
+		if v := p.releaseVelocity(); v != 0 && list.Fling != nil {
+			list.Fling(v)
+		}
 		return // a drag is not a tap
 	}
 	up, _ := p.hit(pos)
