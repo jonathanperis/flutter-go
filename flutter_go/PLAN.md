@@ -615,3 +615,11 @@ The standing goal is now full API parity with Flutter 3.50.1's Dart layer
 - **Design question for scheduler:** Dart's `Future` is an interface that
   Flutter implements (`SynchronousFuture`, `TickerFuture`); `async.Future`
   is a concrete struct. Resolve before porting those two.
+- foundation part 2: collections (`listEquals`/`setEquals`/`mapEquals`
+  with nil as Dart's null, `binarySearch`, Flutter's own stable
+  `mergeSort` ported as is), bitfield (`BitField[T ~int]`, 62 bits as on
+  the Dart VM), unicode (bidi characters as a package-level struct, the
+  mapping for classes of static constants). Flutter's tests ported; empty
+  vs null cases added (a mutation dropping the nil check survived
+  Flutter's tests). One mutation (merge-sort cutoff) is equivalent: a
+  stable sort's output is unique.
