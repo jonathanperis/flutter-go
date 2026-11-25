@@ -16,8 +16,9 @@ Start here when continuing flutter-go in a new session.
   `RenderSliverList`), then G6–G10 in order. GOAL.md defines "done" for
   every item.
 - **Verification:** 55 scenes compared with real Flutter (layout, lists,
-  animations, flings, drags, bouncing, editing, rebuilds, repaints), each
-  checked by deliberately breaking the rule it covers.
+  animations, flings, drags, bouncing, editing, rebuilds, repaints). In
+  each area, the key rules were mutation-checked: breaking one makes a
+  scene fail.
 
 ## Environment
 
