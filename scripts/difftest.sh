@@ -4,5 +4,5 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 FLUTTER="${FLUTTER:-flutter}"
-(cd "$ROOT/difftest/flutter" && "$FLUTTER" test --reporter compact test/scenes_test.dart)
-cd "$ROOT" && go test ./difftest -v -run TestLayoutMatchesFlutter "$@"
+(cd "$ROOT/difftest/flutter" && "$FLUTTER" test --reporter compact test/)
+cd "$ROOT" && go test ./difftest -v -run "TestLayoutMatchesFlutter|TestListsMatchFlutter" "$@"

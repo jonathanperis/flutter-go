@@ -94,6 +94,7 @@ const (
 	kindStateful
 	kindRender
 	kindParentData
+	kindLazy // ListViewBuilder: children built on demand during layout
 )
 
 // Element is a widget's instantiation at a location in the tree. It doubles
@@ -104,7 +105,8 @@ type Element struct {
 	parent   *Element
 	children []*Element
 	state    State
-	render   r.RenderBox // own render object (kindRender only)
+	render   r.RenderBox      // own render object (kindRender and kindLazy)
+	lazy     map[int]*Element // live items by index (kindLazy only)
 	owner    *BuildOwner
 	depth    int
 	dirty    bool
@@ -133,6 +135,8 @@ func (e *Element) RenderObject() r.RenderBox {
 
 func kindOf(w Widget) kind {
 	switch w.(type) {
+	case ListViewBuilder:
+		return kindLazy
 	case StatelessWidget:
 		return kindStateless
 	case StatefulWidget:
@@ -193,6 +197,8 @@ func (e *Element) mount() {
 		e.syncRenderChildren()
 	case kindParentData:
 		e.children = []*Element{e.updateChild(nil, e.widget.(ParentDataWidget).ChildWidget())}
+	case kindLazy:
+		e.mountLazy()
 	}
 }
 
@@ -215,6 +221,8 @@ func (e *Element) update(w Widget) {
 	case kindParentData:
 		e.children = []*Element{e.updateChild(e.children[0], w.(ParentDataWidget).ChildWidget())}
 		e.nearestRenderAncestor().syncRenderChildren()
+	case kindLazy:
+		e.updateLazy(old.(ListViewBuilder))
 	}
 }
 
@@ -336,7 +344,7 @@ func (e *Element) updateChildList(ws []Widget) {
 
 func (e *Element) nearestRenderAncestor() *Element {
 	p := e.parent
-	for p != nil && p.kind != kindRender {
+	for p != nil && p.kind != kindRender && p.kind != kindLazy {
 		p = p.parent
 	}
 	return p
@@ -346,7 +354,7 @@ func (e *Element) nearestRenderAncestor() *Element {
 // the parent data of any ParentDataWidgets above it.
 func childRender(c *Element) r.RenderBox {
 	top := c
-	for c.kind != kindRender {
+	for c.kind != kindRender && c.kind != kindLazy {
 		if len(c.children) == 0 {
 			return nil
 		}
@@ -369,6 +377,10 @@ func childRender(c *Element) r.RenderBox {
 // syncRenderChildren gives a render element's render object the render
 // objects of its child subtrees. It allocates only when they changed.
 func (e *Element) syncRenderChildren() {
+	if e.kind == kindLazy {
+		e.syncLazy()
+		return
+	}
 	cur := e.render.Children()
 	n, same := 0, true
 	for _, c := range e.children {

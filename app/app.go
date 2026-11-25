@@ -16,6 +16,9 @@ import (
 
 func init() { runtime.LockOSThread() } // Cocoa needs the main thread.
 
+// WheelPixelsPerLine converts GLFW scroll units to logical pixels.
+const WheelPixelsPerLine = 20.0
+
 type Options struct {
 	Title         string
 	Width, Height int
@@ -23,6 +26,9 @@ type Options struct {
 	MaxFrames int
 	// OnFrame is called after each frame with its build+layout+paint time.
 	OnFrame func(n int, cpu time.Duration)
+	// InjectScroll synthesizes a wheel scroll of this many pixels at the
+	// window center after the first frame, for unattended runs.
+	InjectScroll float64
 	// InjectTaps synthesizes this many taps at InjectTapAt (logical px), one
 	// per frame, for unattended runs.
 	InjectTaps  int
@@ -76,6 +82,17 @@ func Run(root widgets.Widget, o Options) error {
 			router.PointerUp(pos)
 		}
 	})
+	win.SetCursorPosCallback(func(w *glfw.Window, x, y float64) {
+		if w.GetMouseButton(glfw.MouseButtonLeft) == glfw.Press {
+			router.PointerMove(r.Offset{X: x, Y: y})
+		}
+	})
+	// Wheel/trackpad: GLFW reports lines (or fine trackpad deltas); positive y
+	// means "scroll up", i.e. move content down.
+	win.SetScrollCallback(func(w *glfw.Window, _, yoff float64) {
+		x, y := w.GetCursorPos()
+		router.Scroll(r.Offset{X: x, Y: y}, -yoff*WheelPixelsPerLine)
+	})
 	win.SetSizeCallback(func(*glfw.Window, int, int) { needsFrame = true })
 
 	paint := impeller.NewPaint()
@@ -100,6 +117,10 @@ func Run(root widgets.Widget, o Options) error {
 			frames++
 			if o.OnFrame != nil {
 				o.OnFrame(frames, cpu)
+			}
+			if o.InjectScroll != 0 {
+				router.Scroll(r.Offset{X: float64(w) / 2, Y: float64(h) / 2}, o.InjectScroll)
+				o.InjectScroll = 0
 			}
 			if o.InjectTaps > 0 {
 				o.InjectTaps--
