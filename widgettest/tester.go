@@ -4,6 +4,7 @@
 package widgettest
 
 import (
+	"math"
 	"testing"
 	"time"
 
@@ -22,6 +23,8 @@ type Tester struct {
 	Canvas *r.Recorder
 	// Now is the fake clock (frame timestamp).
 	Now time.Duration
+	// eventTime overrides pointer event timestamps (seconds) when >= 0.
+	eventTime float64
 }
 
 // New creates a tester with Flutter's default test surface (800×600).
@@ -31,7 +34,14 @@ func New(t testing.TB) *Tester {
 	o := &widgets.BuildOwner{DevicePixelRatio: 3}
 	tt := &Tester{t: t, Owner: o, router: widgets.NewPointerRouter(o), Size: r.Size{W: 800, H: 600}}
 	o.SetViewSize(tt.Size)
-	tt.router.Now = func() float64 { return tt.Now.Seconds() }
+	tt.router.Now = func() float64 {
+		if tt.eventTime >= 0 {
+			return tt.eventTime
+		}
+		return tt.Now.Seconds()
+	}
+	tt.router.Clock = func() float64 { return tt.Now.Seconds() }
+	tt.eventTime = -1
 	o.Clipboard = &MemoryClipboard{}
 	o.Scheduler().Clock = func() time.Duration { return tt.Now }
 	return tt
@@ -188,4 +198,58 @@ func (t *Tester) SendKey(ev textedit.KeyEvent) {
 func (t *Tester) EnterText(s string) {
 	t.Owner.DispatchText(s)
 	t.Pump()
+}
+
+// Fling is a port of flutter_test's flingFrom: from the center of f, it
+// drags by dy at speed px/s using 50 moves with synthetic event timestamps,
+// pumping a frame whenever more than 16 ms of event time has passed, then
+// releases.
+func (t *Tester) Fling(f Finder, dy, speed float64) {
+	t.t.Helper()
+	rc := t.Rect(f)
+	start := r.Offset{X: rc.X + rc.W/2, Y: rc.Y + rc.H/2}
+	const moveCount = 50
+	const frameIntervalUs = 16000.0
+	delta := 1e6 * math.Abs(dy) / (moveCount * speed) // µs between moves
+	ts, last := 0.0, 0.0
+	at := func(us float64) { t.eventTime = math.Round(us) / 1e6 }
+	defer func() { t.eventTime = -1 }()
+	at(ts)
+	t.router.PointerDown(start)
+	for i := 0; i <= moveCount; i++ {
+		at(ts)
+		t.router.PointerMove(r.Offset{X: start.X, Y: start.Y + dy*float64(i)/moveCount})
+		ts += delta
+		if ts-last > frameIntervalUs {
+			t.Pump(time.Duration(math.Trunc(ts-last)) * time.Microsecond)
+			last = ts
+		}
+	}
+	at(ts)
+	t.router.PointerUp(r.Offset{X: start.X, Y: start.Y + dy})
+}
+
+// TimedMove is a pointer position (dy from the start) at an event time.
+type TimedMove struct {
+	T  time.Duration
+	DY float64
+}
+
+// DragTimed presses at the center of f at event time 0, moves through
+// moves with their explicit timestamps (no frames in between), and releases
+// at the last move's time — like flutter_test's TestGesture with timeStamps.
+func (t *Tester) DragTimed(f Finder, moves []TimedMove) {
+	t.t.Helper()
+	rc := t.Rect(f)
+	start := r.Offset{X: rc.X + rc.W/2, Y: rc.Y + rc.H/2}
+	defer func() { t.eventTime = -1 }()
+	t.eventTime = 0
+	t.router.PointerDown(start)
+	pos := start
+	for _, m := range moves {
+		t.eventTime = m.T.Seconds()
+		pos = r.Offset{X: start.X, Y: start.Y + m.DY}
+		t.router.PointerMove(pos)
+	}
+	t.router.PointerUp(pos)
 }

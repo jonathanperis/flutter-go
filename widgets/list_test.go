@@ -120,10 +120,13 @@ func TestDragScrollsAfterSlopAndCancelsTap(t *testing.T) {
 			return GestureDetector{OnTap: func() { taps++ }, Child: Text{Text: itemText(i)}}
 		},
 	})
+	// Items have tap handlers, so the drag competes with a tap and is only
+	// accepted past the 18px slop: in 10px steps that's at 20px, and the drag
+	// begins there (DragStartBehavior.start), so 200px scrolls 180px.
 	tester.Drag(widgettest.Text(itemText(5)), -200)
 	tester.Pump()
-	if c.Offset() != 200-TouchSlop {
-		t.Fatalf("offset after 200px drag = %v, want %v (slop not applied)", c.Offset(), 200-TouchSlop)
+	if c.Offset() != 180 {
+		t.Fatalf("offset after 200px drag = %v, want 180", c.Offset())
 	}
 	if taps != 0 {
 		t.Fatal("a drag must not count as a tap")
@@ -131,7 +134,7 @@ func TestDragScrollsAfterSlopAndCancelsTap(t *testing.T) {
 	// A small move stays a tap.
 	tester.Drag(widgettest.Text(itemText(10)), -5)
 	tester.Pump()
-	if taps != 1 || c.Offset() != 200-TouchSlop {
+	if taps != 1 || c.Offset() != 180 {
 		t.Fatalf("taps=%d offset=%v after a 5px move", taps, c.Offset())
 	}
 }
