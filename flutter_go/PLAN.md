@@ -510,3 +510,32 @@ The standing goal is now full API parity with Flutter 3.50.1's Dart layer
   takes under a minute instead of many), and the script ends by verifying
   the index against the tag. The committed tree was correct throughout;
   only the check was blind.
+
+### dart:ui geometry and lerp (P1 starts)
+- `engine/src/flutter/lib/ui/go/geometry.go` and `lerp.go` port
+  geometry.dart and lerp.dart in full (`OffsetBase`, `Offset`, `Size`,
+  `Rect`, `Radius`, `RRect`, `RSuperellipse`, `RSTransform`, `lerpDouble`),
+  with the engine's own Dart tests ported (`testing/dart/geometry_test.dart`,
+  `lerp_test.dart`) and a difftest of 56 cases printed by Flutter 3.50.1
+  (toString forms, lerps against null, `%`, `~/`, middle rects, contains
+  over a grid): all identical.
+- Details that only the difftest pins down: `toStringAsFixed` rounds exact
+  ties away from zero (`Offset(5.25, …)` prints 5.3), Dart's `%` is never
+  negative, `~/` throws `UnsupportedError` on non-finite results, and
+  `RSTransform` stores float32 (`0.1` reads back as 0.10000000149011612).
+  `flutter_go/dart` gained `Mod` and `TruncDiv`, checked against the Dart
+  SDK.
+- **ENGINE GAP:** `RSuperellipse.contains` is native
+  (`RSuperellipse::contains` in the engine); the prebuilt Impeller SDK has
+  no superellipse API. Next step: port the engine's C++ algorithm
+  (`impeller/geometry/round_superellipse_param.cc`) to Go and the 7
+  skipped engine test cases with it.
+- Mutation checks: 10 caught (float32 storage, Flutter's truncated
+  1-cos(π/4) constant, lerp form and null branches, contains radii, tie
+  rounding, `%` sign, `Size - Size` type, isStadium, lerpDouble's NaN
+  shortcut). One rule (elliptical top-right corners in `contains`) was
+  only caught after adding a contains grid to the difftest. Two survivors
+  are equivalent mutations (`>=` at a boundary where the result can't
+  change).
+- `rendering` still defines its own Offset/Size/Rect; moving it onto `ui`
+  is the next P0/P1 step.

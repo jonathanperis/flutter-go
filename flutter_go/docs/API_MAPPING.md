@@ -60,6 +60,23 @@ given" and "zero" stay distinct.
 | static member `Foo.bar` | package-level `FooBar`; `Bar` alone when `bar` already contains `Foo` (`Tolerance.defaultTolerance` → `DefaultTolerance`) |
 | class of static members only (`Colors`, `Curves`, `Icons`) | package-level variable of that name holding a struct: `material.Colors.Red` |
 
+## Operators
+
+| Dart | Go method |
+|---|---|
+| `a + b`, `a - b`, `a * b`, `a / b` | `a.Add(b)`, `a.Sub(b)`, `a.Mul(b)`, `a.Div(b)` |
+| unary `-a` | `a.Neg()` |
+| `a ~/ b` | `a.TruncDiv(b)` (panics with `dart.UnsupportedError` where Dart throws) |
+| `a % b` | `a.Mod(b)` (Dart's semantics: never negative) |
+| `a & b` | `a.And(b)` |
+| `<`, `<=`, `>`, `>=` | `Less`, `LessEq`, `Greater`, `GreaterEq` |
+| `==` on value types | Go's `==` (struct equality; NaN is unequal, as in Dart) |
+
+Value types (`Offset`, `Size`, `Rect`, `Radius`...) are structs with
+exported fields. Outside their package, build them with the constructors
+(`ui.NewOffset(1, 2)` for Dart's `Offset(1, 2)`): `go vet` rejects unkeyed
+literals of imported structs.
+
 ## Types
 
 | Dart | Go |
@@ -78,4 +95,9 @@ Each divergence is listed here when it is introduced.
 
 - `physics.NearEqual` takes `float64`, not `double?`: Dart's null case
   (`nearEqual(null, null) == true`) has no Go equivalent.
+- `RSuperellipse.Contains` is not ported yet: Dart calls into the engine
+  for it, and the prebuilt Impeller SDK has no superellipse API (ENGINE GAP
+  in PLAN.md).
+- Assertions are always on: where Dart asserts in debug mode (negative
+  RRect radii, non-finite lerp inputs), Go panics in every build.
 - Equal widgets skip rebuilds (Go's stand-in for `const`), see PLAN.md G1.
