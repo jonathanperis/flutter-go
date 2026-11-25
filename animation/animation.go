@@ -5,6 +5,8 @@
 package animation
 
 import (
+	"github.com/jonathanperis/flutter-go/physics"
+
 	"math"
 	"time"
 )
@@ -242,7 +244,7 @@ type Controller struct {
 	from, to  float64
 	simDur    time.Duration
 	curve     Curve
-	sim       Simulation // set by AnimateWith; nil for interpolation
+	sim       physics.Simulation // set by AnimateWith; nil for interpolation
 	status    Status
 	listeners []func()
 	statusFns []func(Status)

@@ -433,3 +433,29 @@ The standing goal is now full API parity with Flutter 3.50.1's Dart layer
   `pow(e, x)` differs only in the last bits, inside the comparison's 1e-12
   relative tolerance. Go's `math.Pow` is not the C library's `pow` that
   Dart uses, so exact bit equality is not a goal.
+
+### P0: scroll simulations move to widgets; `ui` and `internal/dart` start
+- `ClampingScrollSimulation` and `BouncingScrollSimulation` now live in
+  `widgets` (where Flutter declares them) on top of `physics`;
+  `animation/simulation.go` is gone and `Controller.AnimateWith` takes a
+  `physics.Simulation`. All existing fling, drag and bouncing scenes still
+  match.
+- **Flutter's own test caught a real bug:** a clamping fling with zero
+  velocity has zero duration, so `time / duration` is NaN. Flutter's
+  `clampDouble` maps NaN to the upper bound; the Go code used
+  `math.Max(0, math.Min(1, …))`, which returns NaN. Fixed by porting
+  `clampDouble` itself, which lives in `dart:ui` (foundation only
+  re-exports it), so it is `ui.ClampDouble`.
+- **A Flutter quirk, kept:** `BouncingScrollSimulation` caps the hand-over
+  velocity with `min(dx, 5000)`, which limits overscroll but not
+  underscroll (negative velocities pass through). The same fast fling
+  overshoots 121 px past the end but 287 px past the start. A mutation that
+  "fixes" this fails the difftest.
+- **Difftest:** 11 scroll-simulation scenes sampled directly at 60 Hz for
+  4 s, max difference 2.7e-12. Before it, two rules survived mutation
+  (the transfer-velocity cap, and the strict `position < leadingExtent`
+  test for starting out of range).
+- **`internal/dart`** reproduces Dart's number formatting
+  (`double.toString`, `toStringAsFixed`), checked against the Dart 3.50.1
+  SDK. Dart rounds exact ties away from zero (`2.5.toStringAsFixed(0)` is
+  "3"); Go's strconv rounds them to even.

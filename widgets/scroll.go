@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/jonathanperis/flutter-go/animation"
+	"github.com/jonathanperis/flutter-go/physics"
 	r "github.com/jonathanperis/flutter-go/rendering"
 	"github.com/jonathanperis/flutter-go/textedit"
 )
@@ -24,10 +25,10 @@ const (
 
 // Constants from Flutter's scroll_physics.dart / scroll_activity.dart.
 var (
-	defaultSpring         = animation.SpringWithDampingRatio(0.5, 100.0, 1.1)
-	fastSpring            = animation.SpringWithDampingRatio(0.3, 75.0, 1.3) // BouncingScrollPhysics.spring, fast deceleration
+	defaultSpring         = physics.NewSpringDescriptionWithDampingRatio(0.5, 100.0, 1.1)
+	fastSpring            = physics.NewSpringDescriptionWithDampingRatio(0.3, 75.0, 1.3) // BouncingScrollPhysics.spring, fast deceleration
 	rubberBandLambda      = math.Log(2) / 0.07
-	rubberBandSpring      = animation.SpringDescription{Mass: 1.0, Stiffness: 1e5 * rubberBandLambda * rubberBandLambda, Damping: (1e5 + 1) * rubberBandLambda}
+	rubberBandSpring      = physics.SpringDescription{Mass: 1.0, Stiffness: 1e5 * rubberBandLambda * rubberBandLambda, Damping: (1e5 + 1) * rubberBandLambda}
 	motionStartThreshold  = 3.5   // BouncingScrollPhysics.dragStartDistanceMotionThreshold
 	motionStoppedDuration = 0.050 // ScrollDragController.motionStoppedDurationThreshold (s)
 	bigThresholdBreak     = 24.0  // ScrollDragController._bigThresholdBreakDistance
@@ -102,8 +103,10 @@ func (c *ScrollController) dpr() float64 {
 	return 1
 }
 
-func (c *ScrollController) tolerance() animation.Tolerance {
-	return animation.Tolerance{Velocity: 1.0 / (0.050 * c.dpr()), Distance: 1.0 / c.dpr()}
+// tolerance is ScrollPhysics.toleranceFor: Flutter's time tolerance stays
+// at the default.
+func (c *ScrollController) tolerance() physics.Tolerance {
+	return physics.NewTolerance(physics.ToleranceOptions{Velocity: F(1.0 / (0.050 * c.dpr())), Distance: F(1.0 / c.dpr())})
 }
 
 func (c *ScrollController) outOfRange() bool {
@@ -208,7 +211,7 @@ func (c *ScrollController) Hold() bool {
 func (c *ScrollController) IsAnimating() bool { return c.anim != nil && c.anim.IsAnimating() }
 
 // createBallisticSimulation is the physics' (nil means: go idle).
-func (c *ScrollController) createBallisticSimulation(v float64) animation.Simulation {
+func (c *ScrollController) createBallisticSimulation(v float64) physics.Simulation {
 	tol := c.tolerance()
 	pixels, max := c.list.ScrollOffset(), c.list.MaxScrollExtent()
 	if !c.bouncing() {
@@ -217,12 +220,12 @@ func (c *ScrollController) createBallisticSimulation(v float64) animation.Simula
 			if pixels > max {
 				end = max
 			}
-			return animation.NewScrollSpringSimulation(defaultSpring, pixels, end, math.Min(0, v), tol)
+			return physics.NewScrollSpringSimulation(defaultSpring, pixels, end, math.Min(0, v), physics.ScrollSpringSimulationOptions{Tolerance: &tol})
 		}
 		if math.Abs(v) < tol.Velocity || (v > 0 && pixels >= max) || (v < 0 && pixels <= 0) {
 			return nil
 		}
-		return animation.NewClampingScrollSimulation(pixels, v)
+		return NewClampingScrollSimulation(ClampingScrollSimulationOptions{Position: pixels, Velocity: v, Tolerance: &tol})
 	}
 	stationary := math.Abs(v) < tol.Velocity
 	if stationary && !c.outOfRange() {
@@ -239,7 +242,8 @@ func (c *ScrollController) createBallisticSimulation(v float64) animation.Simula
 	if c.physics() == BouncingFastPhysics {
 		decel = 1400
 	}
-	return animation.NewBouncingScrollSimulation(spring, pixels, v, 0, max, decel, tol)
+	return NewBouncingScrollSimulation(BouncingScrollSimulationOptions{Spring: spring, Position: pixels, Velocity: v,
+		LeadingExtent: 0, TrailingExtent: max, ConstantDeceleration: decel, Tolerance: &tol})
 }
 
 // goBallistic starts a ballistic activity at velocity v (px/s, positive

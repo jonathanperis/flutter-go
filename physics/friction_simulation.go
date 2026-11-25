@@ -1,6 +1,10 @@
 package physics
 
-import "math"
+import (
+	"math"
+
+	"github.com/jonathanperis/flutter-go/ui"
+)
 
 func newtonsMethod(initialGuess, target float64, f, df func(float64) float64, iterations int) float64 {
 	guess := initialGuess
@@ -129,7 +133,7 @@ type BoundedFrictionSimulation struct {
 }
 
 func NewBoundedFrictionSimulation(drag, position, velocity, minX, maxX float64) *BoundedFrictionSimulation {
-	if clampDouble(position, minX, maxX) != position {
+	if ui.ClampDouble(position, minX, maxX) != position {
 		panic("physics: BoundedFrictionSimulation position is out of bounds")
 	}
 	s := &BoundedFrictionSimulation{minX: minX, maxX: maxX}
@@ -138,7 +142,7 @@ func NewBoundedFrictionSimulation(drag, position, velocity, minX, maxX float64) 
 }
 
 func (s *BoundedFrictionSimulation) X(t float64) float64 {
-	return clampDouble(s.FrictionSimulation.X(t), s.minX, s.maxX)
+	return ui.ClampDouble(s.FrictionSimulation.X(t), s.minX, s.maxX)
 }
 
 func (s *BoundedFrictionSimulation) IsDone(t float64) bool {

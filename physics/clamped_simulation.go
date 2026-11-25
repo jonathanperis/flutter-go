@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"math"
 	"reflect"
+
+	"github.com/jonathanperis/flutter-go/ui"
 )
 
 // ClampedSimulation clamps another simulation's position and velocity.
@@ -40,24 +42,11 @@ func NewClampedSimulation(simulation Simulation, opts ...ClampedSimulationOption
 	return s
 }
 
-func clampDouble(x, lo, hi float64) float64 {
-	if x < lo {
-		return lo
-	}
-	if x > hi {
-		return hi
-	}
-	if math.IsNaN(x) {
-		return hi
-	}
-	return x
-}
-
 func (s *ClampedSimulation) X(t float64) float64 {
-	return clampDouble(s.Simulation.X(t), s.XMin, s.XMax)
+	return ui.ClampDouble(s.Simulation.X(t), s.XMin, s.XMax)
 }
 func (s *ClampedSimulation) Dx(t float64) float64 {
-	return clampDouble(s.Simulation.Dx(t), s.DxMin, s.DxMax)
+	return ui.ClampDouble(s.Simulation.Dx(t), s.DxMin, s.DxMax)
 }
 func (s *ClampedSimulation) IsDone(t float64) bool { return s.Simulation.IsDone(t) }
 func (s *ClampedSimulation) String() string {

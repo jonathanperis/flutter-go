@@ -2,8 +2,8 @@ package physics
 
 import (
 	"math"
-	"strconv"
-	"strings"
+
+	"github.com/jonathanperis/flutter-go/internal/dart"
 )
 
 // Simulation is a one-dimensional simulation over time (Flutter's abstract
@@ -38,33 +38,5 @@ func (s *SimulationBase) SetTolerance(t Tolerance) { s.tolerance = t }
 // two can differ in the last bit, and the difftests compare exactly.
 func powE(x float64) float64 { return math.Pow(math.E, x) }
 
-// dartDouble formats like Dart's double.toString().
-func dartDouble(v float64) string {
-	switch {
-	case math.IsInf(v, 1):
-		return "Infinity"
-	case math.IsInf(v, -1):
-		return "-Infinity"
-	case math.IsNaN(v):
-		return "NaN"
-	}
-	if v == math.Trunc(v) && math.Abs(v) < 1e21 {
-		return strconv.FormatFloat(v, 'f', 1, 64)
-	}
-	s := strconv.FormatFloat(v, 'g', -1, 64)
-	if a := math.Abs(v); a >= 1e-6 && a < 1e21 {
-		s = strconv.FormatFloat(v, 'f', -1, 64)
-	}
-	return strings.Replace(s, "e-0", "e-", 1)
-}
-
-// fixed1 is Dart's toStringAsFixed(1).
-func fixed1(v float64) string {
-	switch {
-	case math.IsInf(v, 1):
-		return "Infinity"
-	case math.IsInf(v, -1):
-		return "-Infinity"
-	}
-	return strconv.FormatFloat(v, 'f', 1, 64)
-}
+func dartDouble(v float64) string { return dart.DoubleToString(v) }
+func fixed1(v float64) string     { return dart.ToStringAsFixed(v, 1) }
