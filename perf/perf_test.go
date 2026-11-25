@@ -59,6 +59,15 @@ func (nopCanvas) ClipRect(r.Rect)                     {}
 func (nopCanvas) DrawRect(r.Rect, r.Color)            {}
 func (nopCanvas) DrawRRect(r.Rect, float64, r.Color)  {}
 func (nopCanvas) DrawParagraph(r.Paragraph, r.Offset) {}
+func (nopCanvas) DrawPicture(r.Picture, r.Offset)     {}
+func (nopCanvas) NewRecording() r.Recording           { return nopRecording{} }
+
+type nopRecording struct{}
+type nopPicture struct{}
+
+func (nopRecording) Canvas() r.Canvas { return nopCanvas{} }
+func (nopRecording) End() r.Picture   { return nopPicture{} }
+func (nopPicture) Release()           {}
 
 type harness struct {
 	owner *BuildOwner

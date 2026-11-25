@@ -25,7 +25,7 @@ partial, not done.
 | # | Item | Verified by | Status |
 |---|---|---|---|
 | G1 | `InheritedWidget` with dependency tracking; `MediaQuery`, `DefaultTextStyle` on top; equal widgets skip rebuilds (Go's stand-in for `const`) | Which widgets rebuild at each step matches Flutter | ✅ |
-| G2 | Repaint boundaries and retained layers | Paint counts per frame match the rules; rerun `perf_compare.sh` | |
+| G2 | Repaint boundaries and retained layers | Paint counts per frame match the rules; rerun `perf_compare.sh` | ✅ |
 | G3 | Flutter's `VelocityTracker` (least-squares drag velocity) | `tester.fling` scenes: same release velocity and offsets as Flutter | |
 | G4 | `BouncingScrollPhysics` (macOS/iOS overscroll and spring-back) | Fling and overscroll scenes on the iOS/macOS platform | |
 | G5 | Variable-height lazy list (`RenderSliverList`) | Built indices, positions and offsets vs Flutter | |

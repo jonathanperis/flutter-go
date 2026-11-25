@@ -135,8 +135,13 @@ func (r *RenderFixedExtentList) PerformLayout(c Constraints) Size {
 func (r *RenderFixedExtentList) Paint(cv Canvas, offset Offset) {
 	cv.Save()
 	cv.ClipRect(RectFrom(offset, r.Size))
+	// Like RenderSliverMultiBoxAdaptor, paint only children that overlap
+	// the visible area; children in the cache extent are laid out, not painted.
 	for _, c := range r.kids {
-		PaintChild(cv, c, offset)
+		y := c.Base().Offset.Y
+		if y+r.itemExtent > 0 && y < r.Size.H {
+			PaintChild(cv, c, offset)
+		}
 	}
 	cv.Restore()
 }

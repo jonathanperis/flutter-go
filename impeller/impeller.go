@@ -169,6 +169,11 @@ func (b *DisplayListBuilder) DrawParagraph(p *Paragraph, x, y float32) {
 	C.ImpellerDisplayListBuilderDrawParagraph(b.h, p.h, &pt)
 }
 
+// DrawDisplayList replays dl into this builder.
+func (b *DisplayListBuilder) DrawDisplayList(dl *DisplayList, opacity float32) {
+	C.ImpellerDisplayListBuilderDrawDisplayList(b.h, dl.h, C.float(opacity))
+}
+
 func (b *DisplayListBuilder) Build() *DisplayList {
 	return &DisplayList{C.ImpellerDisplayListBuilderCreateDisplayListNew(b.h)}
 }

@@ -295,3 +295,38 @@ accessibility. Tab focus traversal is not implemented.
 - **Another zero-value limit:** `TextStyle.Merge` can't let a child turn
   `Bold` off, because Go has no "unset" for `bool`.
 
+## G2 findings: repaint boundaries and layers (2026-11-25)
+
+- **Retained layers like Flutter's:** a repaint boundary records its subtree
+  into a layer made of picture segments and references to child
+  boundaries (with the clips and translation active at each). Compositing
+  reuses every clean boundary. `markNeedsPaint` marks the nearest boundary
+  and stops early if it's already dirty; relayout marks paint, as Flutter's
+  `layout()` does. The root view and every list item are boundaries
+  (Flutter's `addRepaintBoundaries`), and lists paint only items that
+  overlap the visible area, not the cache extent.
+- **Paint counts match Flutter frame by frame** in 4 scenes: a repainting
+  sibling inside a boundary (only it repaints), the same without a
+  boundary (both repaint), nested boundaries (each repaints alone), and
+  scrolling a list (only items becoming visible for the first time paint;
+  moving painted items costs no repaint). Four mutations each fail.
+- **Go vs Flutter rerun** (same grid, profile mode, same machine), now that
+  flutter-go also builds a layer tree:
+
+  | Mode | flutter-go p50 / p90 / p99 | Flutter p50 / p90 / p99 |
+  |---|---|---|
+  | repaint every frame | 4.5 / 5.8 / 7.3 ms | 9.0 / 11.0 / 13.5 ms |
+  | relayout every frame | 5.5 / 8.9 / 14.1 ms | 12.3 / 18.0 / 20.6 ms |
+
+  flutter-go still does less per frame than Flutter (no semantics, simpler
+  reconciliation), so this remains "Go is not the bottleneck" rather than
+  a speed claim; the gap narrowed less than expected because layer
+  bookkeeping is cheap next to building 20,000 widgets.
+- **A benchmark scare that was mostly noise:** one run suggested layers
+  slowed the framework from 2.2 to 3.5 ms per frame. Profiling found a
+  real but small cost (`MarkNeedsPaint` walked to the root twice per
+  call, 7.5% of time; fixed with Flutter's early exit). Repeated runs then
+  gave 2.3–3.2 ms. Single benchmark runs on this machine vary by ±30%.
+- **Scrolling** costs ~4 µs per frame (layout + compositing the root layer),
+  up from ~1.4 µs without layers, still independent of item count.
+
