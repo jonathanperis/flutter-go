@@ -66,6 +66,7 @@ func Run(root widgets.Widget, o Options) error {
 
 	needsFrame := true
 	owner := &widgets.BuildOwner{OnNeedsFrame: func() { needsFrame = true }}
+	epoch := time.Now() // frame timestamps are measured from here
 	router := widgets.NewPointerRouter(owner)
 	owner.RunApp(root)
 
@@ -105,7 +106,7 @@ func Run(root widgets.Widget, o Options) error {
 			scale := layer.Scale()
 			b := impeller.NewDisplayListBuilder()
 			b.Scale(scale, scale)
-			owner.DrawFrame(r.Size{W: float64(w), H: float64(h)}, &impellerCanvas{b, paint})
+			owner.DrawFrameAt(start.Sub(epoch), r.Size{W: float64(w), H: float64(h)}, &impellerCanvas{b, paint})
 			dl := b.Build()
 			b.Release()
 			cpu := time.Since(start)
@@ -132,7 +133,11 @@ func Run(root widgets.Widget, o Options) error {
 				break
 			}
 		}
-		glfw.WaitEventsTimeout(0.25)
+		if needsFrame {
+			glfw.PollEvents() // animating: don't sleep; presenting paces us to the display
+		} else {
+			glfw.WaitEventsTimeout(0.25)
+		}
 	}
 	if rr := owner.RenderRoot(); rr != nil {
 		r.Dispose(rr)

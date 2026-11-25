@@ -2,6 +2,9 @@ package widgets
 
 import (
 	"sort"
+	"time"
+
+	"github.com/jonathanperis/flutter-go/animation"
 
 	r "github.com/jonathanperis/flutter-go/rendering"
 )
@@ -20,7 +23,29 @@ type ListViewBuilder struct {
 type ScrollController struct {
 	list    *r.RenderFixedExtentList
 	initial float64
+	sched   *animation.Scheduler
+	anim    *animation.Controller
 }
+
+// AnimateTo scrolls to offset over d with curve, like Flutter's
+// ScrollPosition.animateTo (a DrivenScrollActivity on an unbounded
+// controller). The offset is clamped each frame.
+func (c *ScrollController) AnimateTo(offset float64, d time.Duration, curve animation.Curve) {
+	if c.list == nil || c.sched == nil {
+		c.JumpTo(offset)
+		return
+	}
+	if c.anim != nil {
+		c.anim.Dispose()
+	}
+	c.anim = animation.NewUnboundedController(c.sched, c.list.ScrollOffset())
+	a := c.anim
+	a.AddListener(func() { c.list.SetScrollOffset(a.Value()) })
+	a.AnimateTo(offset, d, curve)
+}
+
+// IsAnimating reports whether an AnimateTo is in progress.
+func (c *ScrollController) IsAnimating() bool { return c.anim != nil && c.anim.IsAnimating() }
 
 // NewScrollController starts at initialOffset (clamped on first layout).
 func NewScrollController(initialOffset float64) *ScrollController {
@@ -92,6 +117,7 @@ func (e *Element) mountLazy() {
 	list := r.NewFixedExtentList(w.ItemExtent, w.ItemCount, listManager{e})
 	e.render = list
 	if w.Controller != nil {
+		w.Controller.sched = e.Scheduler()
 		w.Controller.attach(list)
 	}
 }
@@ -102,6 +128,7 @@ func (e *Element) updateLazy(old ListViewBuilder) {
 	w := e.widget.(ListViewBuilder)
 	list := e.render.(*r.RenderFixedExtentList)
 	if w.Controller != nil && w.Controller != old.Controller {
+		w.Controller.sched = e.Scheduler()
 		w.Controller.attach(list)
 	}
 	list.Set(w.ItemExtent, w.ItemCount)

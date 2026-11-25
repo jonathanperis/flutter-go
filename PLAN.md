@@ -17,6 +17,7 @@ criterion. If a stage fails its criterion, stop and decide before going on.
 | 5 | Performance | Go is fast enough per frame | Build + layout + paint of 10k widgets measured; GC and cgo cost reported against the 16.6 ms budget ✅ median 4–5 ms; p99 at the budget edge, but below real Flutter's on the same scene |
 | 6 | Decision gate | — | Findings below ✅ — recommendation: continue, with two conditions |
 | 7 | Lazy scrolling list | Building during layout, element lifecycle off-screen, scroll input | `ListViewBuilder` (fixed item height) builds the same item indices as Flutter, with the same positions, after jumps, clamping, and inside a Column ✅ 6/6 scenes |
+| 8 | Animations | Frame scheduling, tickers, curves, implicit animations, animated scroll | `AnimationController`, Flutter's cubic curves, `AnimatedBox` (≈ `AnimatedContainer`) and `ScrollController.AnimateTo` produce the same values as Flutter frame by frame ✅ 4/4 scenes, max difference 5.6e-17 |
 
 ## Design rules
 
@@ -115,8 +116,8 @@ Continue, with two conditions:
 1. ~~**Add the missing comparison**~~ ✅ done: Go's UI-thread time is below
    Flutter's on the same grid, with the caveat that Go does less work.
    Rerun `scripts/perf_compare.sh` whenever layers/repaint boundaries land.
-2. **Make the next stage the hard parts** (scrolling ✅ stage 7; text input
-   and animations still to do), not more box widgets: scrolling
+2. **Make the next stage the hard parts** (scrolling ✅ stage 7, animations ✅
+   stage 8; text input still to do), not more box widgets: scrolling
    (needs viewport + slivers), text input (IME), and implicit animations.
    These stress the frame loop and are where an API in Go will either hold
    up or not.
@@ -153,4 +154,37 @@ boundaries, baseline alignment, RTL, accessibility, Retina scale detection
 Not done: variable-height items (Flutter's `RenderSliverList`, which must
 estimate extents), horizontal lists, slivers in general (`CustomScrollView`),
 keep-alive, scrollbars, and scroll physics/animations.
+
+## Stage 8 findings: animations (2026-11-25)
+
+- **Values match Flutter frame by frame**, to floating-point precision, in
+  4 scenes: an `AnimatedContainer` retargeted mid-animation, a
+  `fastOutSlowIn` animation sampled at 16 ms (not a divisor of 250 ms), and
+  two `animateTo` scrolls. This required copying Flutter's exact arithmetic:
+  the cubic-curve bisection with its 0.001 error bound, `lerpDouble`'s
+  `a*(1-t) + b*t` form, duration scaling rounded to whole microseconds.
+- **Ticker start time has two rules**, and each has a scene that fails
+  when it is broken: a ticker started *during* a frame starts at that
+  frame's timestamp; one started *outside* a frame (a button handler)
+  starts at its first tick. Getting the second wrong shifts every animation
+  by one frame in a real app.
+- **The first version of this test was too weak.** Both rules could be
+  broken without any scene failing, because the Go tester applied
+  `PumpWidget` outside a frame (Flutter applies it inside the next frame)
+  and the scroll scene never let time pass before starting. Fixing the
+  harness to defer root updates into the frame, as Flutter's
+  `RootWidget.attach` does, made the tests discriminating. Lesson: run a
+  mutation check on every new differential test.
+- **Real window:** while animating, frames arrive every 16.7 ms (p95
+  17.4 ms) on a 60 Hz display, paced by Metal presentation, with ~0.2 ms of
+  CPU per frame. The loop no longer sleeps between frames while a ticker
+  is active.
+- **Another zero-value trap:** `Color{}` is transparent, so `Text` without
+  a color was invisible. Unset text color now means opaque black.
+
+Not done: fling/ballistic scrolling and overscroll physics (they need
+Flutter's `ClampingScrollSimulation`/`BouncingScrollSimulation`, which
+are next on the list), explicit-animation widgets (`AnimatedBuilder`,
+transitions), `Hero`, opacity (needs `saveLayer`), and staggered/sequenced
+animations.
 

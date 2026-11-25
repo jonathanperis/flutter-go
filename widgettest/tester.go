@@ -5,6 +5,7 @@ package widgettest
 
 import (
 	"testing"
+	"time"
 
 	r "github.com/jonathanperis/flutter-go/rendering"
 	"github.com/jonathanperis/flutter-go/widgets"
@@ -17,6 +18,8 @@ type Tester struct {
 	Size   r.Size
 	// Canvas holds the last frame's paint commands.
 	Canvas *r.Recorder
+	// Now is the fake clock (frame timestamp).
+	Now time.Duration
 }
 
 // New creates a tester with Flutter's default test surface (800×600).
@@ -32,10 +35,27 @@ func (t *Tester) PumpWidget(w widgets.Widget) {
 	t.Pump()
 }
 
-// Pump draws a frame (rebuilding anything dirty).
-func (t *Tester) Pump() {
+// Pump advances the fake clock by d (optional, default 0) and draws a frame,
+// like flutter_test's tester.pump(duration).
+func (t *Tester) Pump(d ...time.Duration) {
 	t.Canvas = &r.Recorder{}
-	t.Owner.DrawFrame(t.Size, t.Canvas)
+	if len(d) > 0 {
+		t.Now += d[0]
+	}
+	t.Owner.DrawFrameAt(t.Now, t.Size, t.Canvas)
+}
+
+// PumpAndSettle pumps 16ms frames until no animation is scheduled, like
+// flutter_test's pumpAndSettle. It fails after 10 seconds of fake time.
+func (t *Tester) PumpAndSettle() {
+	t.t.Helper()
+	t.Pump()
+	for i := 0; t.Owner.Scheduler().HasScheduledFrame() || t.Owner.NeedsBuild(); i++ {
+		if i > 625 {
+			t.t.Fatal("PumpAndSettle timed out")
+		}
+		t.Pump(16 * time.Millisecond)
+	}
 }
 
 // Finder selects elements.
