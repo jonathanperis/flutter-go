@@ -1,0 +1,104 @@
+// Package rendering is the render-tree layer: box layout (constraints go down,
+// sizes go up), painting to a Canvas, and hit testing. It is pure Go and never
+// touches the GPU directly.
+package rendering
+
+import (
+	"fmt"
+	"math"
+)
+
+// Inf is an unbounded extent (Flutter's double.infinity).
+var Inf = math.Inf(1)
+
+const epsilon = 1e-9
+
+type Offset struct{ X, Y float64 }
+
+func (o Offset) Add(p Offset) Offset { return Offset{o.X + p.X, o.Y + p.Y} }
+func (o Offset) Sub(p Offset) Offset { return Offset{o.X - p.X, o.Y - p.Y} }
+
+type Size struct{ W, H float64 }
+
+func (s Size) Contains(p Offset) bool { return p.X >= 0 && p.X < s.W && p.Y >= 0 && p.Y < s.H }
+
+type Rect struct{ X, Y, W, H float64 }
+
+func RectFrom(o Offset, s Size) Rect { return Rect{o.X, o.Y, s.W, s.H} }
+
+// Color is straight (non-premultiplied) RGBA in [0,1].
+type Color struct{ R, G, B, A float64 }
+
+// RGB builds an opaque color from a 0xRRGGBB value.
+func RGB(hex uint32) Color {
+	return Color{float64(hex>>16&0xff) / 255, float64(hex>>8&0xff) / 255, float64(hex&0xff) / 255, 1}
+}
+
+// Constraints are Flutter's BoxConstraints.
+type Constraints struct{ MinW, MaxW, MinH, MaxH float64 }
+
+func Tight(s Size) Constraints { return Constraints{s.W, s.W, s.H, s.H} }
+func Loose(s Size) Constraints { return Constraints{0, s.W, 0, s.H} }
+
+func (c Constraints) String() string {
+	return fmt.Sprintf("BoxConstraints(%g<=w<=%g, %g<=h<=%g)", c.MinW, c.MaxW, c.MinH, c.MaxH)
+}
+
+func (c Constraints) Loosen() Constraints { return Constraints{0, c.MaxW, 0, c.MaxH} }
+
+func clamp(v, lo, hi float64) float64 { return math.Max(lo, math.Min(hi, v)) }
+
+func (c Constraints) ConstrainW(w float64) float64 { return clamp(w, c.MinW, c.MaxW) }
+func (c Constraints) ConstrainH(h float64) float64 { return clamp(h, c.MinH, c.MaxH) }
+func (c Constraints) Constrain(s Size) Size {
+	return Size{c.ConstrainW(s.W), c.ConstrainH(s.H)}
+}
+func (c Constraints) Smallest() Size { return Size{c.ConstrainW(0), c.ConstrainH(0)} }
+
+func (c Constraints) IsSatisfiedBy(s Size) bool {
+	return s.W >= c.MinW-1e-6 && s.W <= c.MaxW+1e-6 && s.H >= c.MinH-1e-6 && s.H <= c.MaxH+1e-6
+}
+
+// Enforce clamps c into the range allowed by outer (Flutter's enforce).
+func (c Constraints) Enforce(outer Constraints) Constraints {
+	return Constraints{
+		clamp(c.MinW, outer.MinW, outer.MaxW), clamp(c.MaxW, outer.MinW, outer.MaxW),
+		clamp(c.MinH, outer.MinH, outer.MaxH), clamp(c.MaxH, outer.MinH, outer.MaxH),
+	}
+}
+
+// Deflate shrinks constraints by insets (Flutter's deflate).
+func (c Constraints) Deflate(e EdgeInsets) Constraints {
+	h, v := e.Left+e.Right, e.Top+e.Bottom
+	minW, minH := math.Max(0, c.MinW-h), math.Max(0, c.MinH-v)
+	return Constraints{minW, math.Max(minW, c.MaxW-h), minH, math.Max(minH, c.MaxH-v)}
+}
+
+type EdgeInsets struct{ Left, Top, Right, Bottom float64 }
+
+func All(v float64) EdgeInsets           { return EdgeInsets{v, v, v, v} }
+func Symmetric(h, v float64) EdgeInsets  { return EdgeInsets{h, v, h, v} }
+func LTRB(l, t, r, b float64) EdgeInsets { return EdgeInsets{l, t, r, b} }
+func (e EdgeInsets) TopLeft() Offset     { return Offset{e.Left, e.Top} }
+func (e EdgeInsets) Inflate(s Size) Size { return Size{s.W + e.Left + e.Right, s.H + e.Top + e.Bottom} }
+
+// Alignment is Flutter's Alignment: (-1,-1) top-left, (0,0) center, (1,1)
+// bottom-right. The zero value is center, which is also Flutter's default.
+type Alignment struct{ X, Y float64 }
+
+var (
+	TopLeft     = Alignment{-1, -1}
+	TopCenter   = Alignment{0, -1}
+	TopRight    = Alignment{1, -1}
+	CenterLeft  = Alignment{-1, 0}
+	Center      = Alignment{0, 0}
+	CenterRight = Alignment{1, 0}
+	BottomLeft  = Alignment{-1, 1}
+	BottomRight = Alignment{1, 1}
+)
+
+// Along returns where a child of size child sits inside parent.
+func (a Alignment) Along(parent, child Size) Offset {
+	dx, dy := parent.W-child.W, parent.H-child.H
+	return Offset{dx * (a.X + 1) / 2, dy * (a.Y + 1) / 2}
+}
