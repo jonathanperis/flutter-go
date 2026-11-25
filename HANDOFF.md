@@ -15,7 +15,7 @@ Start here when continuing flutter-go in a new session.
 - **Next:** **G5**, a variable-height lazy list (Flutter's
   `RenderSliverList`), then G6–G10 in order. GOAL.md defines "done" for
   every item.
-- **Verification:** 70+ scenes compared with real Flutter (layout, lists,
+- **Verification:** 55 scenes compared with real Flutter (layout, lists,
   animations, flings, drags, bouncing, editing, rebuilds, repaints), each
   checked by deliberately breaking the rule it covers.
 
