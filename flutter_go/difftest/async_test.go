@@ -46,13 +46,13 @@ var asyncScenes = map[string]func(l *Loop, log func(string)){
 	},
 	"completers": func(l *Loop, log func(string)) {
 		a, s := NewCompleter[string](), NewSyncCompleter[string]()
-		a.Future().OnComplete(func(v string) { log("async " + v) }, nil)
-		s.Future().OnComplete(func(v string) { log("sync " + v) }, nil)
+		OnComplete(a.Future(), func(v string) { log("async " + v) }, nil)
+		OnComplete(s.Future(), func(v string) { log("sync " + v) }, nil)
 		a.Complete("a")
 		log("after a.complete")
 		s.Complete("s")
 		log("after s.complete")
-		s.Future().OnComplete(func(v string) { log("late sync " + v) }, nil)
+		OnComplete(s.Future(), func(v string) { log("late sync " + v) }, nil)
 		log("end")
 		l.FlushMicrotasks()
 	},
@@ -60,7 +60,7 @@ var asyncScenes = map[string]func(l *Loop, log func(string)){
 		c := NewSyncCompleter[int]()
 		Then(Then(c.Future(), func(v int) int { return v + 1 }), func(v int) Void { log(fmt.Sprint("chain1 ", v)); return Void{} })
 		Then(c.Future(), func(v int) Void { log(fmt.Sprint("direct ", v)); return Void{} })
-		Then(ThenFuture(c.Future(), func(v int) *Future[int] { return FutureValue(v * 10) }),
+		Then(ThenFuture(c.Future(), func(v int) Future[int] { return FutureValue(v * 10) }),
 			func(v int) Void { log(fmt.Sprint("chainFuture ", v)); return Void{} })
 		c.Future().WhenComplete(func() { log("whenComplete") })
 		c.Complete(1)
@@ -68,7 +68,7 @@ var asyncScenes = map[string]func(l *Loop, log func(string)){
 		l.FlushMicrotasks()
 	},
 	"async_functions": func(l *Loop, log func(string)) {
-		f := func(name string, dep *Future[int]) *Future[int] {
+		f := func(name string, dep Future[int]) Future[int] {
 			return Async(func() int {
 				log(name + " start")
 				v := dep.Await()
@@ -78,18 +78,18 @@ var asyncScenes = map[string]func(l *Loop, log func(string)){
 		}
 		result := func(name string) func(int) { return func(v int) { log(fmt.Sprint(name, " result ", v)) } }
 		gate := NewCompleter[int]()
-		f("a", FutureValue(1)).OnComplete(result("a"), nil)
-		f("b", gate.Future()).OnComplete(result("b"), nil)
+		OnComplete(f("a", FutureValue(1)), result("a"), nil)
+		OnComplete(f("b", gate.Future()), result("b"), nil)
 		done := FutureValue(7)
 		l.FlushMicrotasks()
-		f("c", done).OnComplete(result("c"), nil)
+		OnComplete(f("c", done), result("c"), nil)
 		log("before gate")
 		gate.Complete(5)
 		log("after gate")
 		l.FlushMicrotasks()
 	},
 	"async_nested": func(l *Loop, log func(string)) {
-		inner := func() *Future[int] {
+		inner := func() Future[int] {
 			return Async(func() int {
 				log("inner start")
 				awaitNull()
@@ -97,7 +97,7 @@ var asyncScenes = map[string]func(l *Loop, log func(string)){
 				return 3
 			})
 		}
-		outer := func() *Future[Void] {
+		outer := func() Future[Void] {
 			return AsyncVoid(func() {
 				log("outer start")
 				v := inner().Await()
@@ -106,7 +106,7 @@ var asyncScenes = map[string]func(l *Loop, log func(string)){
 				log("outer after delay")
 			})
 		}
-		outer().OnComplete(func(Void) { log("outer done") }, nil)
+		OnComplete(outer(), func(Void) { log("outer done") }, nil)
 		log("sync end")
 		l.FlushMicrotasks()
 		log("flushed")
@@ -137,7 +137,7 @@ var asyncScenes = map[string]func(l *Loop, log func(string)){
 			}()
 			return 1
 		})
-		awaitsError.OnComplete(func(v int) { log(fmt.Sprint("awaitsError ", v)) }, nil)
+		OnComplete(awaitsError, func(v int) { log(fmt.Sprint("awaitsError ", v)) }, nil)
 		log("sync end")
 		l.FlushMicrotasks()
 	},

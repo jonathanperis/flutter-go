@@ -119,7 +119,7 @@ func debugPrintTask() {
 
 // DebugPrintDone is the debugPrintDone getter: a Future that completes when
 // DebugPrintThrottled has no buffered output left.
-func DebugPrintDone() *async.Future[async.Void] {
+func DebugPrintDone() async.Future[async.Void] {
 	if debugPrintCompleter != nil {
 		return debugPrintCompleter.Future()
 	}

@@ -291,7 +291,7 @@ func throttleEvents() []string {
 		head := string(u[:min(3, len(u))])
 		events = append(events, ms()+"print "+strconv.Itoa(len(line))+" "+head)
 	})()
-	done := func(what string) { f.DebugPrintDone().OnComplete(func(async.Void) { log(what) }, nil) }
+	done := func(what string) { async.OnComplete(f.DebugPrintDone(), func(async.Void) { log(what) }, nil) }
 	done("done (idle)")
 	loop.FlushMicrotasks()
 	f.DebugPrintThrottled(strings.Repeat("a", 5000) + "\n" + strings.Repeat("b", 5000) + "\n" + strings.Repeat("c", 5000) + "\n" + strings.Repeat("d", 3000))

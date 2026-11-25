@@ -90,8 +90,40 @@ literals of imported structs.
 | `Int32List`, `Int64List`, `Float32List`, `Float64List` | `[]int32`, `[]int64`, `[]float32`, `[]float64` |
 | `Endian` | `encoding/binary.ByteOrder` (omitted: the host's, as `Endian.host`) |
 | `Iterable<T>` | `iter.Seq[T]` (methods named `All()` return it) |
-| `Future<T>` | `*async.Future[T]`; `await f` is `f.Await()` inside `async.Async(func() T {...})` |
+| `Future<T>` | `async.Future[T]`, an interface (see "Futures" below); `await f` is `f.Await()` inside `async.Async(func() T {...})` |
 | `Stream<T>` | `*async.Stream[T]` (not yet ported) |
+
+## Futures
+
+Dart's `Future<T>` is an interface that Flutter implements
+(`SynchronousFuture`, `TickerFuture`), so `async.Future[T]` is a Go
+interface. Its methods are Dart's, with three adaptations:
+
+- `f.then<R>(onValue, onError:)` is the generic function
+  `async.Then(f, onValue)` / `ThenOrError(f, onValue, onError)` /
+  `ThenFuture(f, onValue)` (when `onValue` returns a future), because Go
+  methods can't take type parameters. They dispatch to the interface's
+  `ThenAny(onValue func(T) any, onError func(error) any) Future[any]`,
+  Dart's `then` with `R` erased; a callback result that is a `Future[any]`
+  (`async.EraseFuture(f)`) is a `FutureOr<R>` holding a future.
+  `then` with callbacks whose result is ignored is `async.OnComplete(f,
+  onValue, onError)`.
+- `CatchError(onError, test)`, `WhenComplete(action)` and
+  `Timeout(timeLimit, onTimeout)` are methods (`asStream` is not ported).
+  A `WhenComplete` action can't return a future.
+- Dart's `await` and the `ignore()` extension are the methods `Await()` and
+  `Ignore()`.
+
+The futures `async` creates (`FutureValue`, `Completer.Future()`, `Async`...)
+are one unexported implementation, Dart's `_Future`, and `async` treats them
+as Dart treats `_Future` (`_chainCoreFuture`). A user-defined future
+implements `ThenAny`, `CatchError`, `WhenComplete` and `Timeout` as its Dart
+class does, and returns `async.AwaitUserDefined(f)` from `Await` and calls
+`async.IgnoreUserDefined(f)` from `Ignore`: Dart's VM awaits and ignores a
+user-defined future through its `then`, and `async` chains to one through
+`ThenAny` (`_chainForeignFuture`), so a future whose `then` calls back
+synchronously (SynchronousFuture) completes chained futures and resumes an
+awaiting coroutine synchronously, as in Dart.
 
 ## Mixins and overridable methods
 

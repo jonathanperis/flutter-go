@@ -144,7 +144,7 @@ func TestDebugPrintThrottledCapacity(t *testing.T) {
 		DebugPrintThrottled(strings.Repeat("x", 12*1024-1) + "\ny\nz")
 		equal(t, len(lines), 2)
 		done := false
-		DebugPrintDone().OnComplete(func(async.Void) { done = true }, nil)
+		async.OnComplete(DebugPrintDone(), func(async.Void) { done = true }, nil)
 		loop.Elapse(999 * time.Millisecond)
 		equal(t, len(lines), 2)
 		equal(t, done, false)
@@ -218,7 +218,7 @@ func TestDebugPrintThrottledWrapsAndQueues(t *testing.T) {
 func TestDebugPrintDoneWhenIdle(t *testing.T) {
 	withLoop(t, func(loop *async.Loop) {
 		done := false
-		DebugPrintDone().OnComplete(func(async.Void) { done = true }, nil)
+		async.OnComplete(DebugPrintDone(), func(async.Void) { done = true }, nil)
 		loop.FlushMicrotasks()
 		equal(t, done, true)
 	})

@@ -16,9 +16,9 @@ type (
 	ValueSetter[T any]      func(value T)
 	ValueGetter[T any]      func() T
 	IterableFilter[T any]   func(input iter.Seq[T]) iter.Seq[T]
-	AsyncCallback           func() *async.Future[async.Void]
-	AsyncValueSetter[T any] func(value T) *async.Future[async.Void]
-	AsyncValueGetter[T any] func() *async.Future[T]
+	AsyncCallback           func() async.Future[async.Void]
+	AsyncValueSetter[T any] func(value T) async.Future[async.Void]
+	AsyncValueGetter[T any] func() async.Future[T]
 )
 
 // CachingIterable lazily pulls from an iterator once and caches the results,

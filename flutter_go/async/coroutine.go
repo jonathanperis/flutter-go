@@ -8,7 +8,7 @@ package async
 // it never runs at the same time as the loop or another coroutine. A
 // coroutine that awaits a future which never completes stays parked (Dart
 // would garbage-collect it).
-func Async[T any](body func() T) *Future[T] {
+func Async[T any](body func() T) Future[T] {
 	f := newFuture[T]()
 	co := &coroutine{resume: make(chan struct{}), yield: make(chan struct{})}
 	go func() {
@@ -33,7 +33,7 @@ func Async[T any](body func() T) *Future[T] {
 }
 
 // AsyncVoid is Async for a body without a result (Future<void>).
-func AsyncVoid(body func()) *Future[Void] {
+func AsyncVoid(body func()) Future[Void] {
 	return Async(func() Void { body(); return Void{} })
 }
 
@@ -58,7 +58,7 @@ func (co *coroutine) step() {
 // Await suspends the calling coroutine until f completes and returns its
 // value, or panics with its error (Dart's await). It must be called inside
 // Async.
-func (f *Future[T]) Await() T {
+func (f *future[T]) Await() T {
 	co := running
 	if co == nil {
 		panic("async: Await called outside Async")

@@ -785,3 +785,36 @@ The standing goal is now full API parity with Flutter 3.50.1's Dart layer
   here as if this were flutter/flutter (its skills appeared in sessions).
   `sync_upstream.sh` keeps them out (`EXCLUDED`), and `--check` verifies
   everything else as before.
+### dart:async: `Future` becomes an interface (resolves the scheduler design question)
+- `async.Future[T]` is now an interface, as Dart's is, so Go code implements
+  it (foundation's `SynchronousFuture`; scheduler's `TickerFuture` next).
+  Methods: `ThenAny` (Dart's `then<R>` with R erased; the generic
+  `Then`/`ThenOrError`/`ThenFuture` dispatch to it and restore R),
+  `CatchError`, `WhenComplete`, `Timeout` (new, ported from `_Future.timeout`,
+  with `TimeoutException`), `Ignore`, `Await`. `OnComplete` became a free
+  function. The old struct is the unexported `future[T]` (Dart's `_Future`);
+  every constructor returns the interface. See API_MAPPING "Futures".
+- User-defined futures follow the VM: `await` on one calls its `then`
+  (`AwaitUserDefined`; if the callback runs synchronously the coroutine
+  continues without suspending, as the VM resumes within `then`), chaining
+  to one listens through `then` and completes synchronously in the callback
+  (`_chainForeignFuture`), `ignore` is `then(_ignore, onError: _ignore)`.
+  Type erasure (`EraseFuture`, internal casts) keeps identities Dart keeps:
+  `SynchronousFuture.then` returning a future returns that very future.
+- Fixed on the way (a deviation the old difftest did not exercise):
+  `_chainCoreFuture` also completes synchronously when the target has no
+  listeners yet and the source holds a value (or an ignored error); Go
+  always went through a microtask unless `sync` was set. Visible through
+  `Completer.complete(completedFuture)` and `timeout` on a completed future
+  (listener order relative to other microtasks). Caught by the new
+  synchronous_future difftest scene `completer_chains_completed_core`.
+- Checks: the 9 async scenes still match Dart (the Go file only changed
+  `*Future` → `Future` and `x.OnComplete(` → `OnComplete(x, `); the 8 async
+  mutations re-run after the refactor (LIFO microtasks, timer ties, async
+  value delivered synchronously, reversed listeners, late listener run
+  synchronously, early throw completed synchronously, periodic catch-up
+  once, await of a completed future without a microtask): all caught, as
+  before it. Two more were missed before and after (sync chaining of a
+  completed source through a microtask, and not reporting an unhandled
+  error): the first is now caught by the synchronous_future difftest; the
+  second is not observable in a difftest (Dart's zone reports it), noted.
