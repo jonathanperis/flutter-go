@@ -42,6 +42,9 @@ type Box struct {
 	needsLayout bool
 	// onNeedsFrame is set on the root only.
 	onNeedsFrame func()
+	// needsPaint and layer are used by repaint boundaries only.
+	needsPaint bool
+	layer      *Layer
 }
 
 // Base implements RenderBox for every type that embeds Box.
@@ -63,6 +66,9 @@ func Layout(r RenderBox, c Constraints) Size {
 		panic(fmt.Sprintf("%T returned size %v that violates %v", r, size, c))
 	}
 	b.Size, b.laidOut, b.needsLayout = size, true, false
+	// Flutter's layout() ends with markNeedsPaint(). A boundary that was not
+	// relaid out (only moved) keeps its layer.
+	markPaintOnly(r)
 	return size
 }
 
@@ -76,17 +82,6 @@ func MarkNeedsLayout(r RenderBox) {
 			b.onNeedsFrame()
 		}
 		r = b.parent
-	}
-}
-
-// MarkNeedsPaint requests a frame. Every frame repaints the whole tree; there
-// are no repaint boundaries or layers yet.
-func MarkNeedsPaint(r RenderBox) {
-	for r.Base().parent != nil {
-		r = r.Base().parent
-	}
-	if f := r.Base().onNeedsFrame; f != nil {
-		f()
 	}
 }
 
@@ -158,9 +153,22 @@ func Walk(r RenderBox, visit func(r RenderBox, depth int)) {
 	walk(r, 0)
 }
 
+// markPaintOnly marks the nearest boundary dirty without requesting a frame
+// (used during layout, which is already part of a frame).
+func markPaintOnly(r RenderBox) {
+	for n := r; n != nil; n = n.Base().parent {
+		if isBoundary(n) {
+			n.Base().needsPaint = true
+			return
+		}
+	}
+}
+
 // Dispose releases native resources in r's subtree.
 func Dispose(r RenderBox) {
 	Walk(r, func(r RenderBox, _ int) {
+		r.Base().layer.release()
+		r.Base().layer = nil
 		if d, ok := r.(Disposer); ok {
 			d.Dispose()
 		}

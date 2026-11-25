@@ -46,6 +46,30 @@ func (c *impellerCanvas) DrawRRect(x r.Rect, radius float64, col r.Color) {
 	c.b.DrawRoundedRect(rect(x), float32(radius), c.paint)
 }
 
+type impellerRecording struct {
+	b *impeller.DisplayListBuilder
+	c *impellerCanvas
+}
+
+func (r impellerRecording) Canvas() r.Canvas { return r.c }
+func (r impellerRecording) End() r.Picture {
+	dl := r.b.Build()
+	r.b.Release()
+	return dl
+}
+
+func (c *impellerCanvas) NewRecording() r.Recording {
+	b := impeller.NewDisplayListBuilder()
+	return impellerRecording{b, &impellerCanvas{b, c.paint}}
+}
+
+func (c *impellerCanvas) DrawPicture(p r.Picture, at r.Offset) {
+	c.b.Save()
+	c.b.Translate(float32(at.X), float32(at.Y))
+	c.b.DrawDisplayList(p.(*impeller.DisplayList), 1)
+	c.b.Restore()
+}
+
 func (c *impellerCanvas) DrawParagraph(p r.Paragraph, at r.Offset) {
 	c.b.DrawParagraph(p.(*paragraph).p, float32(at.X), float32(at.Y))
 }

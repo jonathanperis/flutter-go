@@ -12,7 +12,9 @@ import (
 
 // ListViewBuilder is a vertical, lazily built list of fixed-height items
 // (Flutter's ListView.builder with itemExtent). ItemBuilder is called only
-// for items within the visible area plus the cache extent.
+// for items within the visible area plus the cache extent. Each item gets a
+// RepaintBoundary, as Flutter's addRepaintBoundaries does, so scrolling
+// moves items without repainting them.
 type ListViewBuilder struct {
 	ItemCount   int
 	ItemExtent  float64
@@ -133,7 +135,7 @@ func (m listManager) CreateChild(i int) r.RenderBox {
 	if i < 0 || i >= w.ItemCount {
 		return nil
 	}
-	child := e.updateChild(nil, w.ItemBuilder(e, i))
+	child := e.updateChild(nil, RepaintBoundary{Child: w.ItemBuilder(e, i)})
 	if child == nil {
 		return nil
 	}
@@ -201,7 +203,7 @@ func (e *Element) updateLazy(old ListViewBuilder) {
 		if i >= w.ItemCount {
 			continue // removed by the next layout
 		}
-		e.lazy[i] = e.updateChild(e.lazy[i], w.ItemBuilder(e, i))
+		e.lazy[i] = e.updateChild(e.lazy[i], RepaintBoundary{Child: w.ItemBuilder(e, i)})
 	}
 	e.syncLazyChildren()
 	e.syncLazy()

@@ -511,7 +511,9 @@ type BuildOwner struct {
 	OnNeedsFrame func()
 	// Builds counts Build calls, for tests and benchmarks.
 	Builds int
-	sched  *animation.Scheduler
+	// Repainted is how many repaint boundaries the last frame repainted.
+	Repainted int
+	sched     *animation.Scheduler
 	// DevicePixelRatio is physical pixels per logical pixel (sets scroll
 	// physics tolerances). 0 means 1.
 	DevicePixelRatio float64
@@ -635,7 +637,7 @@ func (o *BuildOwner) DrawFrameAt(ts time.Duration, size r.Size, cv r.Canvas) {
 	}
 	o.BuildScope()
 	r.Layout(o.rootRender, r.Tight(size))
-	o.rootRender.Paint(cv, r.Offset{})
+	o.Repainted = r.Composite(o.rootRender, cv, r.Offset{})
 	s.EndFrame()
 }
 
