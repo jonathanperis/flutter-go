@@ -637,3 +637,57 @@ The standing goal is now full API parity with Flutter 3.50.1's Dart layer
   broke persistence in the collision path survived Flutter's tests. The
   16-entry inflation threshold is a performance detail (an equivalent
   mutation).
+- foundation diagnostics (`diagnostics.dart`, the text-art and JSON
+  descriptions behind every `toString`/`toStringDeep` and the widget
+  inspector): ported in full, split over five `diagnostics*.go` files, plus
+  `debugFormatDouble` (debug.go, partial) and `dart.MapEntry`. All 39
+  public declarations exposed. Overridable methods use one pattern: every
+  embeddable base keeps `self` (set by constructors, or `SetSelf` for types
+  in other packages) and calls overrides through it; nullable values are the
+  nil of the type parameter (see API_MAPPING "Mixins and overridable
+  methods" and "Nullable values and options"). Strings are measured in
+  UTF-16 units, as Dart does, so wrapping and box widths match with emoji
+  and accents.
+- Flutter's tests: diagnostics_test.dart 29 of 30 (all goldens copied
+  verbatim; "Stack trace test" needs `DiagnosticsStackTrace`, which is
+  assertions.dart) and diagnostics_json_test.dart 13 of 15 (the two Element
+  tests need widgets' `Element`). Plus a few tests of our own for parts
+  Flutter only covers indirectly.
+- Difftest (`difftest/diagnostics_test.go` + `flutter/test/diagnostics_test.dart`):
+  516 outputs compared exactly (hashes normalized): a tree with 68
+  properties of every kind (toStringDeep at 3 widths and with prefixes,
+  toString, toStringShallow, every minLevel, timeline arguments, JSON full /
+  default / iterative), each property alone (toString, dense, toStringDeep,
+  level, showName, JSON), every DiagnosticsTreeStyle as a tree and as a root,
+  long wrapped text (accents, emoji, CJK, unbreakable words, non-wrappable
+  names and values) in 5 style pairs × 4 widths, truncation, error blocks
+  with line prefixes, Diagnosticable vs DiagnosticableTree vs the mixin.
+- **Found by the difftest** (the unit tests passed on the first run):
+  Dart's `toUpperCase` keeps `ß` (simple case mapping; I had expanded it to
+  `SS`); Go enums (named ints) were emitted as JSON numbers and printed
+  without Dart's `Type.` prefix as `defaultValue`; Dart prints a top-level
+  function as `Closure: () => void from Function 'f': static.` (closures
+  omit the suffix; Go tells them apart by the runtime name); a lazy property
+  of non-nilable `T` that panicked reported `""` instead of null. And a bug
+  in the test itself: Go folds the constant `0.1+0.2` exactly (rule 3
+  above). `fmacheck` crashed on constant string concatenation; fixed.
+- Flutter quirks reproduced on purpose: `DiagnosticableTree.toStringShallow`
+  (the class, not the mixin) starts with the full `toString()`, so the
+  properties appear twice; `TextTreeRenderer` truncation appends a `...`
+  property when a node has *fewer* properties than the limit; an unnamed
+  `truncateChildren` node says "This null had..."; an expandable
+  Diagnosticable value prints its properties twice (`Point2#…(x: 3.0)(x:
+  3.0)`); `PercentProperty(-0.0)` is `-0.0%`.
+- Mutations: 39 tried, 37 caught, 2 equivalent. Caught only after adding
+  difftest scenes: wrap ranges measured in bytes instead of UTF-16 units,
+  the break-point boundary at the start of a wrappable range, `ifEmpty` on
+  an unquoted/raw value. Equivalent: the word wrapper's fast-path `<` →
+  `<=` and over-width `>` → `>=` (no line can break at exactly the width;
+  confirmed by comparing the original and mutated wrapper on 300k random
+  inputs).
+- Not ported: `debugDoublePrecision` (needs `toStringAsPrecision`),
+  ErrorSummary/ErrorDescription/ErrorHint/ErrorSpacer/DiagnosticsStackTrace
+  (assertions.dart; the tests' `FlutterError.fromParts([ErrorSummary(..)])`
+  became `panic(NewFlutterError(..))`, same runtime type), and the
+  `.lazy` constructor's `defaultValue is T?` assert. Profile-mode branches
+  are ported but untested.

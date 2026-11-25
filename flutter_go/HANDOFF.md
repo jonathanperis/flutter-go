@@ -28,8 +28,8 @@ Start here when continuing flutter-go in a new session.
      `painting.EdgeInsets`/`painting.Alignment`.
   3. foundation: part 1 done (constants, object, platform, key,
      basic_types, observer_list). Next: collections, bitfield, unicode,
-     print, serialization, stack_frame, persistent_hash_map, then
-     diagnostics + assertions (FlutterError.reportError) and binding. Also
+     print, serialization, stack_frame, persistent_hash_map, diagnostics
+     (done), then assertions (FlutterError.reportError) and binding. Also
      port package:listen (ChangeNotifier...) and vector_math's Matrix4.
      Then the rest of what the scheduler needs (`BindingBase`, `FlutterError`
      reporting, `ChangeNotifier`/`Listenable`), and a minimal

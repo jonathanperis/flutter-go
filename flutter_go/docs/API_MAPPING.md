@@ -93,6 +93,55 @@ literals of imported structs.
 | `Future<T>` | `*async.Future[T]`; `await f` is `f.Await()` inside `async.Async(func() T {...})` |
 | `Stream<T>` | `*async.Stream[T]` (not yet ported) |
 
+## Mixins and overridable methods
+
+Dart subclasses override methods that the base class's own algorithms call
+(`valueToString`, `level`, `debugFillProperties`...). Go's embedding doesn't
+dispatch that way, so every embeddable base (`FooBase`, `FooMixin`, and
+concrete classes meant to be extended, such as `DiagnosticsProperty`) keeps a
+pointer to the outer object, `self`, and calls every overridable method
+through it. One pattern, everywhere:
+
+- Constructors in the base's package set `self`. A type in another package
+  that embeds a base calls `x.SetSelf(x)` once, when it is created:
+
+  ```go
+  type TestTree struct{ foundation.DiagnosticableTreeMixin; ... }
+
+  func NewTestTree() *TestTree {
+  	t := &TestTree{}
+  	t.SetSelf(t)
+  	return t
+  }
+
+  type ColorProperty struct{ foundation.DiagnosticsProperty[ui.Color] }
+
+  func NewColorProperty(name string, c ui.Color) *ColorProperty {
+  	p := &ColorProperty{DiagnosticsProperty: *foundation.NewDiagnosticsProperty(name, c)}
+  	p.SetSelf(p)
+  	return p
+  }
+  ```
+
+- An override calls "super" through the embedded field:
+  `t.DiagnosticableTreeMixin.DebugFillProperties(b)`.
+- Types embedding a base are used by pointer (a copy still points at the
+  original). Using a mixin before `SetSelf` panics with a message saying so.
+
+## Nullable values and options
+
+- A generic value `T?` is a `T` whose nil is Dart's null: use a pointer type
+  for a nullable number, bool or struct (`DiagnosticsProperty[*float64]`).
+  Constructors of fixed-type classes accept both forms through a type
+  parameter (`NewDoubleProperty("x", 1.5)`, `NewDoubleProperty[*float64]("x", nil)`).
+- An option whose Dart default is not null but which accepts an explicit
+  null takes `foundation.Null` (any-typed options, e.g. `DefaultValue: Null`
+  is `defaultValue: null`) or `foundation.NullString` (`*string` options).
+  Leaving an option unset always gives the Dart default.
+- Methods with optional named parameters take a variadic options struct
+  named `<Type><Method>Options` (or `<Method>Options` when only one type has
+  the method): `node.ToStringDeep(DiagnosticsNodeToStringDeepOptions{WrapWidth: &w})`.
+
 ## Build modes
 
 `kReleaseMode` and `kProfileMode` come from build tags (`-tags
@@ -108,3 +157,20 @@ Each divergence is listed here when it is introduced.
 - Assertions are always on: where Dart asserts in debug mode (negative
   RRect radii, non-finite lerp inputs), Go panics in every build.
 - Equal widgets skip rebuilds (Go's stand-in for `const`), see PLAN.md G1.
+- diagnostics: `DiagnosticsNode.Value()` returns `any`; a typed subclass's
+  Dart `T value` is `TypedValue()` (Go has no covariant return types).
+- diagnostics: a positional property name `""` stands for Dart's null name
+  (only JSON shows the difference); `DiagnosticsNode.message` keeps its
+  non-null `''`. `Name()` returns `""` for both.
+- diagnostics: `FlagProperty`'s required named `value:` is positional.
+- diagnostics: `FlagsSummary`'s `Map<String, T?>` is
+  `[]dart.MapEntry[string, T]` (Dart maps keep insertion order; Go maps
+  don't).
+- diagnostics: Dart's `runtimeType`/`toString` are reproduced from Go types
+  (`DiagnosticsProperty[*int]` prints `DiagnosticsProperty<int>`, a Go enum
+  prints `Fruit.apple`, a package-level func prints Dart's
+  `Closure: () => void from Function 'f': static.`). A nullable type
+  argument prints without `?` (Go can't tell `T` from `T?` once T is a
+  pointer).
+- diagnostics: a lazy property's compute callback that panics is recorded as
+  the property's exception (Dart catches the throw).

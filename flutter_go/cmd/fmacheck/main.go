@@ -116,6 +116,9 @@ func isFloatConstOp(info *types.Info, e *ast.BinaryExpr) bool {
 	if !ok || tv.Value == nil {
 		return false
 	}
+	if k := tv.Value.Kind(); k != constant.Float && k != constant.Int {
+		return false // e.g. an untyped string constant "a" + "b"
+	}
 	b, ok := tv.Type.Underlying().(*types.Basic)
 	if !ok || b.Info()&(types.IsFloat|types.IsUntyped) == 0 || b.Info()&types.IsInteger != 0 {
 		return false
