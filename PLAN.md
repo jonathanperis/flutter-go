@@ -459,3 +459,25 @@ The standing goal is now full API parity with Flutter 3.50.1's Dart layer
   (`double.toString`, `toStringAsFixed`), checked against the Dart 3.50.1
   SDK. Dart rounds exact ties away from zero (`2.5.toStringAsFixed(0)` is
   "3"); Go's strconv rounds them to even.
+
+### dart:async in Go (`async`), needed by scheduler and animation
+- Flutter's `TickerFuture` is a `Future`, and the frame contract depends on
+  Dart's event loop (microtasks are drained between `handleBeginFrame` and
+  `handleDrawFrame`; flutter_test advances a fake clock). The `async`
+  package reproduces the Dart 3 VM's rules, read from the 3.50.1 SDK source
+  (`future_impl.dart`, the VM's `async_patch.dart`) and package:fake_async:
+  FIFO microtasks; timers by deadline, then creation order; async
+  `Completer`/`Future.value` deliver in a microtask; listeners run in
+  registration order during completion; `await` on a completed future costs
+  one microtask; a throw before the first `await` fails the future in a
+  microtask, after it synchronously.
+- **`await` without a divergence:** `Async(func)` runs the body as a
+  coroutine (a goroutine with explicit hand-off, so only one runs at a
+  time), and `future.Await()` really suspends it. Code reads like Dart's.
+  Parked coroutines whose future never completes are leaked goroutines
+  (Dart would collect them).
+- **Difftest:** 9 scenes log callback order inside fake_async in Dart and
+  in Go (queue order, completers, chains, async functions, nesting, errors,
+  timers, periodic catch-up, flushTimers): identical. 8 mutations of the
+  rules above each fail it. One mutation deadlocked a coroutine instead of
+  failing: the mutation runner now has a 60 s timeout.
