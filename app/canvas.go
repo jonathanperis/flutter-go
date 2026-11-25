@@ -63,7 +63,7 @@ func (p *paragraph) Release()                   { p.p.Release() }
 
 func (t impellerText) Layout(text string, s r.TextStyle, maxWidth float64) r.Paragraph {
 	w := float32(math.Min(maxWidth, 1e6))
-	p, err := impeller.NewStyledParagraph(t.tc, text, float32(s.Size()), color(s.Color), s.Bold, w)
+	p, err := impeller.NewStyledParagraph(t.tc, text, float32(s.Size()), color(s.TextColor()), s.Bold, w)
 	if err != nil {
 		panic(err)
 	}

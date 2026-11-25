@@ -8,8 +8,17 @@ import (
 
 type TextStyle struct {
 	FontSize float64 // 0 means 14, Flutter's default
-	Color    Color
+	Color    Color   // the zero value means opaque black, not transparent
 	Bold     bool
+}
+
+// TextColor returns the color to draw with: an unset (zero) Color would be
+// fully transparent, so it means opaque black instead.
+func (s TextStyle) TextColor() Color {
+	if s.Color == (Color{}) {
+		return Color{0, 0, 0, 1}
+	}
+	return s.Color
 }
 
 func (s TextStyle) Size() float64 {

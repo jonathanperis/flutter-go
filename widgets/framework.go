@@ -14,7 +14,9 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"time"
 
+	"github.com/jonathanperis/flutter-go/animation"
 	r "github.com/jonathanperis/flutter-go/rendering"
 )
 
@@ -447,7 +449,26 @@ type BuildOwner struct {
 	OnNeedsFrame func()
 	// Builds counts Build calls, for tests and benchmarks.
 	Builds int
+	sched  *animation.Scheduler
+	// pendingRoot is a RunApp widget waiting for the next build phase.
+	pendingRoot *rootWidget
 }
+
+// Scheduler returns the frame scheduler that drives tickers.
+func (o *BuildOwner) Scheduler() *animation.Scheduler {
+	if o.sched == nil {
+		o.sched = animation.NewScheduler()
+		o.sched.RequestFrame = func() {
+			if o.OnNeedsFrame != nil {
+				o.OnNeedsFrame()
+			}
+		}
+	}
+	return o.sched
+}
+
+// Scheduler returns the frame scheduler (Flutter's TickerProvider/vsync).
+func (e *Element) Scheduler() *animation.Scheduler { return e.owner.Scheduler() }
 
 func (o *BuildOwner) scheduleBuild(e *Element) {
 	o.dirty = append(o.dirty, e)
@@ -474,17 +495,27 @@ func (o *BuildOwner) RunApp(w Widget) {
 	}
 	root := rootWidget{child: w, render: o.rootRender}
 	if o.root == nil {
+		// First mount builds synchronously, like Flutter's attachRootWidget.
 		o.root = inflate(root, nil, o)
-	} else {
-		o.root.update(root)
+		return
+	}
+	// Later calls are applied inside the next frame's build phase, as
+	// Flutter's RootWidget.attach does (markNeedsBuild on the root).
+	o.pendingRoot = &root
+	if o.OnNeedsFrame != nil {
+		o.OnNeedsFrame()
 	}
 }
 
 // NeedsBuild reports whether any element is dirty.
-func (o *BuildOwner) NeedsBuild() bool { return len(o.dirty) > 0 }
+func (o *BuildOwner) NeedsBuild() bool { return len(o.dirty) > 0 || o.pendingRoot != nil }
 
 // BuildScope rebuilds dirty elements, parents before children.
 func (o *BuildOwner) BuildScope() {
+	if p := o.pendingRoot; p != nil {
+		o.pendingRoot = nil
+		o.root.update(*p)
+	}
 	for len(o.dirty) > 0 {
 		dirty := o.dirty
 		o.dirty = nil
@@ -497,11 +528,20 @@ func (o *BuildOwner) BuildScope() {
 	}
 }
 
-// DrawFrame builds, lays out at the given logical size, and paints.
+// DrawFrame draws a frame at the current timestamp (no time passes).
 func (o *BuildOwner) DrawFrame(size r.Size, cv r.Canvas) {
+	o.DrawFrameAt(o.Scheduler().Now(), size, cv)
+}
+
+// DrawFrameAt runs one frame at timestamp ts: tickers, then build, layout
+// and paint, in Flutter's order.
+func (o *BuildOwner) DrawFrameAt(ts time.Duration, size r.Size, cv r.Canvas) {
+	s := o.Scheduler()
+	s.BeginFrame(ts)
 	o.BuildScope()
 	r.Layout(o.rootRender, r.Tight(size))
 	o.rootRender.Paint(cv, r.Offset{})
+	s.EndFrame()
 }
 
 // rootWidget hosts the app's widget under the owner's root render object.
