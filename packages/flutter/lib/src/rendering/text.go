@@ -32,7 +32,7 @@ func (s TextStyle) Merge(o TextStyle) TextStyle {
 // fully transparent, so it means opaque black instead.
 func (s TextStyle) TextColor() Color {
 	if s.Color == (Color{}) {
-		return Color{0, 0, 0, 1}
+		return ui.Color{A: 1}
 	}
 	return s.Color
 }

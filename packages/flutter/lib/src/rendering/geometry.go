@@ -23,13 +23,12 @@ type (
 	Rect   = ui.Rect
 )
 
-// Color is straight (non-premultiplied) RGBA in [0,1].
-type Color struct{ R, G, B, A float64 }
+// Color is dart:ui's Color (straight, non-premultiplied alpha).
+type Color = ui.Color
 
-// RGB builds an opaque color from a 0xRRGGBB value.
-func RGB(hex uint32) Color {
-	return Color{float64(hex>>16&0xff) / 255, float64(hex>>8&0xff) / 255, float64(hex&0xff) / 255, 1}
-}
+// RGB builds an opaque color from a 0xRRGGBB value (Color(0xFFRRGGBB)).
+// It is a flutter-go convenience, not Flutter API.
+func RGB(hex uint32) Color { return ui.NewColor(int(0xFF000000 | hex)) }
 
 // Constraints are Flutter's BoxConstraints.
 type Constraints struct{ MinW, MaxW, MinH, MaxH float64 }

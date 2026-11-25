@@ -590,3 +590,5 @@ The standing goal is now full API parity with Flutter 3.50.1's Dart layer
   2.7e-12; the difftests compare them exactly. The drag-fling scenes still
   differ by up to 2.6e-11 (velocity tracker; to be fixed when gestures is
   ported).
+- `rendering.Color` is now dart:ui's `Color` (alias); the two unkeyed
+  literals (different field order: RGBA vs ARGB) were rewritten as keyed.

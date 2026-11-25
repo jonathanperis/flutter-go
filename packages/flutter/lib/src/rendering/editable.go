@@ -27,7 +27,7 @@ type RenderEditable struct {
 }
 
 func NewEditable(style TextStyle) *RenderEditable {
-	return &RenderEditable{style: style, CaretColor: RGB(0x1d1b20), SelectionColor: Color{0.4, 0.31, 0.64, 0.3}}
+	return &RenderEditable{style: style, CaretColor: RGB(0x1d1b20), SelectionColor: ui.Color{R: 0.4, G: 0.31, B: 0.64, A: 0.3}}
 }
 
 func (r *RenderEditable) Children() []RenderBox   { return nil }
