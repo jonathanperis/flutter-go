@@ -3,6 +3,8 @@ package app
 import (
 	"math"
 
+	"github.com/jonathanperis/flutter-go/textedit"
+
 	"github.com/jonathanperis/flutter-go/impeller"
 	r "github.com/jonathanperis/flutter-go/rendering"
 )
@@ -60,6 +62,33 @@ func (p *paragraph) Text() string               { return p.text }
 func (p *paragraph) Height() float64            { return float64(p.p.Height()) }
 func (p *paragraph) MaxIntrinsicWidth() float64 { return float64(p.p.MaxIntrinsicWidth()) }
 func (p *paragraph) Release()                   { p.p.Release() }
+
+func (p *paragraph) CaretX(off int) float64 {
+	n := textedit.Len16(p.text)
+	if n == 0 {
+		return 0
+	}
+	if off >= n {
+		c := p.p.ClusterAt(n - 1)
+		return float64(c.Bounds.X + c.Bounds.W)
+	}
+	return float64(p.p.ClusterAt(off).Bounds.X)
+}
+
+func (p *paragraph) OffsetAtX(x float64) int {
+	n := textedit.Len16(p.text)
+	if n == 0 || x <= 0 {
+		return 0
+	}
+	c := p.p.ClusterAtPoint(x, float64(p.p.Height())/2)
+	if !c.OK {
+		return n
+	}
+	if x < float64(c.Bounds.X+c.Bounds.W/2) {
+		return c.Begin
+	}
+	return c.End
+}
 
 func (t impellerText) Layout(text string, s r.TextStyle, maxWidth float64) r.Paragraph {
 	w := float32(math.Min(maxWidth, 1e6))

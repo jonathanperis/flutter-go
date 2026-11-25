@@ -4,6 +4,8 @@ import (
 	"math"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/jonathanperis/flutter-go/textedit"
 )
 
 type TextStyle struct {
@@ -33,6 +35,10 @@ type Paragraph interface {
 	Text() string
 	Height() float64
 	MaxIntrinsicWidth() float64 // width of the longest line without wrapping
+	// CaretX returns the x position of a caret before UTF-16 offset off.
+	CaretX(off int) float64
+	// OffsetAtX returns the UTF-16 caret offset nearest to x (single line).
+	OffsetAtX(x float64) int
 	Release()
 }
 
@@ -56,12 +62,31 @@ type FixedTextEngine struct{}
 type fixedParagraph struct {
 	text          string
 	height, width float64
+	size          float64
 }
 
 func (p fixedParagraph) Text() string               { return p.text }
 func (p fixedParagraph) Height() float64            { return p.height }
 func (p fixedParagraph) MaxIntrinsicWidth() float64 { return p.width }
 func (p fixedParagraph) Release()                   {}
+
+// In the test font every grapheme cluster is one square glyph.
+func (p fixedParagraph) CaretX(off int) float64 {
+	stops := textedit.GraphemeStops(p.text)
+	n := 0
+	for i, st := range stops {
+		if st <= off {
+			n = i
+		}
+	}
+	return float64(n) * p.size
+}
+
+func (p fixedParagraph) OffsetAtX(x float64) int {
+	stops := textedit.GraphemeStops(p.text)
+	i := int(math.Round(x / p.size))
+	return stops[max(0, min(i, len(stops)-1))]
+}
 
 func (FixedTextEngine) Layout(text string, style TextStyle, maxWidth float64) Paragraph {
 	size := style.Size()
@@ -85,7 +110,7 @@ func (FixedTextEngine) Layout(text string, style TextStyle, maxWidth float64) Pa
 		}
 		used = n
 	}
-	return fixedParagraph{text, float64(lines) * size, full}
+	return fixedParagraph{text, float64(lines) * size, full, size}
 }
 
 // RenderParagraph displays a single-style run of text.

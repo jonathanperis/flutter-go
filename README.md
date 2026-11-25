@@ -12,9 +12,9 @@ No Dart VM and no Flutter engine are involved.
 
 ## Status
 
-Stages 0–9 of [PLAN.md](PLAN.md) are done: a render tree, a widget/element
+Stages 0–10 of [PLAN.md](PLAN.md) are done: a render tree, a widget/element
 layer with `setState`, taps, a headless widget tester, layout that matches
-real Flutter on 11 reference scenes, and frame-time measurements, a lazily built scrolling list with fling physics, and animations that match Flutter frame by frame.
+real Flutter on 11 reference scenes, and frame-time measurements, a lazily built scrolling list with fling physics, animations that match Flutter frame by frame, and a text field whose editing behavior matches Flutter key for key.
 Findings and the recommendation are in [PLAN.md](PLAN.md#findings-2026-11-25).
 
 ![counter](docs/counter.png) ![list](docs/list.png) ![animate](docs/animate.png)
@@ -26,6 +26,7 @@ Findings and the recommendation are in [PLAN.md](PLAN.md#findings-2026-11-25).
 go run ./cmd/counter              # the classic counter app
 go run ./cmd/list                 # 1,000,000-row lazy list (wheel to scroll)
 go run ./cmd/animate              # implicit animation + animated scroll
+go run ./cmd/textfield            # to-do list with a text field
 go run ./cmd/hello                # step 0: raw Impeller from Go
 go test ./...                     # unit, widget and (if generated) diff tests
 FLUTTER=/path/to/flutter ./scripts/difftest.sh   # compare layout with real Flutter
@@ -47,6 +48,7 @@ Requires Go 1.24+ and Xcode command-line tools.
 | `examples/counter/` | The counter app and its widget tests |
 | `impeller/` | Minimal Go binding to `impeller.h` |
 | `platform/metal/` | CAMetalLayer setup and presentation (the only Objective-C) |
+| `textedit/` | Text editing model and shortcuts (ported from Flutter) |
 | `animation/` | Scheduler, tickers, AnimationController, curves |
-| `cmd/` | `counter`, `list`, `animate` and `hello` executables |
+| `cmd/` | `counter`, `list`, `animate`, `textfield` and `hello` executables |
 | `IMPELLER_SHA` | Flutter commit whose prebuilt Impeller SDK we use |

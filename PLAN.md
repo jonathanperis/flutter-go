@@ -19,6 +19,7 @@ criterion. If a stage fails its criterion, stop and decide before going on.
 | 7 | Lazy scrolling list | Building during layout, element lifecycle off-screen, scroll input | `ListViewBuilder` (fixed item height) builds the same item indices as Flutter, with the same positions, after jumps, clamping, and inside a Column ✅ 6/6 scenes |
 | 8 | Animations | Frame scheduling, tickers, curves, implicit animations, animated scroll | `AnimationController`, Flutter's cubic curves, `AnimatedBox` (≈ `AnimatedContainer`) and `ScrollController.AnimateTo` produce the same values as Flutter frame by frame ✅ 4/4 scenes, max difference 5.6e-17 |
 | 9 | Fling physics | Ballistic scrolling after a drag, edge handling, interaction with taps | Flutter's `ClampingScrollSimulation` and `ClampingScrollPhysics` rules give the same offsets as Flutter every frame, and stop at the same frame ✅ 4/4 scenes, max difference 7e-12 px |
+| 10 | Text input | Focus, keyboard shortcuts, selection, graphemes, cursor, clipboard | Editing behavior (text + selection after every key) matches Flutter's `EditableText` on 8 scenes, 81 steps, Android and macOS shortcut maps, both in the model and through the full `TextField` widget stack ✅ |
 
 ## Design rules
 
@@ -118,7 +119,7 @@ Continue, with two conditions:
    Flutter's on the same grid, with the caveat that Go does less work.
    Rerun `scripts/perf_compare.sh` whenever layers/repaint boundaries land.
 2. **Make the next stage the hard parts** (scrolling ✅ stage 7, animations ✅
-   stage 8; text input still to do), not more box widgets: scrolling
+   stage 8, text input ✅ stage 10), not more box widgets: scrolling
    (needs viewport + slivers), text input (IME), and implicit animations.
    These stress the frame loop and are where an API in Go will either hold
    up or not.
@@ -216,4 +217,48 @@ animations.
 Not done: `BouncingScrollPhysics` (the macOS/iOS default, with overscroll
 and spring-back), Flutter's `VelocityTracker`, the overscroll glow, and
 scrollbars.
+
+## Stage 10 findings: text input (2026-11-25)
+
+- **The Flutter reference was wrong at first, and only reading it caught
+  that.** In a bare `EditableText`, no key did anything: Flutter's editing
+  shortcuts come from `DefaultTextEditingShortcuts`, which `WidgetsApp`
+  normally provides. Building Go to match that output would have "passed".
+  Lesson: inspect a new reference before trusting it, not just the diff.
+- **Ported from the fork's source,** not reimplemented from memory:
+  `_DeleteTextAction`, `_UpdateTextSelectionAction` and the text boundaries
+  (`CharacterBoundary`, `moveByWordBoundary` with its
+  skip-spaces-and-punctuation rule). Details that would have been easy to
+  get wrong: character moves collapse a selection first but word and line
+  moves don't; a move landing on the base collapses; deleting a selection
+  widens it to whole grapheme clusters; `_` joins words, so Ctrl+Backspace
+  after `_new` deletes `brave _new`.
+- **Offsets are UTF-16 code units, like Flutter**, although Go strings are
+  UTF-8. Matching Flutter's unit made the port exact; conversion happens
+  only at the edges (Impeller's glyph APIs also use UTF-16).
+- **Grapheme clusters** (via `rivo/uniseg`): Backspace removes 👍🏽 or 🇧🇷 whole
+  and steps over `é` written as e + combining accent.
+- **Results:** 8 scenes, 81 steps, identical text and selection after every
+  step, for the editing model alone and through `TextField` + focus +
+  tester. Includes a macOS scene (Alt for words, Cmd for line ends and
+  select all, Home/End don't move the caret). Three mutations (code points
+  instead of graphemes, no punctuation skipping, word moves collapsing a
+  selection) each fail a scene; the last needed a new scene to be caught.
+- **Cursor blink uses timers, not frames,** as Flutter's does: an idle
+  focused field draws two frames a second, not sixty. The window loop now
+  sleeps until the next timer.
+- **The window needed GLFW's refresh callback** so the system can request a
+  redraw (first show, uncovering). The old loop's 0.25 s polling had hidden
+  that it was missing.
+- **Not verified visually in this stage:** window screenshots stopped
+  working on this machine midway (a build from the previous commit fails
+  the same way), so the text field demo was checked by tests and by
+  running it, not by a screenshot.
+
+Not done: IME composition display. GLFW delivers committed text (so
+Chinese/Japanese input works once committed) but has no preedit support;
+showing the composing underline needs a native `NSTextInputClient` view.
+Also: multi-line fields, mouse drag-selection, double-click word select,
+selection handles/toolbar, undo/redo, password obscuring, and
+accessibility. Tab focus traversal is not implemented.
 

@@ -18,6 +18,7 @@ import (
 
 	"github.com/jonathanperis/flutter-go/animation"
 	r "github.com/jonathanperis/flutter-go/rendering"
+	"github.com/jonathanperis/flutter-go/textedit"
 )
 
 type Widget any
@@ -454,6 +455,11 @@ type BuildOwner struct {
 	// DevicePixelRatio is physical pixels per logical pixel (sets scroll
 	// physics tolerances). 0 means 1.
 	DevicePixelRatio float64
+	// Platform selects keyboard shortcuts (flutter_test's default is Android).
+	Platform textedit.Platform
+	// Clipboard backs copy/cut/paste; nil disables them.
+	Clipboard textedit.Clipboard
+	focus     KeyTarget
 	// pendingRoot is a RunApp widget waiting for the next build phase.
 	pendingRoot *rootWidget
 }

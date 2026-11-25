@@ -1,0 +1,365 @@
+{
+ "basic": [
+  {
+   "type": "hello"
+  },
+  {
+   "key": "backspace"
+  },
+  {
+   "key": "backspace"
+  },
+  {
+   "key": "arrowLeft"
+  },
+  {
+   "key": "arrowLeft"
+  },
+  {
+   "type": "X"
+  },
+  {
+   "key": "arrowRight"
+  },
+  {
+   "key": "delete"
+  },
+  {
+   "key": "end"
+  },
+  {
+   "type": "!"
+  },
+  {
+   "key": "home"
+  },
+  {
+   "type": ">"
+  }
+ ],
+ "shift_select": [
+  {
+   "type": "hello world"
+  },
+  {
+   "key": "arrowLeft",
+   "mods": [
+    "shift"
+   ]
+  },
+  {
+   "key": "arrowLeft",
+   "mods": [
+    "shift"
+   ]
+  },
+  {
+   "key": "arrowLeft",
+   "mods": [
+    "shift"
+   ]
+  },
+  {
+   "type": "W"
+  },
+  {
+   "key": "home",
+   "mods": [
+    "shift"
+   ]
+  },
+  {
+   "key": "backspace"
+  },
+  {
+   "type": "abc"
+  },
+  {
+   "key": "keyA",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "type": "z"
+  }
+ ],
+ "collapse": [
+  {
+   "type": "abcdef"
+  },
+  {
+   "key": "arrowLeft",
+   "mods": [
+    "shift"
+   ]
+  },
+  {
+   "key": "arrowLeft",
+   "mods": [
+    "shift"
+   ]
+  },
+  {
+   "key": "arrowLeft"
+  },
+  {
+   "key": "arrowRight",
+   "mods": [
+    "shift"
+   ]
+  },
+  {
+   "key": "arrowRight",
+   "mods": [
+    "shift"
+   ]
+  },
+  {
+   "key": "arrowRight"
+  },
+  {
+   "key": "arrowLeft",
+   "mods": [
+    "shift"
+   ]
+  },
+  {
+   "key": "delete"
+  }
+ ],
+ "words": [
+  {
+   "type": "hello brave new world"
+  },
+  {
+   "key": "arrowLeft",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "key": "arrowLeft",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "type": "_"
+  },
+  {
+   "key": "arrowRight",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "key": "backspace",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "key": "arrowLeft",
+   "mods": [
+    "control",
+    "shift"
+   ]
+  },
+  {
+   "key": "arrowLeft",
+   "mods": [
+    "control",
+    "shift"
+   ]
+  },
+  {
+   "key": "delete"
+  },
+  {
+   "key": "home"
+  },
+  {
+   "key": "delete",
+   "mods": [
+    "control"
+   ]
+  }
+ ],
+ "graphemes": [
+  {
+   "type": "a👍🏽b"
+  },
+  {
+   "key": "backspace"
+  },
+  {
+   "key": "backspace"
+  },
+  {
+   "type": "éx"
+  },
+  {
+   "key": "arrowLeft"
+  },
+  {
+   "key": "arrowLeft"
+  },
+  {
+   "key": "backspace"
+  },
+  {
+   "type": "🇧🇷"
+  },
+  {
+   "key": "arrowLeft",
+   "mods": [
+    "shift"
+   ]
+  },
+  {
+   "key": "arrowRight"
+  },
+  {
+   "key": "delete"
+  }
+ ],
+ "vertical": [
+  {
+   "type": "abc"
+  },
+  {
+   "key": "arrowLeft"
+  },
+  {
+   "key": "arrowUp"
+  },
+  {
+   "type": "^"
+  },
+  {
+   "key": "arrowDown"
+  },
+  {
+   "type": "$"
+  },
+  {
+   "key": "arrowUp",
+   "mods": [
+    "shift"
+   ]
+  },
+  {
+   "type": "-"
+  }
+ ],
+ "word_move_with_selection": [
+  {
+   "type": "one two three"
+  },
+  {
+   "key": "arrowLeft",
+   "mods": [
+    "shift"
+   ]
+  },
+  {
+   "key": "arrowLeft",
+   "mods": [
+    "shift"
+   ]
+  },
+  {
+   "key": "arrowLeft",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "key": "arrowRight",
+   "mods": [
+    "shift"
+   ]
+  },
+  {
+   "key": "arrowRight",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "key": "home"
+  },
+  {
+   "key": "arrowRight",
+   "mods": [
+    "shift",
+    "control"
+   ]
+  },
+  {
+   "key": "arrowRight",
+   "mods": [
+    "control"
+   ]
+  }
+ ],
+ "mac_shortcuts": [
+  {
+   "type": "hello brave world"
+  },
+  {
+   "key": "arrowLeft",
+   "mods": [
+    "alt"
+   ]
+  },
+  {
+   "key": "arrowLeft",
+   "mods": [
+    "alt",
+    "shift"
+   ]
+  },
+  {
+   "key": "arrowLeft",
+   "mods": [
+    "meta"
+   ]
+  },
+  {
+   "key": "arrowRight",
+   "mods": [
+    "meta",
+    "shift"
+   ]
+  },
+  {
+   "key": "keyA",
+   "mods": [
+    "meta"
+   ]
+  },
+  {
+   "key": "arrowRight"
+  },
+  {
+   "key": "backspace",
+   "mods": [
+    "alt"
+   ]
+  },
+  {
+   "key": "home"
+  },
+  {
+   "key": "end"
+  },
+  {
+   "key": "backspace",
+   "mods": [
+    "meta"
+   ]
+  }
+ ]
+}
