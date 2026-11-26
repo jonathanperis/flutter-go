@@ -310,6 +310,8 @@ func deShapes(f deFixture, img *ui.Image) []*p.ShapeDecoration {
 			Shape: p.NewRoundedRectangleBorder(p.RRectBorderOptions{BorderRadius: p.BorderRadiusDirectional{TopEnd: circ(25)}})}),
 		ns(o{Image: p.NewDecorationImage(p.DecorationImageOptions{Image: newDeImg(img, "s2"), Fit: &fill}),
 			Shape: p.NewCircleBorder(p.CircleBorderOptions{Side: side(deBS(0xFF000000, 2))})}),
+		ns(o{Color: deCol(0xFF336699), Shadows: f.shadows1, Shape: p.NewRoundedRectangleBorder(p.RRectBorderOptions{
+			BorderRadius: p.BorderRadiusDirectional{TopStart: circ(20)}})}),
 	}
 }
 

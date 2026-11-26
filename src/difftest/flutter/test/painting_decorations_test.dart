@@ -272,6 +272,11 @@ List<ShapeDecoration> shapeDecos(ui.Image img) => <ShapeDecoration>[
     shape: const RoundedRectangleBorder(borderRadius: BorderRadiusDirectional.only(topEnd: Radius.circular(25))),
   ),
   ShapeDecoration(image: DecorationImage(image: Img(img, 's2'), fit: BoxFit.fill), shape: CircleBorder(side: bs(0xFF000000, 2))),
+  const ShapeDecoration(
+    color: Color(0xFF336699),
+    shadows: shadows1,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadiusDirectional.only(topStart: Radius.circular(20))),
+  ),
 ];
 
 const List<double> ts = <double>[-0.5, 0, 0.25, 0.5, 0.75, 1, 1.5];

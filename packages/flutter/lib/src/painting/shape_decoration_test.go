@@ -318,3 +318,16 @@ func TestShapeDecorationMembers(t *testing.T) {
 		t.Error("isComplex")
 	}
 }
+
+// Go-only: the painter computes the outer path whenever it has shadows or
+// an interior (Dart's _precache), observable as getOuterPath calls on a
+// custom shape: one per shadow plus the outer path itself.
+func TestShapeDecorationPainterOuterPathCalls(t *testing.T) {
+	outerPathCount = 0
+	d := shapeDeco(ShapeDecorationOptions{Shape: newPathHitTestBorder(), Shadows: []BoxShadow{NewBoxShadow()}})
+	size := ui.NewSize(10, 10)
+	d.CreateBoxPainter(func() {}).Paint(ft.NewTestRecordingCanvas(), ui.OffsetZero, ImageConfiguration{Size: &size})
+	if outerPathCount != 2 {
+		t.Errorf("getOuterPath calls %d, want 2", outerPathCount)
+	}
+}
