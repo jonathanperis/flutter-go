@@ -177,6 +177,7 @@ func bdSides() []p.BorderSide {
 		bdBS(0xFF4CAF50, 2, none, in),
 		bdBS(0xFFFF9800, 0, solid, in),
 		bdBS(0x33123456, 12.75, solid, -0.25),
+		bdBS(0xFF2196F3, 1.5, solid, 0.75),
 	}
 }
 
@@ -544,6 +545,20 @@ func paintingBordersCases() map[string]string {
 		}
 	}
 	out["notch.auto.noguest"] = bdPathSig(p.NewAutomaticNotchedShape(b[10], b[6]).GetOuterPath(bdRects[1], nil), bdRects[1], 9)
+
+	comp := b[0].Add(b[6])
+	for _, e := range []struct {
+		name string
+		f    func() p.ShapeBorder
+	}{
+		{"b2+c", func() p.ShapeBorder { return b[2].Add(comp) }},
+		{"c+b2", func() p.ShapeBorder { return comp.Add(b[2]) }},
+		{"c+c", func() p.ShapeBorder { return comp.Add(comp) }},
+		{"c+b6", func() p.ShapeBorder { return comp.Add(b[6]) }},
+		{"b0+c", func() p.ShapeBorder { return b[0].Add(comp) }},
+	} {
+		out["compoundAdd."+e.name] = bdTry(func() string { return bdDesc(e.f()) })
+	}
 
 	for i := range b {
 		var buf strings.Builder

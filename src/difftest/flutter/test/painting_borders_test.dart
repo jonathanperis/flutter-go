@@ -127,6 +127,7 @@ List<BorderSide> sides() => <BorderSide>[
   bs(color: 0xFF4CAF50, width: 2, style: BorderStyle.none),
   bs(color: 0xFFFF9800, width: 0),
   bs(color: 0x33123456, width: 12.75, strokeAlign: -0.25),
+  bs(color: 0xFF2196F3, width: 1.5, strokeAlign: 0.75),
 ];
 
 const List<double> ts = <double>[-0.5, 0, 0.1, 0.25, 0.5, 0.75, 1, 1.5];
@@ -443,6 +444,19 @@ void main() {
       AutomaticNotchedShape(b[10], b[6]).getOuterPath(rects[1], null),
       rects[1],
     );
+
+    // Compound borders gaining borders on either side.
+    final ShapeBorder comp = b[0] + b[6];
+    final adds = <String, ShapeBorder Function()>{
+      'b2+c': () => b[2] + comp,
+      'c+b2': () => comp + b[2],
+      'c+c': () => comp + comp,
+      'c+b6': () => comp + b[6],
+      'b0+c': () => b[0] + comp,
+    };
+    for (final MapEntry<String, ShapeBorder Function()> e in adds.entries) {
+      out['compoundAdd.${e.key}'] = tryS(() => desc(e.value()));
+    }
 
     // Equality.
     for (int i = 0; i < b.length; i++) {

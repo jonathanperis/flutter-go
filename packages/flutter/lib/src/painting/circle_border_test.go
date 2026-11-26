@@ -206,6 +206,14 @@ func TestRoundedRectangleBorderAndCircleBorder(t *testing.T) {
 	if !ShapeBorderEqual(lerp(r, c, 0.1), lerp(r, c, 0.1)) {
 		t.Error("==")
 	}
+	// Not from Flutter's test: Dart's == compares the circularity but not
+	// the eccentricity.
+	if ShapeBorderEqual(lerp(r, c, 0.1), lerp(r, c, 0.2)) {
+		t.Error("== ignores circularity")
+	}
+	if !ShapeBorderEqual(lerp(r, c, 0.1), lerp(r, NewCircleBorder(CircleBorderOptions{Eccentricity: 0.5}), 0.1)) {
+		t.Error("== compares eccentricity")
+	}
 	direct50 := lerp(r, c, 0.5)
 	indirect50 := lerp(lerp(c, r, 0.1), lerp(c, r, 0.9), 0.5)
 	if !ShapeBorderEqual(direct50, indirect50) || direct50.String() != indirect50.String() {
