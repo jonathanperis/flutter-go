@@ -1507,3 +1507,43 @@ The standing goal is now full API parity with Flutter 3.50.1's Dart layer
   forks' reports).
 - Parity: 371 → 400 of 2889 exposed (tested 284 → 309); services 11 → 31,
   dart:ui 51 → 60.
+
+### Bindings: one composition pattern for binding mixins
+- Problem: each binding mixin struct embedded `foundation.BindingBase` as
+  its "super", so a binding could embed only the topmost mixin; the
+  semantics port forwarded SemanticsBinding's methods to a field, and
+  ServicesBinding's super was typed `scheduler.SchedulerBinding` (fixed
+  order). Go can't embed a type parameter, so a static mixin chain over an
+  arbitrary composition is impossible.
+- Pattern (`foundation/binding_mixins.go`, API_MAPPING "Bindings"): a
+  binding embeds `foundation.BindingBaseBase` and the mixin structs (which
+  embed nothing) in Dart's `with` order, calls each mixin's `SetSelf(b)`,
+  then `b.Construct(b, &b.M1, &b.M2, ...)`. Methods defined by several
+  mixins (`InitInstances`, `InitServiceExtensions`, `Unlocked`, a mixin's
+  method a later mixin overrides) are ambiguous in Go, so the binding
+  defines them as calls to the last mixin in `with` order that defines
+  them; the compiler lists the missing ones. Dart's `super.m()` inside a
+  mixin is `foundation.BindingSuper[I](self, mixin)` (the closest mixin
+  before it implementing I, else BindingBase) or
+  `foundation.BindingBaseSuper(self, mixin)` for BindingBase's methods: a
+  dynamic walk of the binding's mixin list, i.e. Dart's linearization,
+  whatever the composition. Mixin-on-mixin overrides
+  (TestDefaultBinaryMessengerBinding.createBinaryMessenger over
+  ServicesBinding's) work the same way.
+- Moved onto it: SchedulerBinding, ServicesBinding, SemanticsBinding,
+  flutter_test's TestDefaultBinaryMessengerBinding and
+  AutomatedTestWidgetsFlutterBinding (now BindingBase with Scheduler,
+  Services, Gesture, Semantics, TestDefaultBinaryMessenger, as
+  TestWidgetsFlutterBinding orders them; the loop is flushed after
+  construction for the channel buffers' microtask and the engine's posted
+  reply), src/app's binding, and every test/difftest binding (the
+  semantics forwarding wrappers are gone).
+- Verified by `foundation/binding_mixins_test.go` (three toy mixins:
+  init order, super of a mixin's own method, unlocked order, errors) and
+  the `binding_composition` difftest: BindingBase with L0, Gesture, L1,
+  Scheduler, L2, Services, L3 (on Services), Semantics, L4 (on
+  Scheduler), logging mixins interleaved, compared line by line with Dart:
+  initInstances/initServiceExtensions/unlocked nesting, the X.instance
+  statics set at each step, createBinaryMessenger and
+  handleAppLifecycleStateChanged chains (incl. through the lifecycle
+  channel), and the 10 service extensions in registration order.
