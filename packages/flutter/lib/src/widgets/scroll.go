@@ -31,9 +31,9 @@ var (
 	fastSpring            = physics.NewSpringDescriptionWithDampingRatio(0.3, 75.0, 1.3) // BouncingScrollPhysics.spring, fast deceleration
 	rubberBandLambda      = dart.Log(2) / 0.07
 	rubberBandSpring      = physics.SpringDescription{Mass: 1.0, Stiffness: 1e5 * rubberBandLambda * rubberBandLambda, Damping: (1e5 + 1) * rubberBandLambda}
-	motionStartThreshold  = 3.5   // BouncingScrollPhysics.dragStartDistanceMotionThreshold
+	motionStartThreshold  = 3.5                   // BouncingScrollPhysics.dragStartDistanceMotionThreshold
 	motionStoppedDuration = 50 * time.Millisecond // ScrollDragController.motionStoppedDurationThreshold
-	bigThresholdBreak     = 24.0  // ScrollDragController._bigThresholdBreakDistance
+	bigThresholdBreak     = 24.0                  // ScrollDragController._bigThresholdBreakDistance
 )
 
 // ScrollController owns a list's scroll position and its physics (Flutter's
