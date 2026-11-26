@@ -34,13 +34,20 @@ func synthesiseDownButtons(buttons int, kind ui.PointerDeviceKind) int {
 // device pixel ratio of a view, or nil if the view doesn't exist.
 type DevicePixelRatioGetter func(viewID int) *float64
 
-// PointerEventConverterExpand is PointerEventConverter.expand: it converts
+// PointerEventConverter converts pointer data from the engine to framework
+// pointer events (a class of static members: its statics are methods of
+// this variable).
+var PointerEventConverter pointerEventConverter
+
+type pointerEventConverter struct{}
+
+// Expand is PointerEventConverter.expand: it converts
 // the engine's pointer data (physical pixels) to framework pointer events
 // (logical pixels). The sequence is lazy, as Dart's Iterable: data are
 // converted as it is iterated. Data of unknown signal kinds and of views
 // that no longer exist are skipped, as are scroll signals with non-finite
 // deltas or a non-positive device pixel ratio.
-func PointerEventConverterExpand(data iter.Seq[ui.PointerData], devicePixelRatioForView DevicePixelRatioGetter) iter.Seq[PointerEvent] {
+func (pointerEventConverter) Expand(data iter.Seq[ui.PointerData], devicePixelRatioForView DevicePixelRatioGetter) iter.Seq[PointerEvent] {
 	return func(yield func(PointerEvent) bool) {
 		for datum := range data {
 			if datum.SignalKind != nil && *datum.SignalKind == ui.PointerSignalKindUnknown {

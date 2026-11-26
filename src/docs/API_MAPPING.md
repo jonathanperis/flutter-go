@@ -709,7 +709,7 @@ Each divergence is listed here when it is introduced.
   (`NewHitTestEntry`, `InitHitTestEntry` for subclasses); `HitTestEntry(t)`
   prints `HitTestEntry<HitTestTarget>` as Flutter's does; `Path()` is an
   `iter.Seq`. `PointerEventConverter.expand` is
-  `PointerEventConverterExpand(iter.Seq[ui.PointerData], getter)`, lazy as
+  `PointerEventConverter.Expand(iter.Seq[ui.PointerData], getter)` (a variable of statics), lazy as
   Dart's Iterable; `DevicePixelRatioGetter` returns `*float64` (nil: the
   view is gone). `PointerRouter.addRoute`'s optional transform is
   variadic; routes compare with `dart.FunctionsEqual`.

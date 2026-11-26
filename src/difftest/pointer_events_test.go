@@ -341,7 +341,7 @@ func runPointerEventsScene() []string {
 	)
 	for _, dpr := range []float64{1, 2, 3.5, 0} {
 		d := dpr
-		out := slices.Collect(g.PointerEventConverterExpand(slices.Values(data), func(viewID int) *float64 {
+		out := slices.Collect(g.PointerEventConverter.Expand(slices.Values(data), func(viewID int) *float64 {
 			if viewID == 99 {
 				return nil
 			}

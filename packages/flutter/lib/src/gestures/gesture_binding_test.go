@@ -130,7 +130,7 @@ func pdp(data ...ui.PointerData) ui.PointerDataPacket { return ui.PointerDataPac
 func change(c ui.PointerChange) ui.PointerData { return ui.PointerData{Change: c} }
 
 func expand(data []ui.PointerData, dpr func(int) *float64) []PointerEvent {
-	return slices.Collect(PointerEventConverterExpand(slices.Values(data), dpr))
+	return slices.Collect(PointerEventConverter.Expand(slices.Values(data), dpr))
 }
 
 func TestGestureBindingFile(t *testing.T) {

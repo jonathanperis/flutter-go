@@ -262,7 +262,7 @@ func (m *GestureBindingMixin) handlePointerDataPacket(packet ui.PointerDataPacke
 			}))
 		}
 	}()
-	for event := range PointerEventConverterExpand(slices.Values(packet.Data), m.devicePixelRatioForView) {
+	for event := range PointerEventConverter.Expand(slices.Values(packet.Data), m.devicePixelRatioForView) {
 		m.pendingPointerEvents = append(m.pendingPointerEvents, event)
 	}
 	if !m.outer().Locked() {
