@@ -1,10 +1,8 @@
 package gestures_test
 
 // Port of packages/flutter/test/gestures/long_press_test.dart (Flutter
-// 3.50.1).
-//
-// Skipped: "Long press: Drag start delayed by microtask" (needs
-// HorizontalDragGestureRecognizer, monodrag.dart, ported separately).
+// 3.50.1): all 27 tests (the tests the "Long press" and "long press drag"
+// groups share run as subtests).
 
 import (
 	"testing"
@@ -544,5 +542,35 @@ func TestLongPressSwitchingButtonsMidStreamSendsEndAlternative(t *testing.T) {
 		expectLog(t, recognized, "primaryStart", "two seconds later...", "two more seconds later...",
 			"two more seconds later still...", "primaryEnd")
 		longPress.Dispose()
+	})
+}
+
+func TestLongPressDragStartDelayedByMicrotask(t *testing.T) {
+	tapTestGesture(t, func(tester *flutter_test.GestureTester) {
+		var recognized strs
+		gesture := newLP(&recognized)
+		drag := NewHorizontalDragGestureRecognizer()
+		isDangerousStack := false
+		drag.OnStart = func(*DragStartDetails) {
+			if isDangerousStack {
+				t.Error("drag started from the long press's dispose")
+			}
+			recognized.add("drag_start")
+		}
+		drag.AddPointer(lpDown)
+		gesture.AddPointer(lpDown)
+		tester.CloseArena(5)
+		expectLog(t, recognized)
+		tester.Route(lpDown)
+		expectLog(t, recognized, "down")
+		tester.Async.Elapse(tapMs(300))
+		expectLog(t, recognized, "down")
+		isDangerousStack = true
+		gesture.Dispose()
+		isDangerousStack = false
+		expectLog(t, recognized, "down", "cancel")
+		tester.Async.FlushMicrotasks()
+		expectLog(t, recognized, "down", "cancel", "drag_start")
+		drag.Dispose()
 	})
 }

@@ -1,12 +1,7 @@
 package gestures_test
 
 // Port of packages/flutter/test/gestures/force_press_test.dart (Flutter
-// 3.50.1).
-//
-// Skipped (need PanGestureRecognizer, monodrag.dart, ported separately):
-//   - Should recognize drag and not force touch if there is a drag recognizer
-//   - Should not call ended on pointer up if the gesture was never accepted
-//   - Should call start only once if there is a competing gesture recognizer
+// 3.50.1): all 9 tests.
 
 import (
 	"math"
@@ -224,5 +219,72 @@ func TestForcePressPressureOfNaNGivesNoError(t *testing.T) {
 		tester.Route(fpMove(tapF(math.NaN())))
 		tester.Route(pointer.Up())
 		expectCounts(t, c, 1, 1, 1, 1)
+	})
+}
+
+// forceAndPan is the tests' ForcePressGestureRecognizer and competing
+// PanGestureRecognizer, and the pointer set down at (10, 10).
+func forceAndPan(t *testing.T, c *forceCounts, didStartPan *int) *flutter_test.TestPointer {
+	drag := NewPanGestureRecognizer()
+	t.Cleanup(drag.Dispose)
+	force := countingForce(t, c)
+	drag.OnStart = func(*DragStartDetails) { *didStartPan++ }
+	pointer, down := fpDown(nil, fpPressureMax)
+	force.AddPointer(down)
+	drag.AddPointer(down)
+	return pointer
+}
+
+func TestForcePressShouldRecognizeDragAndNotForceTouchWithDragRecognizer(t *testing.T) {
+	tapTestGesture(t, func(tester *flutter_test.GestureTester) {
+		var c forceCounts
+		didStartPan := 0
+		pointer := forceAndPan(t, &c, &didStartPan)
+		tester.CloseArena(1)
+		expectCounts(t, c, 0, 0, 0, 0)
+		expectDeep(t, didStartPan, 0)
+		tester.Route(pointer.Move(ui.NewOffset(30, 30)))
+		expectCounts(t, c, 0, 0, 0, 0)
+		expectDeep(t, didStartPan, 1)
+		tester.Route(fpMove(tapF(2.5)))
+		expectCounts(t, c, 0, 0, 0, 0)
+		expectDeep(t, didStartPan, 1)
+		tester.Route(fpMove(tapF(4.0)))
+		expectCounts(t, c, 0, 0, 0, 0)
+		expectDeep(t, didStartPan, 1)
+		tester.Route(pointer.Up())
+		expectCounts(t, c, 0, 0, 0, 0)
+		expectDeep(t, didStartPan, 1)
+	})
+}
+
+func TestForcePressShouldNotCallEndedIfNeverAccepted(t *testing.T) {
+	tapTestGesture(t, func(tester *flutter_test.GestureTester) {
+		var c forceCounts
+		didStartPan := 0
+		pointer := forceAndPan(t, &c, &didStartPan)
+		tester.CloseArena(1)
+		expectCounts(t, c, 0, 0, 0, 0)
+		expectDeep(t, didStartPan, 0)
+		tester.Route(pointer.Up())
+		expectCounts(t, c, 0, 0, 0, 0)
+		expectDeep(t, didStartPan, 0)
+	})
+}
+
+func TestForcePressShouldCallStartOnceWithCompetingRecognizer(t *testing.T) {
+	tapTestGesture(t, func(tester *flutter_test.GestureTester) {
+		var c forceCounts
+		didStartPan := 0
+		pointer := forceAndPan(t, &c, &didStartPan)
+		tester.CloseArena(1)
+		expectCounts(t, c, 0, 0, 0, 0)
+		expectDeep(t, didStartPan, 0)
+		tester.Route(fpMove(tapF(3.0)))
+		expectCounts(t, c, 1, 0, 1, 0)
+		expectDeep(t, didStartPan, 0)
+		tester.Route(pointer.Up())
+		expectCounts(t, c, 1, 0, 1, 1)
+		expectDeep(t, didStartPan, 0)
 	})
 }

@@ -1,34 +1,11 @@
 package gestures_test
 
 // Port of packages/flutter/test/gestures/scale_test.dart and
-// transformed_scale_test.dart (Flutter 3.50.1).
-//
-// Ported: Should recognize scale gestures; Rejects scale gestures from
-// unallowed device kinds; Scale gestures starting from allowed device
-// kinds cannot be ended from unallowed devices; Should recognize rotation
-// gestures; First rotation test; Scale gestures pointer count test; scale
-// trackpadScrollCausesScale; scale ending velocity; ScaleStartDetails and
-// ScaleUpdateDetails callbacks should contain their event.timestamp;
-// ScaleStartDetails should contain the correct PointerDeviceKind;
-// transformed_scale_test's "gets local coordinates" (adapted, see below).
-//
-// Adapted: the tests whose competitor is a TapGestureRecognizer use
-// tapStub, a PrimaryPointerGestureRecognizer with TapGestureRecognizer's
-// slop rules and no callbacks (tap.dart is ported separately; in these
-// tests the tap only takes part in the arena and is always rejected, so
-// `didTap` is never true). transformed_scale_test pumps a GestureDetector
-// in a Center: here the down events carry the hit test's transform
-// (translate(-350, -250), the 100x100 box centered in 800x600) directly.
-//
-// Skipped (need HorizontalDragGestureRecognizer, monodrag.dart, ported
-// separately): Scale gesture competes with drag; Should recognize scale
-// gestures from pointer pan/zoom events; Pointer pan/zooms should work
-// alongside touches; Scale gesture competes with drag for trackpad
-// gesture; Scale gesture from pan/zoom events properly handles
-// DragStartBehavior.start. Their scale-side behavior (pan/zoom alone,
-// alongside touches, DragStartBehavior.start, competition) is covered by
-// the recognizers_scale difftest with an eager and a second scale
-// recognizer as competitors.
+// transformed_scale_test.dart (Flutter 3.50.1): all 15 tests of
+// scale_test.dart, and transformed_scale_test's "gets local coordinates",
+// adapted: it pumps a GestureDetector in a Center; here the down events
+// carry the hit test's transform (translate(-350, -250), the 100x100 box
+// centered in 800x600) directly.
 
 import (
 	"math"
@@ -41,22 +18,13 @@ import (
 	vm "github.com/jonathanperis/flutter-go/src/pub/vector_math"
 )
 
-// tapStub stands in for TapGestureRecognizer as an arena competitor.
-type tapStub struct {
-	PrimaryPointerGestureRecognizerBase
+// newTapStub is the tests' TapGestureRecognizer whose onTap sets didTap:
+// every test expects didTap to stay false, so a tap fails the test.
+func newTapStub(t *testing.T) *TapGestureRecognizer {
+	tap := NewTapGestureRecognizer()
+	tap.OnTap = func() { t.Error("didTap") }
+	return tap
 }
-
-func newTapStub() *tapStub {
-	r := &tapStub{}
-	d := 100 * time.Millisecond // kPressTimeout
-	r.Construct(r, PrimaryPointerGestureRecognizerOptions{Deadline: &d})
-	return r
-}
-
-func (r *tapStub) HandlePrimaryPointer(PointerEvent)              {}
-func (r *tapStub) DidExceedDeadline()                             {}
-func (r *tapStub) DidExceedDeadlineWithEvent(e *PointerDownEvent) {}
-func (r *tapStub) DebugDescription() string                       { return "tap" }
 
 func sOff(x, y float64) ui.Offset { return ui.NewOffset(x, y) }
 
@@ -158,7 +126,7 @@ func sTS(ms int) flutter_test.TestPointerEventOptions {
 func TestScaleShouldRecognizeScaleGestures(t *testing.T) {
 	flutter_test.RunTestGesture(t, func(tester *flutter_test.GestureTester) {
 		scale := NewScaleGestureRecognizer()
-		tap := newTapStub()
+		tap := newTapStub(t)
 		p := sProbe(scale)
 
 		pointer1 := sTP(1)
@@ -392,7 +360,7 @@ func TestScaleFromAllowedDevicesCannotBeEndedFromUnallowed(t *testing.T) {
 func TestScaleShouldRecognizeRotationGestures(t *testing.T) {
 	flutter_test.RunTestGesture(t, func(tester *flutter_test.GestureTester) {
 		scale := NewScaleGestureRecognizer()
-		tap := newTapStub()
+		tap := newTapStub(t)
 		p := sProbe(scale)
 
 		pointer1 := sTP(1)
@@ -683,7 +651,7 @@ func TestScaleEndingVelocity(t *testing.T) {
 func TestScaleDetailsContainEventTimestamps(t *testing.T) {
 	flutter_test.RunTestGesture(t, func(tester *flutter_test.GestureTester) {
 		scale := NewScaleGestureRecognizer()
-		tap := newTapStub()
+		tap := newTapStub(t)
 		p := sProbe(scale)
 		ms := func(m int) time.Duration { return time.Duration(m) * time.Millisecond }
 
@@ -947,4 +915,348 @@ func TestScaleDetailsToString(t *testing.T) {
 	}()
 	neg := -1.0
 	NewScaleUpdateDetails(ScaleUpdateDetailsOptions{Scale: &neg})
+}
+
+func sPZ(p *flutter_test.TestPointer, location, pan ui.Offset, scale *float64, rotation float64) *PointerPanZoomUpdateEvent {
+	return p.PanZoomUpdate(location, flutter_test.TestPointerPanZoomUpdateOptions{Pan: pan, Scale: scale, Rotation: rotation})
+}
+
+// scaleDragLog is the competition tests' log of a scale and a horizontal
+// drag.
+func scaleDragLog(t *testing.T, opts ...ScaleGestureRecognizerOptions) (*ScaleGestureRecognizer, *HorizontalDragGestureRecognizer, *[]string) {
+	log := &[]string{}
+	add := func(s string) { *log = append(*log, s) }
+	scale := NewScaleGestureRecognizer(opts...)
+	drag := NewHorizontalDragGestureRecognizer()
+	scale.OnStart = func(*ScaleStartDetails) { add("scale-start") }
+	scale.OnUpdate = func(*ScaleUpdateDetails) { add("scale-update") }
+	scale.OnEnd = func(*ScaleEndDetails) { add("scale-end") }
+	drag.OnStart = func(*DragStartDetails) { add("drag-start") }
+	drag.OnEnd = func(*DragEndDetails) { add("drag-end") }
+	t.Cleanup(scale.Dispose)
+	t.Cleanup(drag.Dispose)
+	return scale, drag, log
+}
+
+func sLog(t *testing.T, log *[]string, want ...string) {
+	t.Helper()
+	got := append([]string{}, *log...)
+	if want == nil {
+		want = []string{}
+	}
+	if len(got) != len(want) {
+		t.Fatalf("log %q, want %q", got, want)
+	}
+	for i := range got {
+		if got[i] != want[i] {
+			t.Fatalf("log %q, want %q", got, want)
+		}
+	}
+	*log = (*log)[:0]
+}
+
+func TestScaleCompetesWithDrag(t *testing.T) {
+	flutter_test.RunTestGesture(t, func(tester *flutter_test.GestureTester) {
+		scale, drag, log := scaleDragLog(t)
+		pointer1 := sTP(1)
+		down := pointer1.Down(sOff(10, 10))
+		scale.AddPointer(down)
+		drag.AddPointer(down)
+		tester.CloseArena(1)
+		sLog(t, log)
+		tester.Route(down)
+		sLog(t, log)
+		tester.Route(pointer1.Move(sOff(10, 50)))
+		sLog(t, log, "scale-start", "scale-update")
+		pointer2 := sTP(2)
+		down2 := pointer2.Down(sOff(10, 20))
+		scale.AddPointer(down2)
+		drag.AddPointer(down2)
+		tester.CloseArena(2)
+		sLog(t, log)
+		tester.Route(down2)
+		sLog(t, log, "scale-end")
+		tester.Route(pointer2.Move(sOff(30, 20)))
+		sLog(t, log, "scale-start", "scale-update")
+		tester.Route(pointer1.Up())
+		sLog(t, log, "scale-end")
+		tester.Route(pointer2.Up())
+		sLog(t, log)
+		pointer3 := sTP(3)
+		down3 := pointer3.Down(sOff(30, 30))
+		scale.AddPointer(down3)
+		drag.AddPointer(down3)
+		tester.CloseArena(3)
+		tester.Route(down3)
+		sLog(t, log)
+		tester.Route(pointer3.Move(sOff(100, 30)))
+		sLog(t, log, "scale-start", "scale-update")
+		tester.Route(pointer3.Up())
+		sLog(t, log, "scale-end")
+	})
+}
+
+func TestScaleRecognizesPointerPanZoomEvents(t *testing.T) {
+	flutter_test.RunTestGesture(t, func(tester *flutter_test.GestureTester) {
+		scale := NewScaleGestureRecognizer()
+		t.Cleanup(scale.Dispose)
+		drag := NewHorizontalDragGestureRecognizer()
+		t.Cleanup(drag.Dispose)
+		p := sProbe(scale)
+		pointer1 := sTP(2, ui.PointerDeviceKindTrackpad)
+		start := pointer1.PanZoomStart(sOff(0, 0))
+		scale.AddPointerPanZoom(start)
+		drag.AddPointerPanZoom(start)
+		tester.CloseArena(2)
+		sBool(t, "didStartScale", p.didStart, false)
+		p.expectNoUpdate(t)
+		sBool(t, "didEndScale", p.didEnd, false)
+		tester.Route(start)
+		sBool(t, "didStartScale", p.didStart, false)
+		p.expectNoUpdate(t)
+
+		tester.Route(sPZ(pointer1, sOff(0, 0), sOff(20, 30), nil, 0))
+		sBool(t, "didStartScale", p.didStart, true)
+		p.didStart = false
+		sEq(t, "focal", p.focal, sOff(20, 30))
+		sEq(t, "scale", p.scale, 1.0)
+		sEq(t, "delta", p.delta, sOff(20, 30))
+		sEq(t, "pointerCount", p.pointerCount, 2)
+		p.clearUpdate()
+		sBool(t, "didEndScale", p.didEnd, false)
+
+		two := 2.0
+		tester.Route(sPZ(pointer1, sOff(0, 0), sOff(20, 30), &two, 0))
+		sEq(t, "focal", p.focal, sOff(20, 30))
+		sEq(t, "scale", p.scale, 2.0)
+		sEq(t, "hScale", p.hScale, 2.0)
+		sEq(t, "vScale", p.vScale, 2.0)
+		sEq(t, "delta", p.delta, sOff(0, 0))
+		sEq(t, "pointerCount", p.pointerCount, 2)
+		p.clearUpdate()
+		sBool(t, "didEndScale", p.didEnd, false)
+
+		tester.Route(sPZ(pointer1, sOff(0, 0), sOff(20, 30), nil, 0))
+		sEq(t, "focal", p.focal, sOff(20, 30))
+		sEq(t, "scale", p.scale, 1.0)
+		sEq(t, "hScale", p.hScale, 1.0)
+		sEq(t, "vScale", p.vScale, 1.0)
+		sEq(t, "delta", p.delta, sOff(0, 0))
+		sEq(t, "pointerCount", p.pointerCount, 2)
+		p.clearUpdate()
+		sBool(t, "didEndScale", p.didEnd, false)
+
+		tester.Route(pointer1.PanZoomEnd())
+		sBool(t, "didStartScale", p.didStart, false)
+		p.expectNoUpdate(t)
+		sBool(t, "didEndScale", p.didEnd, true)
+	})
+}
+
+func TestScalePointerPanZoomsWorkAlongsideTouches(t *testing.T) {
+	flutter_test.RunTestGesture(t, func(tester *flutter_test.GestureTester) {
+		scale := NewScaleGestureRecognizer()
+		t.Cleanup(scale.Dispose)
+		drag := NewHorizontalDragGestureRecognizer()
+		t.Cleanup(drag.Dispose)
+		p := sProbe(scale)
+		touchPointer1, touchPointer2 := sTP(2), sTP(3)
+		panZoomPointer := sTP(4, ui.PointerDeviceKindTrackpad)
+		panZoomStart := panZoomPointer.PanZoomStart(sOff(0, 0))
+		scale.AddPointerPanZoom(panZoomStart)
+		drag.AddPointerPanZoom(panZoomStart)
+		tester.CloseArena(4)
+		sBool(t, "didStartScale", p.didStart, false)
+		p.expectNoUpdate(t)
+		tester.Route(panZoomStart)
+		sBool(t, "didStartScale", p.didStart, false)
+		p.expectNoUpdate(t)
+
+		tester.Route(sPZ(panZoomPointer, sOff(0, 0), sOff(40, 40), nil, 0))
+		sBool(t, "didStartScale", p.didStart, true)
+		p.didStart = false
+		sEq(t, "focal", p.focal, sOff(40, 40))
+		sEq(t, "scale", p.scale, 1.0)
+		sEq(t, "delta", p.delta, sOff(40, 40))
+		sEq(t, "pointerCount", p.pointerCount, 2)
+		p.clearUpdate()
+
+		touchStart1 := touchPointer1.Down(sOff(40, 40))
+		scale.AddPointer(touchStart1)
+		drag.AddPointer(touchStart1)
+		tester.CloseArena(2)
+		tester.Route(touchStart1)
+		sBool(t, "didEndScale", p.didEnd, true)
+		p.didEnd = false
+
+		tester.Route(touchPointer1.Move(sOff(10, 10)))
+		sBool(t, "didStartScale", p.didStart, true)
+		p.didStart = false
+		sEq(t, "focal", p.focal, sOff(25, 25))
+		sEq(t, "scale", p.scale, 1.0)
+		sEq(t, "delta", p.delta, sOff(-15, -15))
+		sEq(t, "pointerCount", p.pointerCount, 3)
+		p.clearUpdate()
+		sBool(t, "didEndScale", p.didEnd, false)
+
+		touchStart2 := touchPointer2.Down(sOff(10, 40))
+		scale.AddPointer(touchStart2)
+		drag.AddPointer(touchStart2)
+		tester.CloseArena(3)
+		tester.Route(touchStart2)
+		sBool(t, "didEndScale", p.didEnd, true)
+		p.didEnd = false
+
+		tester.Route(touchPointer2.Move(sOff(40, 40)))
+		sBool(t, "didStartScale", p.didStart, true)
+		p.didStart = false
+		sEq(t, "focal", p.focal, sOff(30, 30))
+		sEq(t, "scale", p.scale, math.Sqrt(2))
+		sEq(t, "hScale", p.hScale, 1.0)
+		sEq(t, "vScale", p.vScale, 1.0)
+		sEq(t, "delta", p.delta, sOff(10, 0))
+		sEq(t, "rotation", p.rotation, -math.Pi/4)
+		sEq(t, "pointerCount", p.pointerCount, 4)
+		p.clearUpdate()
+		sBool(t, "didEndScale", p.didEnd, false)
+
+		sqrt2 := math.Sqrt(2)
+		tester.Route(sPZ(panZoomPointer, sOff(0, 0), sOff(40, 40), &sqrt2, math.Pi/3))
+		sBool(t, "didStartScale", p.didStart, false)
+		sEq(t, "focal", p.focal, sOff(30, 30))
+		sClose(t, "scale", p.scale, 2, 0.0001)
+		sEq(t, "hScale", p.hScale, math.Sqrt(2))
+		sEq(t, "vScale", p.vScale, math.Sqrt(2))
+		sEq(t, "delta", p.delta, sOff(0, 0))
+		sClose(t, "rotation", p.rotation, math.Pi/12, 0.0001)
+		sEq(t, "pointerCount", p.pointerCount, 4)
+		p.clearUpdate()
+		sBool(t, "didEndScale", p.didEnd, false)
+
+		tester.Route(sPZ(panZoomPointer, sOff(15, 15), sOff(55, 55), &sqrt2, math.Pi/3))
+		sBool(t, "didStartScale", p.didStart, false)
+		sEq(t, "focal", p.focal, sOff(40, 40))
+		sClose(t, "scale", p.scale, 2, 0.0001)
+		sEq(t, "delta", p.delta, sOff(10, 10))
+		sClose(t, "rotation", p.rotation, math.Pi/12, 0.0001)
+		sEq(t, "pointerCount", p.pointerCount, 4)
+		p.clearUpdate()
+		sBool(t, "didEndScale", p.didEnd, false)
+
+		tester.Route(panZoomPointer.PanZoomEnd())
+		sNil(t, "focal", p.focal)
+		sBool(t, "didEndScale", p.didEnd, true)
+		p.didEnd = false
+		p.expectNoUpdate(t)
+		sBool(t, "didStartScale", p.didStart, false)
+		tester.Route(touchPointer1.Up())
+		sNil(t, "focal", p.focal)
+		sBool(t, "didEndScale", p.didEnd, false)
+		p.expectNoUpdate(t)
+		sBool(t, "didStartScale", p.didStart, false)
+		tester.Route(touchPointer2.Up())
+		sBool(t, "didEndScale", p.didEnd, false)
+		p.expectNoUpdate(t)
+		sBool(t, "didStartScale", p.didStart, false)
+	})
+}
+
+func TestScaleCompetesWithDragForTrackpadGesture(t *testing.T) {
+	flutter_test.RunTestGesture(t, func(tester *flutter_test.GestureTester) {
+		scale, drag, log := scaleDragLog(t)
+		pointer1 := sTP(2, ui.PointerDeviceKindTrackpad)
+		down := pointer1.PanZoomStart(sOff(10, 10))
+		scale.AddPointerPanZoom(down)
+		drag.AddPointerPanZoom(down)
+		tester.CloseArena(2)
+		sLog(t, log)
+		tester.Route(down)
+		sLog(t, log)
+		tester.Route(sPZ(pointer1, sOff(10, 10), sOff(10, 40), nil, 0))
+		sLog(t, log, "scale-start", "scale-update")
+		pointer2 := sTP(3, ui.PointerDeviceKindTrackpad)
+		down2 := pointer2.PanZoomStart(sOff(10, 20))
+		scale.AddPointerPanZoom(down2)
+		drag.AddPointerPanZoom(down2)
+		tester.CloseArena(3)
+		sLog(t, log)
+		tester.Route(down2)
+		sLog(t, log, "scale-end")
+		tester.Route(sPZ(pointer2, sOff(10, 20), sOff(20, 0), nil, 0))
+		sLog(t, log, "scale-start", "scale-update")
+		tester.Route(pointer1.PanZoomEnd())
+		sLog(t, log, "scale-end")
+		tester.Route(pointer2.PanZoomEnd())
+		sLog(t, log)
+		pointer3 := sTP(4, ui.PointerDeviceKindTrackpad)
+		down3 := pointer3.PanZoomStart(sOff(30, 30))
+		scale.AddPointerPanZoom(down3)
+		drag.AddPointerPanZoom(down3)
+		tester.CloseArena(4)
+		tester.Route(down3)
+		sLog(t, log)
+		tester.Route(sPZ(pointer3, sOff(30, 30), sOff(70, 0), nil, 0))
+		sLog(t, log, "scale-start", "scale-update")
+		tester.Route(pointer3.PanZoomEnd())
+		sLog(t, log, "scale-end")
+	})
+}
+
+func TestScalePanZoomHandlesDragStartBehaviorStart(t *testing.T) {
+	flutter_test.RunTestGesture(t, func(tester *flutter_test.GestureTester) {
+		start := DragStartBehaviorStart
+		scale := NewScaleGestureRecognizer(ScaleGestureRecognizerOptions{DragStartBehavior: &start})
+		t.Cleanup(scale.Dispose)
+		drag := NewHorizontalDragGestureRecognizer()
+		t.Cleanup(drag.Dispose)
+		p := sProbe(scale)
+		pointer1 := sTP(2, ui.PointerDeviceKindTrackpad)
+		pzStart := pointer1.PanZoomStart(sOff(0, 0))
+		scale.AddPointerPanZoom(pzStart)
+		drag.AddPointerPanZoom(pzStart)
+		tester.CloseArena(2)
+		sBool(t, "didStartScale", p.didStart, false)
+		p.expectNoUpdate(t)
+		sBool(t, "didEndScale", p.didEnd, false)
+		tester.Route(pzStart)
+		sBool(t, "didStartScale", p.didStart, false)
+		p.expectNoUpdate(t)
+
+		s11 := 1.1
+		tester.Route(sPZ(pointer1, sOff(0, 0), sOff(0, 0), &s11, 1))
+		sBool(t, "didStartScale", p.didStart, true)
+		p.didStart = false
+		sEq(t, "focal", p.focal, sOff(0, 0))
+		sEq(t, "scale", p.scale, 1.0)
+		sEq(t, "delta", p.delta, sOff(0, 0))
+		p.clearUpdate()
+		sBool(t, "didEndScale", p.didEnd, false)
+
+		s121 := 1.21
+		tester.Route(sPZ(pointer1, sOff(0, 0), sOff(0, 0), &s121, 1.5))
+		sEq(t, "focal", p.focal, sOff(0, 0))
+		sClose(t, "scale", p.scale, 1.1, 0.0001)
+		sClose(t, "hScale", p.hScale, 1.1, 0.0001)
+		sClose(t, "vScale", p.vScale, 1.1, 0.0001)
+		sEq(t, "rotation", p.rotation, 0.5)
+		sEq(t, "delta", p.delta, sOff(0, 0))
+		p.clearUpdate()
+		sBool(t, "didEndScale", p.didEnd, false)
+
+		s099 := 0.99
+		tester.Route(sPZ(pointer1, sOff(0, 0), sOff(0, 0), &s099, 1.0))
+		sEq(t, "focal", p.focal, sOff(0, 0))
+		sClose(t, "scale", p.scale, 0.9, 0.0001)
+		sClose(t, "hScale", p.hScale, 0.9, 0.0001)
+		sClose(t, "vScale", p.vScale, 0.9, 0.0001)
+		sEq(t, "rotation", p.rotation, 0.0)
+		sEq(t, "delta", p.delta, sOff(0, 0))
+		p.clearUpdate()
+		sBool(t, "didEndScale", p.didEnd, false)
+
+		tester.Route(pointer1.PanZoomEnd())
+		sBool(t, "didStartScale", p.didStart, false)
+		p.expectNoUpdate(t)
+		sBool(t, "didEndScale", p.didEnd, true)
+	})
 }

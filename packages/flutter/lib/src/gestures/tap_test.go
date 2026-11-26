@@ -1,12 +1,8 @@
 package gestures_test
 
-// Port of packages/flutter/test/gestures/tap_test.dart (Flutter 3.50.1).
-//
-// Skipped (need HorizontalDragGestureRecognizer, monodrag.dart, ported
-// separately):
-//   - PointerCancelEvent after exceeding deadline cancels tap
-//   - losing tap gesture recognizer does not send onTapCancel
-//   - A second tap after rejection is ignored
+// Port of packages/flutter/test/gestures/tap_test.dart (Flutter 3.50.1):
+// all 34 tests (the three competing with HorizontalDragGestureRecognizer
+// are at the end of the file).
 
 import (
 	"strings"
@@ -655,5 +651,79 @@ func TestTapOnTapMoveWorks(t *testing.T) {
 		}
 		expectDeep(t, tapMoveDetails.GlobalPosition(), ui.NewOffset(60, 10))
 		expectDeep(t, tapMoveDetails.Delta, ui.NewOffset(10, 10))
+	})
+}
+
+func tapLogged(t *testing.T, recognized *strs) *TapGestureRecognizer {
+	tap := NewTapGestureRecognizer()
+	t.Cleanup(tap.Dispose)
+	tap.OnTapDown = func(*TapDownDetails) { recognized.add("down") }
+	tap.OnTapUp = func(*TapUpDetails) { recognized.add("up") }
+	tap.OnTap = func() { recognized.add("tap") }
+	tap.OnTapCancel = func() { recognized.add("cancel") }
+	return tap
+}
+
+func TestTapPointerCancelAfterExceedingDeadlineCancelsTap(t *testing.T) {
+	tapTestGesture(t, func(tester *flutter_test.GestureTester) {
+		down := peDown(5, 10, 10)
+		cancel := peCancel(5, 10, 10)
+		var recognized strs
+		tap := tapLogged(t, &recognized)
+		drag := NewHorizontalDragGestureRecognizer()
+		drag.OnStart = func(*DragStartDetails) {} // Need a callback to compete
+		t.Cleanup(drag.Dispose)
+		tap.AddPointer(down)
+		drag.AddPointer(down)
+		tester.CloseArena(5)
+		tester.Route(down)
+		expectLog(t, recognized)
+		tester.Async.Elapse(ms(1000))
+		expectLog(t, recognized, "down")
+		tester.Route(cancel)
+		expectLog(t, recognized, "down", "cancel")
+	})
+}
+
+func TestTapLosingRecognizerDoesNotSendOnTapCancel(t *testing.T) {
+	tapTestGesture(t, func(tester *flutter_test.GestureTester) {
+		var recognized strs
+		tap := tapLogged(t, &recognized)
+		drag := NewHorizontalDragGestureRecognizer()
+		t.Cleanup(drag.Dispose)
+		tap.AddPointer(tDown3)
+		drag.AddPointer(tDown3)
+		tester.CloseArena(3)
+		tester.Route(tMove3)
+		tapArena().Sweep(3)
+		expectLog(t, recognized)
+	})
+}
+
+func TestTapSecondTapAfterRejectionIsIgnored(t *testing.T) {
+	tapTestGesture(t, func(tester *flutter_test.GestureTester) {
+		didTap := false
+		tap := NewTapGestureRecognizer()
+		tap.OnTap = func() { didTap = true }
+		t.Cleanup(tap.Dispose)
+		drag := NewHorizontalDragGestureRecognizer()
+		drag.OnStart = func(*DragStartDetails) {}
+		t.Cleanup(drag.Dispose)
+		pointer1 := testPointerN(1)
+		down := pointer1.Down(ui.Offset{})
+		drag.AddPointer(down)
+		tap.AddPointer(down)
+		tester.CloseArena(1)
+		tester.Route(down)
+		tester.Route(pointer1.Move(ui.NewOffset(50, 0)))
+		pointer2 := testPointerN(2)
+		down2 := pointer2.Down(ui.NewOffset(10, 20))
+		drag.AddPointer(down2)
+		tap.AddPointer(down2)
+		tester.CloseArena(2)
+		tester.Route(down2)
+		if didTap {
+			t.Fatal("tapped")
+		}
 	})
 }
