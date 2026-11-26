@@ -12,10 +12,10 @@ package services_test
 //     `invokeMethod<List<String>>` throwing a TypeError (a failed cast of
 //     List<dynamic>) has no Go equivalent (InvokeMethod returns any); the
 //     rest of each test is ported.
-//   - binding_test.dart: the licenses test (rootBundle LICENSES), the memory
-//     pressure test (asset caches), the textInput handler test (TextInput),
-//     and the view focus test (ViewFocusEvent) need libraries not ported
-//     yet; the keyboard state test is in binding_keyboard_test.go.
+//   - binding_test.dart: the licenses and memory pressure tests are in
+//     binding_assets_test.go, the keyboard state test in
+//     binding_keyboard_test.go; the textInput handler test (TextInput) and
+//     the view focus test (ViewFocusEvent) need libraries not ported yet.
 //   - lifecycle_test.dart: TestPlatformDispatcher's
 //     initialLifecycleStateTestValue doesn't exist yet; the two testWidgets
 //     are ported by sending the states on flutter/lifecycle, as the engine

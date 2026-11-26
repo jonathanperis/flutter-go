@@ -114,7 +114,10 @@ func ensureBinding() *appBinding {
 // engine is the embedder's side of dart:ui's PlatformConfiguration: the
 // framework's frame requests (PlatformDispatcher.scheduleFrame) set
 // needsFrame, and the run loop produces the frame at the next vsync.
-type engine struct{ needsFrame bool }
+type engine struct {
+	needsFrame bool
+	window     *glfw.Window // for the platform plugins (platform_plugins.go)
+}
 
 func (e *engine) ScheduleFrame()             { e.needsFrame = true }
 func (e *engine) EndWarmUpFrame()            {}
@@ -155,7 +158,7 @@ func Run(root widgets.Widget, o Options) error {
 
 	r.SetTextEngine(r.UITextEngine{})
 
-	eng := &engine{}
+	eng := &engine{window: win}
 	pc := ui.NewPlatformConfiguration(eng)
 	defer ui.SetPlatformConfiguration(pc)()
 	b := ensureBinding()

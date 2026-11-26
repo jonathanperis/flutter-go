@@ -8,15 +8,21 @@ package services
 // system context menu client), exitApplication, initializationComplete and
 // the service extensions.
 //
-// The keyboard (HardwareKeyboard, KeyEventManager, the key event channel)
-// comes with hardware_keyboard.go. Not ported yet (they come with their
-// libraries): the restoration manager, TextInput.ensureInitialized, the licenses read from
-// the asset bundle (initLicenses), the root bundle's clear/evict
-// (handleMemoryPressure and evict do nothing else), SystemChrome's
-// lifecycle hook, and PlatformDispatcher.onViewFocusChange /
-// handleViewFocusChanged.
+// Also the keyboard (HardwareKeyboard, KeyEventManager, the key event
+// channel; hardware_keyboard.go), the restoration manager, the licenses
+// read from the asset bundle (initLicenses), the root bundle's clear/evict
+// and SystemChrome's lifecycle hook.
+//
+// Not ported yet: TextInput.ensureInitialized (comes with text_input.go),
+// and PlatformDispatcher.onViewFocusChange / handleViewFocusChanged
+// (dart:ui's ViewFocusEvent is not ported yet).
 
 import (
+	"bytes"
+	"compress/gzip"
+	"io"
+	"strings"
+
 	ui "github.com/jonathanperis/flutter-go/engine/src/flutter/lib/ui/go"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/foundation"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/scheduler"
@@ -70,6 +76,16 @@ type ServicesBinding interface {
 	// InitializationComplete tells the platform that the framework has
 	// initialized (it may then remove the splash screen).
 	InitializationComplete() async.Future[async.Void]
+	// InitLicenses adds the licenses the flutter tool collected (the
+	// NOTICES.Z asset) to the LicenseRegistry; overrides must call it.
+	InitLicenses()
+	// RestorationManager is the RestorationManager synchronizing the
+	// restoration data with the engine (a binding may return a subtype's
+	// embedded manager, as flutter_test's does).
+	RestorationManager() *RestorationManager
+	// CreateRestorationManager creates the RestorationManager (called once,
+	// by InitInstances; bindings override it).
+	CreateRestorationManager() *RestorationManager
 
 	// Keyboard is the global HardwareKeyboard (HardwareKeyboard.instance).
 	Keyboard() *HardwareKeyboard
@@ -123,6 +139,7 @@ type ServicesBindingMixin struct {
 	self ServicesBinding
 
 	defaultBinaryMessenger  BinaryMessenger
+	restorationManager      *RestorationManager
 	accessibilityFocus      *foundation.ValueNotifier[*int]
 	systemUiChangeCallback  SystemUiChangeCallback
 	systemContextMenuClient SystemContextMenuClient
@@ -159,7 +176,9 @@ func (m *ServicesBindingMixin) InitInstances() {
 	self := m.outer()
 	servicesBindingInstance = self
 	m.defaultBinaryMessenger = self.CreateBinaryMessenger()
+	m.restorationManager = self.CreateRestorationManager()
 	m.initKeyboard()
+	self.InitLicenses()
 	// The handlers' Future<void> results are encoded as null.
 	SystemChannels.System.SetMessageHandler(func(message any) async.Future[any] {
 		return voidToNull(self.HandleSystemMessage(message))
@@ -217,7 +236,7 @@ func (m *ServicesBindingMixin) CreateBinaryMessenger() BinaryMessenger {
 }
 
 func (m *ServicesBindingMixin) HandleMemoryPressure() {
-	// rootBundle.clear(): the asset bundle is not ported yet.
+	RootBundle.Clear()
 }
 
 func (m *ServicesBindingMixin) HandleSystemMessage(systemMessage any) async.Future[async.Void] {
@@ -251,7 +270,76 @@ func (m *ServicesBindingMixin) InitServiceExtensions() {
 }
 
 func (m *ServicesBindingMixin) Evict(asset string) {
-	// rootBundle.evict(asset): the asset bundle is not ported yet.
+	RootBundle.Evict(asset)
+}
+
+func (m *ServicesBindingMixin) InitLicenses() {
+	foundation.LicenseRegistry.AddLicense(m.addLicenses)
+}
+
+func (m *ServicesBindingMixin) addLicenses() async.Stream[foundation.LicenseEntry] {
+	var controller *async.StreamController[foundation.LicenseEntry]
+	controller = async.NewStreamController[foundation.LicenseEntry](async.StreamControllerOptions{
+		OnListen: func() {
+			async.AsyncVoid(func() {
+				var rawLicenses string
+				if foundation.KIsWeb {
+					// NOTICES for web isn't compressed since we don't have
+					// access to dart:io on the client side and it's already
+					// compressed between the server and client.
+					rawLicenses = RootBundle.LoadString("NOTICES", LoadStringOptions{NoCache: true}).Await()
+				} else {
+					// The compressed version doesn't have a more common .gz
+					// extension because gradle for Android non-transparently
+					// manipulates .gz files.
+					licenseBytes := RootBundle.Load("NOTICES.Z").Await()
+					decompress, decode := "decompressLicenses", "utf8DecodeLicenses"
+					unzippedBytes := foundation.Compute(gzipDecode, licenseBytes,
+						foundation.ComputeOptions{DebugLabel: &decompress}).Await()
+					rawLicenses = foundation.Compute(dart.UTF8Decode, unzippedBytes,
+						foundation.ComputeOptions{DebugLabel: &decode}).Await()
+				}
+				parse := "parseLicenses"
+				licenses := foundation.Compute(parseLicenses, rawLicenses,
+					foundation.ComputeOptions{DebugLabel: &parse}).Await()
+				for _, license := range licenses {
+					controller.Add(license)
+				}
+				controller.Close().Await()
+			})
+		},
+	})
+	return controller.Stream()
+}
+
+// gzipDecode is dart:io's gzip.decode (concatenated members included).
+func gzipDecode(data []byte) []byte {
+	r, err := gzip.NewReader(bytes.NewReader(data))
+	if err != nil {
+		panic(dart.NewFormatException("Filter error, bad data"))
+	}
+	out, err := io.ReadAll(r)
+	if err != nil {
+		panic(dart.NewFormatException("Filter error, bad data"))
+	}
+	return out
+}
+
+// parseLicenses is _parseLicenses (run in another isolate by
+// _addLicenses): the NOTICES text split into entries at lines of 80
+// dashes; an entry's first paragraph lists its packages, one per line.
+func parseLicenses(rawLicenses string) []foundation.LicenseEntry {
+	licenseSeparator := "\n" + strings.Repeat("-", 80) + "\n"
+	var out []foundation.LicenseEntry
+	for _, license := range strings.Split(rawLicenses, licenseSeparator) {
+		if split := strings.Index(license, "\n\n"); split >= 0 {
+			out = append(out, foundation.NewLicenseEntryWithLineBreaks(
+				strings.Split(license[:split], "\n"), license[split+2:]))
+		} else {
+			out = append(out, foundation.NewLicenseEntryWithLineBreaks([]string{}, license))
+		}
+	}
+	return out
 }
 
 func (m *ServicesBindingMixin) ReadInitialLifecycleStateFromNativeWindow() {
@@ -275,7 +363,7 @@ func (m *ServicesBindingMixin) handleLifecycleMessage(message *string) async.Fut
 		generated := m.generateStateTransitions(m.outer().LifecycleState(), *state)
 		for _, stateChange := range generated {
 			m.outer().HandleAppLifecycleStateChanged(stateChange)
-			// SystemChrome.handleAppLifecycleStateChanged: not ported yet.
+			SystemChrome.HandleAppLifecycleStateChanged(stateChange)
 		}
 		return nil
 	})
@@ -449,6 +537,12 @@ func (m *ServicesBindingMixin) ExitApplication(exitType ui.AppExitType, exitCode
 			return ui.AppExitResponseExit
 		}
 	})
+}
+
+func (m *ServicesBindingMixin) RestorationManager() *RestorationManager { return m.restorationManager }
+
+func (m *ServicesBindingMixin) CreateRestorationManager() *RestorationManager {
+	return NewRestorationManager()
 }
 
 func (m *ServicesBindingMixin) SetSystemUiChangeCallback(callback SystemUiChangeCallback) {
