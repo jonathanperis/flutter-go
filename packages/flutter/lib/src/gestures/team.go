@@ -25,6 +25,12 @@ type combiningGestureArenaMember struct {
 	entry    GestureArenaEntry
 }
 
+// String is Object.toString of the private Dart class (the arena
+// diagnostics print it).
+func (c *combiningGestureArenaMember) String() string {
+	return "Instance of '_CombiningGestureArenaMember'"
+}
+
 func (c *combiningGestureArenaMember) AcceptGesture(pointer int) {
 	dartAssert(c.pointer == pointer, nil)
 	dartAssert(c.winner != nil || len(c.members) > 0, nil)
