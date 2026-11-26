@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	ui "github.com/jonathanperis/flutter-go/engine/src/flutter/lib/ui/go"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/foundation"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/services"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/widgets"
@@ -105,7 +106,21 @@ func TestEditingActionsMatchFlutter(t *testing.T) {
 				t.Fatalf("reference has %d steps, scene %d", len(want[name]), len(scenes[name]))
 			}
 			for i, op := range scenes[name] {
-				if op.Type != nil {
+				if op.Reset != nil {
+					caret := services.NewTextSelectionCollapsed(dart.StringLength(*op.Reset))
+					tester.Binding().TestTextInput().UpdateEditingValue(services.NewTextEditingValue(services.TextEditingValueOptions{
+						Text: *op.Reset, Selection: &caret}))
+					tester.Loop().FlushMicrotasks()
+				} else if op.Select != nil {
+					affinity := ui.TextAffinityDownstream
+					if op.Affinity == "upstream" {
+						affinity = ui.TextAffinityUpstream
+					}
+					sel := services.NewTextSelection(op.Select[0], op.Select[1], services.TextSelectionOptions{Affinity: &affinity})
+					tester.Binding().TestTextInput().UpdateEditingValue(controller.Value().CopyWith(
+						services.TextEditingValueCopyWithOptions{Selection: &sel}))
+					tester.Loop().FlushMicrotasks()
+				} else if op.Type != nil {
 					v := controller.Value()
 					text := dart.Concat(v.Selection.TextBefore(v.Text), *op.Type, v.Selection.TextAfter(v.Text))
 					caret := services.NewTextSelectionCollapsed(v.Selection.Start + dart.StringLength(*op.Type))
@@ -128,7 +143,14 @@ func TestEditingActionsMatchFlutter(t *testing.T) {
 				exp := fmt.Sprintf("%q %d %d %s", w[0], int(w[1].(float64)), int(w[2].(float64)), w[3])
 				if got != exp {
 					desc := op.Key
-					if op.Type != nil {
+					if op.Reset != nil {
+						caret := services.NewTextSelectionCollapsed(dart.StringLength(*op.Reset))
+						tester.Binding().TestTextInput().UpdateEditingValue(services.NewTextEditingValue(services.TextEditingValueOptions{
+							Text: *op.Reset, Selection: &caret}))
+						tester.Loop().FlushMicrotasks()
+					} else if op.Select != nil {
+						desc = fmt.Sprintf("select %v %s", op.Select, op.Affinity)
+					} else if op.Type != nil {
 						desc = "type " + *op.Type
 					}
 					t.Errorf("step %d (%s %v): flutter %s, go %s", i, desc, op.Mods, exp, got)

@@ -130,9 +130,31 @@ Start here when continuing flutter-go in a new session.
      an Op for lines/cubics only), AA clips (the SDK records is_aa=false),
      gamma color filters and ColorFilter-as-ImageFilter, drawVertices'
      colors/texture coordinates, blur bounds, mipmap/cubic sampling.
-  10. Split `services` (text-editing model under non-Flutter names) by
-     library; RendererBinding/PaintingBinding/WidgetsBinding into the
+  10. Done: the old text-editing model (services' textedit.go/keys.go) is
+     gone; RendererBinding/PaintingBinding/WidgetsBinding go into the
      bindings as their libraries are ported.
+  12. Done (P3): services in full, 211/211 (keyboard with generated keys
+     and maps, HardwareKeyboard/KeyEventManager/RawKeyboard and all
+     platform data; text input, autofill, deltas, formatters, boundaries,
+     clipboard; assets, restoration, system chrome/navigator/sound,
+     haptics, platform views, mouse cursor, undo/scribe/live text/process
+     text/spell check...), package:characters (`src/pub/characters`),
+     `dart.RegExp`, flutter_test's key simulation, TestTextInput (+ macOS
+     key handler), TestRestorationManager and fake platform views. The
+     interim TextField runs on the real types through an editing bridge in
+     widgets (actions.go, shortcuts.go, focus_manager.go,
+     text_editing_intents.go, default_text_editing_shortcuts.go,
+     editable_text.go). src/app delivers real key events (the macOS
+     embedder's key responders ported) and hosts Clipboard, assets and a
+     text-input stand-in. Next for it: the widgets port proper (FocusNode/
+     FocusManager, Shortcuts/Actions widgets, EditableText with formatters,
+     undo history and multi-line VerticalCaretMovementRun) replaces the
+     bridge; painting's TextPainter.wordBoundaries replaces
+     editable_text.go's interim WordBoundary; `ServicesBinding`'s view
+     focus once dart:ui has ViewFocusEvent; src/app: a real text input
+     plugin (NSTextInputContext for IME), SystemSound/SystemNavigator/
+     mouse cursor/platform views hosts (ENGINE GAPs); widgets re-exports
+     package:characters.
   11. Done (P1): dart:ui text.dart in full (styles, Paragraph,
      ParagraphBuilder, placeholders, loadFontFromList,
      Canvas.drawParagraph) on the engine's own txt/SkParagraph inside the

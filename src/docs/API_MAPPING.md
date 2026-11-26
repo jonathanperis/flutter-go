@@ -559,8 +559,9 @@ Each divergence is listed here when it is introduced.
   package variable of a struct of channels. `BinaryMessenger.
   HandlePlatformMessage` returns `Future[[]byte]` for every messenger (Dart:
   `Future<void>`, which TestDefaultBinaryMessenger overrides as
-  `Future<ByteData?>`). ServicesBinding is partial (no keyboard,
-  restoration, text input, licenses from the asset bundle, view focus).
+  `Future<ByteData?>`). ServicesBinding is complete except view focus
+  (`onViewFocusChange`/`handleViewFocusChanged` wait for dart:ui's
+  ViewFocusEvent).
   `BackgroundIsolateBinaryMessenger.send` panics (ENGINE GAP: no isolates).
   The int/double key merge follows the VM on arm64, where the double 2^63
   hashes as 2^63-1.
@@ -888,3 +889,192 @@ Each divergence is listed here when it is introduced.
   name (the engine's dynamic font manager lowercases ASCII names); the
   builder's `impeller_enabled` flag is always true (it only selects the
   painting path).
+- services (keyboard): `LogicalKeyboardKey`/`PhysicalKeyboardKey` are
+  comparable value structs (`KeyID`, `UsbHidUsage`) implementing
+  Diagnosticable directly (a mixin's self pointer would break `==`); build
+  them with `NewLogicalKeyboardKey(id)` or a literal. Their constants and
+  maps are generated (`src/cmd/genkeycodes` → `keyboard_key.g.go`,
+  `keyboard_maps.g.go`): `LogicalKeyboardKey.keyA` →
+  `LogicalKeyboardKeyKeyA`, statics `LogicalKeyboardKeyFindKeyByKeyId`,
+  `IsControlCharacter`, `CollapseSynonyms`, `ExpandSynonyms`,
+  `LogicalKeyboardKeyKnownLogicalKeys()` (iter.Seq), planes and masks as
+  constants, `PhysicalKeyboardKeyFindKeyByCode`/`KnownPhysicalKeys`.
+  `KeyboardKey` is an interface. Dart `Set`s of keys or lock modes
+  (`physicalKeysPressed`, `logicalKeysPressed`, `lockModesEnabled`,
+  `keysPressed`, `synonyms`) are duplicate-free slices in Dart's insertion
+  order. The `k...` maps (`kAndroidToLogicalKey`...) are Go maps plus
+  `K<Map>Keys` slices giving Dart's key order (flutter_test's simulator
+  takes the first matching key); `kWebLocationMap`'s values are
+  `[]*LogicalKeyboardKey` (nil is null).
+- services (keyboard): `KeyEvent` is an interface of getters
+  (`PhysicalKey()`, `LogicalKey()`, `Character() *string`, `TimeStamp()`,
+  `DeviceType()`, `Synthesized()`); `*KeyDownEvent`/`*KeyUpEvent`/
+  `*KeyRepeatEvent` embed `KeyEventBase`, built with
+  `NewKeyDownEvent(physical, logical, timeStamp, KeyEventOptions{...})`.
+  `HardwareKeyboard.instance` is `HardwareKeyboardInstance()`; handlers
+  compare with `dart.FunctionsEqual`. `KeyMessage` is `*KeyMessage{Events,
+  RawEvent}`; `KeyEventManager.keyMessageHandler` is the field
+  `KeyMessageHandler`. Divergences: Dart hands the manager's live event
+  list to the KeyMessage and clears it after dispatch, Go's message keeps
+  its events; `syncKeyboardState` records the platform's pressed keys in
+  increasing key order (the decoded map is unordered).
+- services (raw keyboard, deprecated): `RawKeyEventData` is an interface
+  plus `RawKeyEventDataBase` (self pattern); each platform's data is a
+  pointer built with `NewRawKeyEventData<Platform>(options)` (Linux:
+  `NewRawKeyEventDataLinux(keyHelper, isDown, options)`), compared with
+  `Equal`. `isModifierPressed(key, {side})` takes
+  `IsModifierPressedOptions{Side}` (zero: any); `getModifierSide` returns
+  `*KeyboardSide`; `modifiersPressed` is `map[ModifierKey]KeyboardSide`.
+  Static masks are package constants (`RawKeyEventDataAndroidModifierAlt`,
+  `GLFWKeyHelperModifierShift`...). `KeyHelper` is an interface
+  (`NewKeyHelper(toolkit)`). `RawKeyEvent` is an interface plus
+  `*RawKeyDownEvent`/`*RawKeyUpEvent`; `RawKeyEvent.fromMessage` is
+  `RawKeyEventFromMessage(map[string]any)`; `RawKeyboard.instance` is the
+  variable `RawKeyboardInstance`. Files `raw_keyboard_{android,ios,linux,
+  windows}.dart` are `raw_keyboard_<p>_data.go` (Go reads the plain names
+  as GOOS build constraints).
+- flutter_test (keys): `KeyEventSimulator` is a package variable of
+  statics; `getKeyData(key, platform:, ...)` is `GetKeyData(key, platform,
+  GetKeyDataOptions{...})` returning an ordered map; `simulateKeyDown/Up/
+  RepeatEvent` are `SimulateKeyDownEvent(key, SimulateKeyEventOptions{...})`
+  returning `async.Future[bool]` (no TestAsyncUtils guard); an unhandled
+  key goes to `TestTextInput.HandleKeyDownEvent/UpEvent` (the macOS
+  `MacOSTestTextInputKeyHandler`) as in Dart. `WidgetController.sendKey*`
+  are `Tester.SendKeyEvent/Down/Up/Repeat`. `KeySimulatorTransitModeVariant`
+  is a plain struct (TestVariant is not ported). `flutter_test.New` sets
+  `FLUTTER_TEST` for the test, as `flutter test` does (defaultTargetPlatform
+  is android under it).
+- dart:core strings (`src/dart`): Dart's String operations on Go strings
+  read as WTF-8, at the UTF-16 level: `StringLength`, `CodeUnitAt`,
+  `Substring`, `ReplaceRange`, `StringCodeUnits`, `StringFromCharCodes`,
+  `StringFromCharCode`, `Concat` (Dart's `+`: Go's `+` of the two halves of
+  a split surrogate pair is not `==` to the pair; `Concat` joins them),
+  `StringToUpperCase`/`StringToLowerCase` (the VM's simple case mapping,
+  whose tables are older than Go's `unicode`), `StringHashCode` (the VM's
+  hash) and `NullHashCode`. `RegExp` is `*dart.RegExp` with Dart's matching
+  rules on UTF-16 code units (see `src/dart/regexp.go`; no look-around or
+  backreferences, which RE2's parser rejects); `Pattern` is `dart.Pattern`
+  (`dart.StringPattern` or `*dart.RegExp`) with `AllMatches`. Dart's
+  default Map is `dart.LinkedMap` (insertion order; int and integral double
+  keys merge). `Uri.encodeFull` is `dart.URIEncodeFull`, `Uri(path:).path`
+  `dart.URIPath`.
+- package:characters (`src/pub/characters`, 1.4.1): `Characters` and
+  `CharacterRange` are interfaces (`NewCharacters`, `NewCharacterRange`,
+  `NewCharacterRangeAt`); Dart's Iterable is `All()` plus the members the
+  package overrides; the extension `String.characters` is
+  `StringCharacters(s)`. Indices are UTF-16. widgets re-exports it (not
+  added to widgets yet).
+- services (text input): `TextEditingValue` is a comparable value
+  (`NewTextEditingValue(TextEditingValueOptions{...})`, nil selection or
+  composing: Dart's defaults; `TextEditingValueEmpty`; `==` is `Equal`;
+  `toJSON` is `ToJSON()` returning an ordered map). `TextInput` is a
+  private singleton whose statics are `TextInputAttach`,
+  `TextInputSetChannel` (a `TextInputChannel` interface, which
+  `*MethodChannel` implements), `TextInputSetInputControl`,
+  `TextInputRestorePlatformInputControl`, `TextInputEnsureInitialized`,
+  `TextInputUpdateEditingValue`, `TextInputFinishAutofillContext(opts)`,
+  `TextInputRegisterScribbleElement`/`Unregister...`,
+  `TextInputScribbleClients`. `TextInputClient`, `TextInputControl` and
+  `TextSelectionDelegate` are interfaces plus `...Mixin` structs with
+  Dart's default methods; controls compare with `==` (use pointers).
+  `TextInputConfiguration` is a value from `NewTextInputConfiguration(opts)`
+  (nil options: Dart's defaults; `HintLocales *[]ui.Locale` so an explicit
+  null differs from unset; `Equal` compares `HintLocales` by identity, as
+  Dart's List `==`; copyWith drops an autofill scope's configuration
+  type). `toJson` is `ToJSON()` (ordered: key order reaches the JSON bytes).
+  `TextInputType` has `*bool` flags and `Equal`; `TextInputType.url` is
+  `TextInputTypeURL`. `RawFloatingCursorPoint.startLocation` (a Dart
+  record) is `*FloatingCursorStartLocation`. `TextInputStyle`,
+  `SystemContextMenuController` and the titled
+  `IOSSystemContextMenuItemData...` are Diagnosticable pointers; their Dart
+  `title` field is `TitleText` (`Title()` is the nullable getter);
+  equality is `IOSSystemContextMenuItemDataEqual`; a custom item's
+  `HashCode`/`CallbackID` use flutter-go's identity hash of the closure (not
+  Dart's). `KeyboardInsertedContent.Equal` compares `Data` by identity.
+  `AutofillHints` is a variable of a struct of strings. `Clipboard` is a
+  variable of statics, `kTextPlain` `ClipboardKTextPlain`.
+  `TextEditingDelta` is an interface plus `TextEditingDeltaBase`; required
+  named parameters are positional. `updateEditingStateWithTag` visits tags
+  in sorted order (decoded JSON maps lose their order). flutter_test's
+  `TestTextInput` (no TestAsyncUtils guard) is the binding's
+  `TestTextInput()`.
+- services (formatters and boundaries): `TextBoundary` is an interface plus
+  `TextBoundaryBase` (self pattern; a subclass overrides
+  `GetTextBoundaryAt` or both of the others); positions are `*int` (nil is
+  null). Formatters' patterns are `dart.Pattern` values. `TextLayoutMetrics`
+  statics are `TextLayoutMetricsIsWhitespace`/`IsLineTerminator`.
+- services (assets): `AssetBundle` is an interface plus `AssetBundleBase`
+  (self pattern); `CachingAssetBundle` is embedded and `SetSelf`'d. The
+  generic `loadStructuredData<T>`/`loadStructuredBinaryData<T>` are the
+  erased methods `LoadStructuredDataAny`/`LoadStructuredBinaryDataAny`
+  plus the functions `AssetBundleLoadStructuredData[T]`/
+  `AssetBundleLoadStructuredBinaryData[T]`. `loadString`'s `cache:` is
+  `LoadStringOptions{NoCache}`. `rootBundle` is `RootBundle`.
+  `AssetManifest.loadFromAssetBundle` is `AssetManifestLoadFromAssetBundle`;
+  `AssetMetadata` is a struct literal (`*float64` dpr). `NetworkAssetBundle`
+  takes a `*url.URL` and runs on net/http on a goroutine (reading the body
+  at once).
+- services (restoration): `RestorationManager` is a struct embedding
+  `ChangeNotifierMixin`; a type extending it calls `Construct(self)`.
+  `handleRestorationUpdateFromEngine`'s required named parameters are
+  positional; `rootBucket` returns `Future[*RestorationBucket]`.
+  `RestorationBucket` is used by pointer (`NewRestorationBucketEmpty(id,
+  owner)`, `NewRestorationBucketRoot(manager, rawData)`,
+  `NewRestorationBucketChild(id, parent, owner)`); `read<P>` is `Read` (any)
+  or `RestorationBucketRead[P]`. Raw data and engine maps are
+  `*dart.LinkedMap` (their order reaches the engine's bytes).
+  flutter_test's covariant `restorationManager` is
+  `TestRestorationManager()`.
+- services (system): `SystemChrome`, `SystemNavigator`, `SystemSound`,
+  `HapticFeedback`, `DeferredComponent`, `BrowserContextMenu`,
+  `PlatformViewsService`, `UndoManager`, `Scribe` and `LiveText` are package
+  variables whose methods are the statics (created on first use, as Dart's
+  lazy statics). `SystemUiOverlayStyle` is Diagnosticable (pointer,
+  `NewSystemUiOverlayStyle(opts)`, `Equal`, `SystemUiOverlayStyleLight/
+  Dark`); `setEnabledSystemUIMode`'s overlays are
+  `SetEnabledSystemUIModeOptions{Overlays}`, `pop({animated})`
+  `SystemNavigatorPopOptions`, `routeInformationUpdated`
+  `RouteInformationUpdatedOptions{Location, URI *url.URL, State, Replace}`.
+  `FontLoader` is extended by embedding (override `LoadFont`). Compile-time
+  defines (`appFlavor`, `appBuildName/Number`, `FlutterVersion`) are set
+  with `-ldflags -X` on the `...Define` variables (nil: not defined).
+- services (platform views): `PlatformViewController` and
+  `AndroidViewController` are interfaces (Flutter's fakes implement them)
+  with `PlatformViewControllerBase`/`AndroidViewControllerBase`; the init
+  functions take positional required parameters and options
+  (`InitAndroidView(id, viewType, layoutDirection,
+  PlatformViewsServiceInitOptions{...})`, `InitUiKitView(...,
+  InitUiKitViewOptions{GestureBlockingPolicy})`). `platformViewsRegistry`
+  is `PlatformViewsRegistryInstance()`, `getNextPlatformViewId`
+  `GetNextPlatformViewID`. `textureId` is `TextureID() *int` (panics with
+  UnimplementedError under hybrid composition, as Dart throws);
+  `create({size, position})`/`rejectGesture({gestureId})` take options.
+  Messages use ordered maps. flutter_test's fake controllers are in
+  `flutter_test/fake_platform_views.go`.
+- services (mouse cursor, misc): `MouseCursor` and `MouseCursorSession` are
+  interfaces plus bases; `MouseCursor.defer/.uncontrolled` are
+  `MouseCursorDefer`/`MouseCursorUncontrolled`; `SystemMouseCursors.basic`
+  is `SystemMouseCursors.Basic`. `MouseTrackerAnnotation` is an interface
+  with `*MouseTrackerAnnotationBase` (`NewMouseTrackerAnnotation(opts)`).
+  `DefaultProcessTextService.queryTextActions` sorts actions by id (the
+  standard codec's decoded map loses the platform's order).
+  `async.CastFuture[R]` is Dart's implicit cast of a `Future<dynamic>` (no
+  extra microtask).
+- widgets (interim editing bridge; see PLAN "services, part 2"): `Intent`
+  is an interface (intent types embed `IntentBase`; actions are found by
+  the intent's dynamic type, `IntentType`/`IntentTypeOf[T]`); intents are
+  comparable values with positional required parameters
+  (`NewExtendSelectionByCharacterIntent(forward, collapseSelection)`).
+  `Action` is an interface plus `ActionBase`; `CallbackAction[T]`,
+  `DoNothingAction`. `SingleActivator` is a comparable value (Dart's
+  canonical const instance; `includeRepeats` is `ExcludeRepeats` negated so
+  the zero value is the default); a Dart `Map<ShortcutActivator, Intent>`
+  literal is a `ShortcutMap` whose `NonConst` entries (a `new`
+  SingleActivator in a collection-for) never replace an equal key, as Dart
+  compares those by identity. `ShortcutManager.handleKeypress` takes the
+  action lookup (Actions.maybeFind). `DefaultTextEditingShortcuts`' maps are
+  `DefaultTextEditingShortcutsShortcuts()`/`...DisablingShortcuts()` and
+  its two Shortcuts' handlers `DefaultTextEditingShortcutsHandlers`.
+  `KeyEventResult`, `combineKeyEventResults` and FocusManager's
+  `handleKeyMessage` (`BuildOwner.HandleKeyMessage` over the interim
+  focus) are ported; FocusNode/Shortcuts/Actions widgets are not.

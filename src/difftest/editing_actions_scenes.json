@@ -1,4 +1,307 @@
 {
+ "select_ops": [
+  {
+   "reset": "a\ud83d\udc4d\ud83c\udffdb c"
+  },
+  {
+   "select": [
+    2,
+    2
+   ]
+  },
+  {
+   "key": "delete"
+  },
+  {
+   "reset": "a\ud83d\udc4d\ud83c\udffdb c"
+  },
+  {
+   "select": [
+    4,
+    4
+   ]
+  },
+  {
+   "key": "delete"
+  },
+  {
+   "reset": "a\ud83d\udc4d\ud83c\udffdb c"
+  },
+  {
+   "select": [
+    2,
+    2
+   ]
+  },
+  {
+   "key": "backspace"
+  },
+  {
+   "reset": "a\ud83d\udc4d\ud83c\udffdb c"
+  },
+  {
+   "select": [
+    4,
+    4
+   ]
+  },
+  {
+   "key": "backspace"
+  },
+  {
+   "reset": "a\ud83d\udc4d\ud83c\udffdb c"
+  },
+  {
+   "select": [
+    6,
+    1
+   ]
+  },
+  {
+   "key": "arrowRight"
+  },
+  {
+   "reset": "a\ud83d\udc4d\ud83c\udffdb c"
+  },
+  {
+   "select": [
+    4,
+    4
+   ],
+   "affinity": "upstream"
+  },
+  {
+   "select": [
+    4,
+    4
+   ]
+  },
+  {
+   "key": "arrowLeft"
+  },
+  {
+   "select": [
+    1,
+    1
+   ],
+   "affinity": "upstream"
+  },
+  {
+   "key": "delete"
+  },
+  {
+   "reset": "a\ud83d\udc4d\ud83c\udffdb c"
+  },
+  {
+   "select": [
+    0,
+    5
+   ]
+  },
+  {
+   "type": "z"
+  },
+  {
+   "reset": "a\ud83d\udc4d\ud83c\udffdb c"
+  },
+  {
+   "select": [
+    5,
+    0
+   ]
+  },
+  {
+   "key": "backspace",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "reset": "a\ud83d\udc4d\ud83c\udffdb c"
+  },
+  {
+   "select": [
+    1,
+    1
+   ]
+  },
+  {
+   "key": "arrowRight",
+   "mods": [
+    "shift"
+   ]
+  },
+  {
+   "reset": "a\ud83d\udc4d\ud83c\udffdb c"
+  },
+  {
+   "select": [
+    8,
+    8
+   ],
+   "affinity": "upstream"
+  },
+  {
+   "key": "arrowLeft",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "reset": "a\ud83d\udc4d\ud83c\udffdb c"
+  },
+  {
+   "select": [
+    3,
+    3
+   ]
+  },
+  {
+   "key": "arrowRight"
+  },
+  {
+   "reset": "a\ud83d\udc4d\ud83c\udffdb c"
+  },
+  {
+   "select": [
+    3,
+    3
+   ]
+  },
+  {
+   "key": "arrowLeft"
+  }
+ ],
+ "mac_transpose_edge": [
+  {
+   "type": "x"
+  },
+  {
+   "key": "keyT",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "type": "y"
+  },
+  {
+   "key": "arrowLeft",
+   "mods": [
+    "meta"
+   ]
+  },
+  {
+   "key": "keyT",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "key": "arrowRight"
+  },
+  {
+   "key": "keyT",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "select": [
+    0,
+    2
+   ]
+  },
+  {
+   "key": "keyT",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "select": [
+    1,
+    1
+   ],
+   "affinity": "upstream"
+  },
+  {
+   "key": "keyE",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "key": "keyA",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "select": [
+    1,
+    1
+   ]
+  },
+  {
+   "key": "arrowRight",
+   "mods": [
+    "shift",
+    "meta"
+   ]
+  },
+  {
+   "select": [
+    2,
+    0
+   ]
+  },
+  {
+   "key": "arrowRight",
+   "mods": [
+    "shift",
+    "meta"
+   ]
+  },
+  {
+   "select": [
+    2,
+    0
+   ]
+  },
+  {
+   "key": "end",
+   "mods": [
+    "shift"
+   ]
+  },
+  {
+   "select": [
+    2,
+    1
+   ]
+  },
+  {
+   "key": "arrowLeft",
+   "mods": [
+    "shift",
+    "meta"
+   ]
+  },
+  {
+   "select": [
+    0,
+    1
+   ]
+  },
+  {
+   "key": "arrowLeft",
+   "mods": [
+    "shift",
+    "meta"
+   ]
+  }
+ ],
  "docs": [
   {
    "type": "foo, bar... baz! qux"
@@ -296,6 +599,52 @@
   },
   {
    "key": "keyC",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "key": "arrowLeft",
+   "mods": [
+    "shift",
+    "control"
+   ]
+  },
+  {
+   "key": "keyV",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "key": "home"
+  },
+  {
+   "key": "arrowRight",
+   "mods": [
+    "shift"
+   ]
+  },
+  {
+   "key": "arrowRight",
+   "mods": [
+    "shift"
+   ]
+  },
+  {
+   "key": "keyV",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "select": [
+    4,
+    1
+   ]
+  },
+  {
+   "key": "keyV",
    "mods": [
     "control"
    ]

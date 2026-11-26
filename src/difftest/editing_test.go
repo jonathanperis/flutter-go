@@ -19,6 +19,11 @@ type editOp struct {
 	Type *string  `json:"type"`
 	Key  string   `json:"key"`
 	Mods []string `json:"mods"`
+	// Select (editing_actions only) is a selection change from the
+	// platform: [base, extent] with Affinity.
+	Select   []int   `json:"select"`
+	Affinity string  `json:"affinity"`
+	Reset    *string `json:"reset"`
 }
 
 var editKeys = map[string]services.LogicalKeyboardKey{

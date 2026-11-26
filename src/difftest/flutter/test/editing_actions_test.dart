@@ -5,7 +5,9 @@
 // shortcuts. Scenes are read from ../editing_actions_scenes.json (shared
 // with Go); a scene's prefix (mac_, ios_, linux_, windows_) selects the
 // platform, android otherwise. Typing is delivered the way a platform
-// keyboard does (TextInput's updateEditingValue); every other key is
+// keyboard does (TextInput's updateEditingValue), and so are selection
+// changes (select: [base, extent], affinity) and whole new values
+// (reset: text, caret at the end); every other key is
 // simulated (on macOS the keys the framework leaves to the platform come
 // back as selectors from flutter_test's macOS key handler). The clipboard is
 // mocked on flutter/platform. After each step we record [text, baseOffset,
@@ -113,7 +115,23 @@ void main() {
       final List<List<Object>> samples = <List<Object>>[];
       for (final dynamic op in scene.value as List<dynamic>) {
         final Map<String, dynamic> o = op as Map<String, dynamic>;
-        if (o.containsKey('type')) {
+        if (o.containsKey('reset')) {
+          final String text = o['reset'] as String;
+          tester.testTextInput.updateEditingValue(
+            TextEditingValue(text: text, selection: TextSelection.collapsed(offset: text.length)),
+          );
+        } else if (o.containsKey('select')) {
+          final List<dynamic> sel = o['select'] as List<dynamic>;
+          tester.testTextInput.updateEditingValue(
+            controller.value.copyWith(
+              selection: TextSelection(
+                baseOffset: sel[0] as int,
+                extentOffset: sel[1] as int,
+                affinity: o['affinity'] == 'upstream' ? TextAffinity.upstream : TextAffinity.downstream,
+              ),
+            ),
+          );
+        } else if (o.containsKey('type')) {
           final TextEditingValue v = controller.value;
           final String text =
               v.selection.textBefore(v.text) + (o['type'] as String) + v.selection.textAfter(v.text);
