@@ -691,3 +691,76 @@ Each divergence is listed here when it is introduced.
   `double.compareTo`, `String.compareTo` (UTF-16 code units) and
   `double.tryParse` are `dart.CompareDoubles`, `dart.CompareStrings`,
   `dart.DoubleTryParse`.
+- gestures: `PointerEvent` is an interface; each event class is a struct
+  used by pointer (`*PointerDownEvent`), so `event is PointerDownEvent` is
+  a type switch. Dart's `_TransformedPointerXEvent` wrappers are values of
+  the same struct with `Original()` set (so the switch matches them too);
+  only `ToStringShort`/`toString` show the `_Transformed...` name.
+  `copyWith` is `CopyWith(PointerEventCopyWithOptions)` and `transformed`
+  is `Transformed(*Matrix4)`, both returning `PointerEvent` (no covariant
+  returns). Constructors take per-class options whose non-zero Dart
+  defaults are pointers (`Buttons`, `Pressure`, `PressureMin/Max`, signal
+  events' `Kind`, `Scale`). `PointerSignalEvent` is an interface.
+  PointerEvent's statics are functions (`PointerEventTransformPosition`,
+  `PointerEventTransformDeltaViaPositions`, `ComputeHitSlop`...).
+- gestures: hit_test.dart is `hittest.go` and dart:ui's onHitTest is
+  `platform_dispatcher_hittest.go` (a `_test.go` name would make them test
+  files). `HitTestEntry` is an interface plus `HitTestEntryBase`
+  (`NewHitTestEntry`, `InitHitTestEntry` for subclasses); `HitTestEntry(t)`
+  prints `HitTestEntry<HitTestTarget>` as Flutter's does; `Path()` is an
+  `iter.Seq`. `PointerEventConverter.expand` is
+  `PointerEventConverterExpand(iter.Seq[ui.PointerData], getter)`, lazy as
+  Dart's Iterable; `DevicePixelRatioGetter` returns `*float64` (nil: the
+  view is gone). `PointerRouter.addRoute`'s optional transform is
+  variadic; routes compare with `dart.FunctionsEqual`.
+- gestures: `GestureArenaEntry` is an interface (team.dart implements it);
+  `GestureArenaMember` is an interface.
+- gestures: the recognizer classes are interfaces plus embeddable bases
+  (`GestureRecognizer` + `GestureRecognizerBase`,
+  `OneSequenceGestureRecognizer` + `...Base`,
+  `PrimaryPointerGestureRecognizer` + `...Base`); a recognizer embeds the
+  base of its Dart superclass (or the concrete recognizer it extends) and
+  calls `Construct(self, options)` once (Dart's super constructor); every
+  overridable method goes through `self`, and overrides call "super"
+  through the embedded field. Public mutable fields (`GestureSettings`,
+  `SupportedDevices`, callbacks such as `OnTap`, `OnStart`) are struct
+  fields; @protected methods are exported. The generic
+  `invokeCallback<T>` is `InvokeCallback[T](recognizer, name, callback,
+  debugReport...)` (T's zero value is Dart's null result) and
+  `InvokeVoidCallback`. `PrimaryPointerGestureRecognizer`'s slop
+  tolerances are `*float64` options whose nil is Dart's default (the touch
+  slop); `NoPreAcceptSlopTolerance`/`NoPostAcceptSlopTolerance` pass
+  Dart's explicit null.
+- gestures: `GestureBinding` is a binding mixin (see "Bindings"); its
+  public fields `pointerRouter`, `gestureArena`, `pointerSignalResolver`
+  are methods, `resamplingEnabled`/`samplingOffset` are getter/setter
+  pairs. `SamplingClock` is an interface (`Now`, `Stopwatch()
+  *dart.Stopwatch`); the velocity trackers read
+  `GestureBinding.instance.samplingClock` through a hook GestureBinding
+  sets in InitInstances (the wall clock without a binding).
+  `FlutterError.reportError` takes `*foundation.FlutterErrorDetails`, so
+  `details is FlutterErrorDetailsForPointerEventDispatcher` is
+  `gestures.AsFlutterErrorDetailsForPointerEventDispatcher(details)`.
+  Only the implicit view exists: the device pixel ratio of any other view
+  id is unknown (null).
+- gestures: `VelocityTracker` is a struct the iOS/macOS trackers embed
+  (self pattern); `getVelocityEstimate` returns `*VelocityEstimate` (nil:
+  null). `Velocity`, `VelocityEstimate`, `DeviceGestureSettings` and
+  `OffsetPair` are comparable values. Drag/scale details are used by
+  pointer and built with `NewXDetails(XDetailsOptions{...})` (nil options:
+  Dart's defaults; `ScaleEndDetails`'s `Velocity` defaults to the zero
+  value, which is `VelocityZero`). `pointerCount` is `PointerCount()`.
+- dart:ui (pointer.dart, key.dart): enums with `Name()`/`String()` and
+  `...Values`; `PointerData` is a struct literal (`SignalKind` is a
+  pointer; nil is null); `PlatformDispatcher.onPointerDataPacket`/
+  `onKeyData`/`onHitTest` are getter/setter pairs; the engine side is
+  `PlatformConfiguration.DispatchPointerDataPacket(bytes)` and
+  `PlatformConfiguration.HitTest(viewID, x, y)`. ENGINE GAP: views have no
+  metrics: the device pixel ratio is 1.0 and the gesture settings empty
+  unless an embedder sets them with
+  `PlatformConfiguration.UpdateViewGestureMetrics` (a stand-in for
+  `_updateWindowMetrics`).
+- flutter_test: `TestPointer` is ported (`NewTestPointer(opts)`, events'
+  named parameters as options); `TestGesture` is not. The gesture tests'
+  helper `testGesture`/`GestureTester` (test/gestures/gesture_tester.dart)
+  is `flutter_test.RunTestGesture`/`GestureTester`.
