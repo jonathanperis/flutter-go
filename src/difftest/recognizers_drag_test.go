@@ -256,6 +256,9 @@ func TestRecognizersDragMatchesFlutter(t *testing.T) {
 						p = int(f)
 					}
 				}
+				if op[0] != "transform" {
+					rdlog("> " + op[0].(string) + " " + strconv.Itoa(p))
+				}
 				switch op[0] {
 				case "transform":
 					var m []float64

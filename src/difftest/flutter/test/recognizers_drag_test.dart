@@ -177,6 +177,9 @@ void main() {
         for (final Object? opObject in scene['ops']! as List<Object?>) {
           final op = opObject! as List<Object?>;
           final p = op.length > 1 && op[1] is int ? op[1]! as int : 0;
+          if (op[0] != 'transform') {
+            log.add('> ${op[0]} $p');
+          }
           switch (op[0]) {
             case 'transform':
               final List<double> m = (op[1]! as List<Object?>).map(d).toList();
