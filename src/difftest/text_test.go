@@ -213,6 +213,7 @@ func paragraphStyleFrom(p map[string]any) *ParagraphStyle {
 			LeadingDistribution: textEnum(TextLeadingDistributionValues, m["leadingDistribution"]),
 			Leading:             textD(m["leading"]),
 		}
+		so.FontFamilyFallback = textStrings(m["fontFamilyFallback"])
 		if f, ok := m["fontFamily"]; ok {
 			so.FontFamily = ptr(f.(string))
 		}
@@ -372,6 +373,12 @@ func dumpParagraph(p Paragraph, length int) map[string]any {
 
 var textFontsLoaded bool
 
+// textLateFont is the lateFont case, computed once per process.
+var (
+	textLateLoaded bool
+	textLateFont   []any
+)
+
 // loadTextFonts loads the difftest's fonts once (as the Dart side does at
 // the start of its run); their fontsChange messages go to a listener, as
 // flutter_test's binding takes them.
@@ -429,7 +436,7 @@ func textAPICases() map[string]any {
 	out["fontWeight.odd"] = textStringsOf(NewFontWeight(1), NewFontWeight(450), NewFontWeight(1000))
 	out["fontWeight.index"] = []any{NewFontWeight(1).Index(), NewFontWeight(450).Index(), NewFontWeight(1000).Index()}
 	lerps := []any{}
-	for _, t := range []float64{-1, 0, 0.25, 0.5, 0.55, 1, 2} {
+	for _, t := range []float64{-1, 0, 0.25, 0.5, 0.55, 1, 2, 1.0 / 3, 0.123, 0.6789} {
 		lerps = append(lerps, textNullable(FontWeightLerp(&FontWeightW100, &FontWeightW900, t))+"|"+
 			textNullable(FontWeightLerp(nil, &FontWeightW100, t))+"|"+textNullable(FontWeightLerp(&FontWeightW300, nil, t))+"|"+
 			textNullable(FontWeightLerp(nil, nil, t)))
@@ -731,6 +738,30 @@ func textCases(t *testing.T) map[string]any {
 		p.Dispose()
 		out["scene."+scene["name"].(string)] = perWidth
 	}
+	lateWidth := func() float64 {
+		b := NewParagraphBuilder(NewParagraphStyle())
+		b.PushStyle(NewTextStyle(TextStyleOptions{FontFamily: ptr("LateFamily"), FontSize: ptr(20.0)}))
+		b.AddText("late font")
+		p := b.Build()
+		p.Layout(NewParagraphConstraints(1000))
+		w := p.MaxIntrinsicWidth()
+		p.Dispose()
+		return w
+	}
+	if !textLateLoaded {
+		before := lateWidth()
+		data, err := os.ReadFile("../../engine/src/flutter/txt/third_party/fonts/Roboto-Regular.ttf")
+		if err != nil {
+			t.Fatal(err)
+		}
+		ChannelBuffersInstance().SetListener("flutter/system", func([]byte, PlatformMessageResponseCallback) {})
+		LoadFontFromList(data, LoadFontFromListOptions{FontFamily: ptr("LateFamily")})
+		async.Current().FlushMicrotasks()
+		ChannelBuffersInstance().ClearListener("flutter/system")
+		textLateFont = []any{before, lateWidth()}
+		textLateLoaded = true
+	}
+	out["lateFont"] = textLateFont
 	for k, v := range textAPICases() {
 		out[k] = v
 	}

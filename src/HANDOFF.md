@@ -122,9 +122,8 @@ Start here when continuing flutter-go in a new session.
      codecs and decoding (Go decoders), FragmentProgram/FragmentShader
      (impellerc runtime stages). src/app records frames with
      ui.PictureRecorder/ui.Canvas and presents with dart:ui's Impeller
-     context. Next for it: text.dart (Paragraph; Canvas.drawParagraph is
-     `ui.EngineDrawParagraph` for now) and compositing.dart (Scene,
-     SceneBuilder, EngineLayers); then move rendering off its interim
+     context. Next for it: compositing.dart (Scene, SceneBuilder,
+     EngineLayers; text.dart is done, item 11); then move rendering off its interim
      `rendering.Canvas` onto ui.Canvas (painting library: BoxPainter,
      decorations, image providers). ENGINE GAPs to revisit: Path.combine
      (Skia PathOps — the Flutter SDK's prebuilt libpath_ops.dylib exposes
@@ -134,6 +133,19 @@ Start here when continuing flutter-go in a new session.
   10. Split `services` (text-editing model under non-Flutter names) by
      library; RendererBinding/PaintingBinding/WidgetsBinding into the
      bindings as their libraries are ported.
+  11. Done (P1): dart:ui text.dart in full (styles, Paragraph,
+     ParagraphBuilder, placeholders, loadFontFromList,
+     Canvas.drawParagraph) on the engine's own txt/SkParagraph inside the
+     Impeller SDK, reached through its vtables (`src/impeller/
+     txt_mirror.h`, `typography_bridge.cc`: re-check the mirrors whenever
+     IMPELLER_SHA moves — `go test ./src/impeller` does). flutter_tester's
+     test fonts are `ui.EngineUseTestFonts()`; flutter_test's tester and
+     src/app lay text out with `rendering.UITextEngine` (ui.Paragraph),
+     `FixedTextEngine` is left for benchmarks. Next for it: painting's
+     TextPainter/TextSpan/StrutStyle/TextStyle on ui.ParagraphBuilder (the
+     painting agent), then drop rendering's interim text engine;
+     loadFontFromList's family names are case-sensitive (the engine
+     lowercases them; see API_MAPPING).
 
 ## Environment
 

@@ -58,7 +58,7 @@ func TestFontWeightLerpReturnsW400IfBIsNull(t *testing.T) {
 func TestFontWeightsHaveTheCorrectValue(t *testing.T) {
 	for i, w := range []FontWeight{FontWeightW100, FontWeightW200, FontWeightW300, FontWeightW400, FontWeightW500,
 		FontWeightW600, FontWeightW700, FontWeightW800, FontWeightW900} {
-		eq(t, w.String(), w.Value(), (i+1)*100)
+		eq(t, w.String(), w.Value, (i+1)*100)
 	}
 }
 

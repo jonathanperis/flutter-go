@@ -806,7 +806,7 @@ Each divergence is listed here when it is introduced.
   event of the current loop. Engine hooks: `ui.EngineImpellerContext()`
   (the process's Impeller context), `ui.EnginePictureDisplayList(p)`,
   `ui.EngineDevicePixelRatio` (drawShadow), `ui.EngineAssetLoader`
-  (assets), `ui.EngineDrawParagraph` (until Paragraph is ported). ENGINE
+  (assets); `Canvas.DrawParagraph` is text.dart's (see below). ENGINE
   GAPs: see PLAN.md "dart:ui drawing over Impeller".
 - dart:ui Path: used by pointer (`ui.NewPath()`, `Path.from` →
   `NewPathFrom`, `Path.combine` → `PathCombine`); `Float64List matrix4` is
@@ -835,3 +835,56 @@ Each divergence is listed here when it is introduced.
   runtime-stage bundles through `ui.EngineAssetLoader`; `ImageFilter.shader`
   is `NewImageFilterShader`. ENGINE GAPs: the SDK samples shader samplers
   linearly and the filter input nearest, whatever the FilterQuality.
+- dart:ui text (text.dart): the enums (`FontStyle`, `TextAlign`,
+  `Hyphens`, `TextBaseline`, `TextDecorationStyle`,
+  `TextLeadingDistribution`, `BoxHeightStyle`, `BoxWidthStyle`,
+  `PlaceholderAlignment`) have `Name()`/`String()` and `...Values`.
+  `FontWeight`, `FontFeature`, `FontVariation`, `TextDecoration`,
+  `TextHeightBehavior`, `GlyphInfo`, `TextBox`, `LineMetrics` and
+  `ParagraphConstraints` are comparable values (Dart's `==` is Go's);
+  `FontWeight(v)` is `NewFontWeight(v)` and its statics `FontWeightW100`
+  ... `FontWeightBold`/`FontWeightValues`; `FontWeight.lerp` and
+  `FontVariation.lerp` take and return pointers (nil is null). The named
+  constructors are `NewFontFeatureTabularFigures()`,
+  `NewFontVariationWeight(v)`...; optional positional arguments are
+  variadic (`NewFontFeature(tag, value...)`, `NewFontFeatureSwash(v...)`),
+  `localeAware({enable})` takes `FontFeatureLocaleAwareOptions`.
+  `TextHeightBehavior(...)` is `NewTextHeightBehavior(TextHeightBehaviorOptions{...})`
+  (nil bools are Dart's `true`). `TextDecoration.combine` is
+  `TextDecorationCombine`. `kTextHeightNone` is `KTextHeightNone`.
+- dart:ui text styles: `TextStyle`, `ParagraphStyle` and `StrutStyle` are
+  used by pointer, built with `NewTextStyle(TextStyleOptions{...})` etc.
+  (nullable arguments are pointers; nil slices are null, so an empty
+  `[]Shadow{}` is a non-null empty list); `==` is `Equal` (paints compare
+  by identity, as Dart's `Paint` has no `==`); `StrutStyle` prints Dart's
+  `Instance of 'StrutStyle'`. As in Dart, pushing a `TextStyle` records the
+  paragraph's leading distribution in the style's encoding, and building a
+  paragraph with a `StrutStyle` records it in the strut's (both change
+  `==` afterwards).
+- dart:ui `Paragraph` and `ParagraphBuilder` are interfaces (Flutter's
+  tests implement them); `NewParagraphBuilder(style)` returns the
+  engine's. `getBoxesForRange`'s named arguments are
+  `GetBoxesForRangeOptions` (zero values: tight), `addPlaceholder`'s are
+  `AddPlaceholderOptions` (nil `Scale`: 1.0). Nullable results are
+  pointers: `GetGlyphInfoAt`, `GetClosestGlyphInfoForOffset`,
+  `GetLineMetricsAt` (`*LineMetrics`), `GetLineNumberAt` (`*int`). Integer
+  arguments reach the engine as Dart passes them to its `Uint32` natives
+  (mod 2^32: `getWordBoundary` upstream at offset 0 asks for
+  4294967295). Native calls after `build()`/`dispose()` panic with the
+  `dart.StateError` the cleared Dart wrapper throws.
+  `loadFontFromList(list, {fontFamily})` is
+  `LoadFontFromList(list, LoadFontFromListOptions{FontFamily})`, returning
+  `async.Future[async.Void]` and sending the `fontsChange` system message.
+  `Canvas.drawParagraph` is `Canvas.DrawParagraph(paragraph, offset)`.
+  Engine hook: `ui.EngineUseTestFonts()` is flutter_tester's
+  `--use-test-fonts` (FlutterTest for every family but Ahem and Cough, no
+  font fallback); flutter_test's tester calls it. Without it, text uses the
+  platform's fonts with fallback (src/app).
+- dart:ui text engine: the paragraphs are the engine's own (txt over
+  SkParagraph/HarfBuzz/ICU) compiled into the Impeller SDK, reached through
+  the SDK's objects' vtables (`src/impeller/txt_mirror.h`,
+  `typography_bridge.cc`, which ports lib/ui/text's natives). Divergences:
+  fonts loaded with `loadFontFromList` are matched by their exact family
+  name (the engine's dynamic font manager lowercases ASCII names); the
+  builder's `impeller_enabled` flag is always true (it only selects the
+  painting path).

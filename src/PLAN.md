@@ -1739,3 +1739,104 @@ The standing goal is now full API parity with Flutter 3.50.1's Dart layer
   ran for 8 s with no errors (window opened; screenshots don't work on
   this machine, so the pixels were not inspected on screen — the offscreen
   pixel difftest covers rendering).
+
+### dart:ui text (P1): text.dart on the engine's own SkParagraph
+
+- **Scope.** Every declaration of text.dart: FontStyle, FontWeight,
+  FontFeature (all named constructors), FontVariation, GlyphInfo,
+  TextAlign, Hyphens, TextBaseline, TextDecoration, TextDecorationStyle,
+  TextLeadingDistribution, TextHeightBehavior, TextStyle/ParagraphStyle/
+  StrutStyle with their encodings, toString and ==, TextBox,
+  ParagraphConstraints, BoxHeightStyle/BoxWidthStyle,
+  PlaceholderAlignment, LineMetrics, Paragraph (every query),
+  ParagraphBuilder (styles, placeholders and their scales),
+  loadFontFromList (with the fontsChange message), and
+  Canvas.drawParagraph (the `ui.EngineDrawParagraph` stand-in is gone).
+  TextSelection and FontLoader are services', not dart:ui's. dart:ui parity
+  133 → 158 of 195 (no text.dart name missing).
+- **How it maps to the engine.** The SDK's typography C API is a small
+  subset (no boxes, positions, placeholders, strut, spacing, shadows,
+  features or variations), but its ImpellerParagraphBuilder and
+  ImpellerParagraph hold the engine's txt::ParagraphBuilder and
+  txt::Paragraph — abstract classes whose every method is virtual — over
+  SkParagraph, HarfBuzz and ICU compiled into libimpeller.dylib. So the
+  bridge (`src/impeller/typography_bridge.cc`) declares layout mirrors of
+  the engine headers at the pinned revision (`txt_mirror.h`: txt's
+  TextStyle/ParagraphStyle/LineMetrics, Skia's GlyphInfo/LineMetrics,
+  DlPaint, the interop objects) and calls through the vtables: no hidden
+  symbol, no copied engine code, and the layout is exactly flutter_tester's
+  (the same code). The builder is the SDK's: the encoded ParagraphStyle
+  is written into an ImpellerParagraphStyle's txt::ParagraphStyle, pushed
+  once to make the SDK create its ParagraphBuilderSkia, and popped
+  (SkParagraph's builder is then in its constructor's state: one empty
+  block with the paragraph's text style — checked in
+  ParagraphBuilderImpl.cpp). lib/ui/text's natives (paragraph_builder.cc's
+  decoding of the Dart encodings, paragraph.cc's result encodings) are
+  ported in the bridge; text.dart is Go. The SDK's libc++ (`std::__fl`,
+  LLVM 21) has the system libc++'s object layout and both allocate with
+  malloc/free, so strings, vectors, maps and optionals cross the boundary;
+  a self-test reads values set through the SDK's public setters back
+  through the mirrors (`go test ./src/impeller`).
+- **flutter_tester's fonts.** `flutter test` runs flutter_tester with
+  --use-test-fonts: FlutterTest, Ahem and Cough (extracted from
+  runtime/test_font_data.cc by `src/cmd/gentestfonts`; kCoughFont's array
+  holds 4 bytes more than its declared length, which is what the engine
+  streams) are registered in a second typography context, and
+  txt::TestFontManager (any other family → FlutterTest) is reimplemented
+  as an SkFontMgr subclass over its provider (Skia's SkFontMgr vtable at
+  the pinned revision, with the new onMatch/onFallback), placed in the
+  font collection's test slot with fallback disabled.
+  `ui.EngineUseTestFonts()` turns it on; flutter_test's tester does.
+- **Difftest (text, exact).** 65 scenes from `difftest/text_scenes.json`
+  (shared with Dart), 90 layouts: FlutterTest (wrapping, newlines,
+  trailing spaces, RTL Hebrew and bidi, emoji ZWJ/flags/skin tones,
+  combining marks, CJK with a supplementary char, tabs, mixed sizes,
+  letter/word spacing incl. negative, height/kTextHeightNone/even leading,
+  TextHeightBehavior, struts (forced, not forced, leading only, fallback family, Ahem), an empty paragraph whose last style resets the height, placeholders on the baseline with the default offset, maxLines, ellipsis incl.
+  RTL, all alignments, every placeholder alignment and scale, soft hyphens
+  with both Hyphens, Ahem/Cough/unknown families, locales) and real fonts
+  (Roboto: ligatures on/off, tnum/smcp, kerning with spacing, bold/italic
+  mixes, strut, ellipsis, placeholders, justify; Noto Naskh Arabic RTL and
+  mixed; Roboto Slab's wght axis via fontVariations and fontWeight). Each
+  layout dumps the metrics, line metrics (computeLineMetrics and
+  getLineMetricsAt −1..n), getLineNumberAt −1..n+1, boxes of every
+  one-unit range and of 4 ranges × 12 height/width styles, placeholder
+  boxes, getGlyphInfoAt −1..n, positions and closest glyphs on a grid,
+  word and line boundaries at every offset with both affinities. Plus 37
+  API cases (incl. a family resolved before a font of that name is loaded: loading clears the caches) (toString/== matrices of TextStyle/ParagraphStyle/StrutStyle,
+  the encodings' mutation by pushStyle/build, FontWeight/FontVariation
+  lerps, every FontFeature constructor, errors: asserts, malformed UTF-16,
+  native calls after build/dispose, drawParagraph's checks). Matched on
+  the first run. Flutter plain and --enable-impeller write byte-identical
+  references (the layout is SkParagraph's on both); Go checks both.
+- **Difftest (pixels).** 16 drawParagraph scenes against flutter_tester
+  --enable-impeller: 12 bit-exact (FlutterTest glyphs at integer and
+  fractional offsets, colors with alpha, background, shadow, gradient and
+  stroked foregrounds through the copied DlPaint, RTL ellipsis, Roboto at
+  20 and 9 px, no pushed style), a blurred shadow within 1; decorations differ on one anti-aliased row (one MSAA
+  sample, as lines in painting_pixels), rotated glyphs by ≤13 on edges.
+- **Moved onto ui.Paragraph:** flutter_test's tester and src/app lay text
+  out with `rendering.UITextEngine` (dart:ui ParagraphBuilder; test fonts in
+  tests), replacing the ad-hoc FixedTextEngine and the SDK-API paragraphs;
+  every widget/editing/scene difftest still passes unchanged.
+- **Mutations.** 65 (Go encodings/equality/toString/lerps, the builder
+  and paragraph wrappers, and the C++ bridge's decoding, test font
+  manager and cache clearing): 61 caught. Eight were first missed and
+  caught after adding cases (strut forceStrutHeight false, strut with only
+  leading, strut fallback families, the placeholder's default baseline
+  offset, shadow blur sigma, FontWeight.lerp rounding, kTextHeightNone's
+  height override — visible only in an empty paragraph — and the font
+  cache clearing). 4 equivalent: StrutStyle == on the view instead of
+  the whole buffer (the bytes past the view are always zero); the
+  `offset == line.end` term of getLineBoundary's downstream rule (implied
+  by the other two); the strut's default `""` family (with test fonts an
+  empty family list resolves to FlutterTest too); the initial pop of the
+  style the SDK's builder needs (its style equals the base style; it only
+  differs for unbalanced pops, which are undefined in the engine). A first
+  run filled the disk (each mutation of a cgo file adds a build of every
+  dependent package): the mutation helper now cleans the build cache
+  below 15 GB free.
+- **Divergences:** families loaded with loadFontFromList are matched
+  exactly (the engine's dynamic font manager lowercases ASCII names); the
+  builder's impeller flag is always set (it selects the painting path
+  only).

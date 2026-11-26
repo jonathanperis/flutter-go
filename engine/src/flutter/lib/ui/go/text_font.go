@@ -39,23 +39,21 @@ func (s FontStyle) String() string { return "FontStyle." + s.Name() }
 // FontWeight is the thickness of the glyphs used to draw the text (a value
 // from 1 to 1000). Compare with ==.
 type FontWeight struct {
-	value int
+	// Value is the thickness value of this font weight.
+	Value int
 }
 
 // NewFontWeight is FontWeight(value) (1 ≤ value ≤ 1000).
 func NewFontWeight(value int) FontWeight {
 	dartAssert(value >= 1, "Font weight must be between 1 and 1000")
 	dartAssert(value <= 1000, "Font weight must be between 1 and 1000")
-	return FontWeight{value: value}
+	return FontWeight{Value: value}
 }
-
-// Value is the thickness value of this font weight.
-func (w FontWeight) Value() int { return w.value }
 
 // Index is the encoded integer value of this font weight (deprecated:
 // value is more precise).
 func (w FontWeight) Index() int {
-	i := w.value/100 - 1
+	i := w.Value/100 - 1
 	return min(max(i, 0), 8)
 }
 
@@ -89,12 +87,12 @@ func FontWeightLerp(a, b *FontWeight, t float64) *FontWeight {
 	if a == nil && b == nil {
 		return nil
 	}
-	av, bv := FontWeightNormal.value, FontWeightNormal.value
+	av, bv := FontWeightNormal.Value, FontWeightNormal.Value
 	if a != nil {
-		av = a.value
+		av = a.Value
 	}
 	if b != nil {
-		bv = b.value
+		bv = b.Value
 	}
 	v := int(math.Round(lerpInt(av, bv, t)))
 	w := NewFontWeight(min(max(v, 100), 900))
@@ -102,8 +100,8 @@ func FontWeightLerp(a, b *FontWeight, t float64) *FontWeight {
 }
 
 func (w FontWeight) String() string {
-	if w.value%100 != 0 {
-		return "FontWeight(" + strconv.Itoa(w.value) + ")"
+	if w.Value%100 != 0 {
+		return "FontWeight(" + strconv.Itoa(w.Value) + ")"
 	}
 	return "FontWeight.w" + strconv.Itoa((w.Index()+1)*100)
 }

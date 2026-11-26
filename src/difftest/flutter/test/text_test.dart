@@ -128,6 +128,7 @@ ParagraphStyle paragraphStyle(Map<String, Object?> p) {
         ? null
         : StrutStyle(
             fontFamily: strut['fontFamily'] as String?,
+            fontFamilyFallback: (strut['fontFamilyFallback'] as List<Object?>?)?.cast<String>(),
             fontSize: d(strut['fontSize']),
             height: d(strut['height']),
             leadingDistribution: enumOf(TextLeadingDistribution.values, strut['leadingDistribution']),
@@ -296,7 +297,7 @@ Map<String, Object?> apiCases() {
   // ignore: deprecated_member_use
   out['fontWeight.index'] = <int>[const FontWeight(1).index, const FontWeight(450).index, const FontWeight(1000).index];
   out['fontWeight.lerp'] = <String>[
-    for (final double t in <double>[-1, 0, 0.25, 0.5, 0.55, 1, 2])
+    for (final double t in <double>[-1, 0, 0.25, 0.5, 0.55, 1, 2, 1 / 3, 0.123, 0.6789])
       '${FontWeight.lerp(FontWeight.w100, FontWeight.w900, t)}|${FontWeight.lerp(null, FontWeight.w100, t)}|${FontWeight.lerp(FontWeight.w300, null, t)}|${FontWeight.lerp(null, null, t)}',
   ];
   out['fontWeight.errors'] = <String>[err(() => FontWeight(0)), err(() => FontWeight(1001))];
@@ -637,6 +638,20 @@ void main() {
       out['scene.${scene['name']}'] = perWidth;
     }
     out.addAll(apiCases());
+    // A family resolved (to FlutterTest) before a font of that name is
+    // loaded: loading clears the font collection's caches.
+    double lateWidth() {
+      final ParagraphBuilder b = ParagraphBuilder(ParagraphStyle());
+      b.pushStyle(TextStyle(fontFamily: 'LateFamily', fontSize: 20));
+      b.addText('late font');
+      final Paragraph p = b.build()..layout(const ParagraphConstraints(width: 1000));
+      final double w = p.maxIntrinsicWidth;
+      p.dispose();
+      return w;
+    }
+    final double before = lateWidth();
+    await loadFontFromList(File(fontPath('Roboto-Regular.ttf')).readAsBytesSync(), fontFamily: 'LateFamily');
+    out['lateFont'] = <double>[before, lateWidth()];
     final bool impeller = Platform.environment['FLUTTER_TEST_IMPELLER'] == 'true';
     File(impeller ? 'build/text_impeller.json' : 'build/text.json')
       ..createSync(recursive: true)

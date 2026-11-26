@@ -84,6 +84,19 @@ func textPixelScenes() map[string]func(c Canvas) {
 				Shadows: []Shadow{NewShadow(ShadowOptions{Color: ptr(NewColor(0xFFFF0000)), Offset: NewOffset(3, 2)})}}),
 				w, nil), NewOffset(6, 6))
 		},
+		"shadow.blur": func(c Canvas) {
+			c.DrawParagraph(textPara("bl", nil, NewTextStyle(TextStyleOptions{FontSize: ptr(16.0),
+				Color: ptr(NewColor(0xFF000000)),
+				Shadows: []Shadow{NewShadow(ShadowOptions{Color: ptr(NewColor(0xFF0000FF)), Offset: NewOffset(2, 3),
+					BlurRadius: 3})}}), w, nil), NewOffset(6, 6))
+		},
+		"no_push": func(c Canvas) {
+			b := NewParagraphBuilder(NewParagraphStyle(ParagraphStyleOptions{FontSize: ptr(14.0)}))
+			b.AddText("none")
+			p := b.Build()
+			p.Layout(NewParagraphConstraints(88))
+			c.DrawParagraph(p, NewOffset(4, 4))
+		},
 		"foreground.gradient": func(c Canvas) {
 			fg := NewPaint()
 			fg.SetShader(NewGradientLinear(OffsetZero, NewOffset(72, 0), []Color{NewColor(0xFFFF0000), NewColor(0xFF0000FF)}))

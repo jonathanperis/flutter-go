@@ -88,6 +88,22 @@ Map<String, void Function(Canvas c)> scenes() {
       ),
       const Offset(6, 6),
     ),
+    'shadow.blur': (Canvas c) => c.drawParagraph(
+      para(
+        'bl',
+        textStyle: TextStyle(
+          fontSize: 16,
+          color: const Color(0xFF000000),
+          shadows: const <Shadow>[Shadow(color: Color(0xFF0000FF), offset: Offset(2, 3), blurRadius: 3)],
+        ),
+      ),
+      const Offset(6, 6),
+    ),
+    'no_push': (Canvas c) {
+      final ParagraphBuilder b = ParagraphBuilder(ParagraphStyle(fontSize: 14));
+      b.addText('none');
+      c.drawParagraph(b.build()..layout(const ParagraphConstraints(width: 88)), const Offset(4, 4));
+    },
     'foreground.gradient': (Canvas c) => c.drawParagraph(
       para(
         'grad',

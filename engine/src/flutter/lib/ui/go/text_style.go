@@ -121,7 +121,7 @@ func encodeTextStyle(o TextStyleOptions) []int32 {
 	}
 	if o.FontWeight != nil {
 		result[0] |= 1 << 5
-		result[5] = int32(o.FontWeight.value)
+		result[5] = int32(o.FontWeight.Value)
 	}
 	if o.FontStyle != nil {
 		result[0] |= 1 << 6
@@ -329,7 +329,7 @@ func encodeParagraphStyle(o ParagraphStyleOptions) []int32 {
 	}
 	if o.FontWeight != nil {
 		result[0] |= 1 << 3
-		result[3] = int32(o.FontWeight.value)
+		result[3] = int32(o.FontWeight.Value)
 	}
 	if o.FontStyle != nil {
 		result[0] |= 1 << 4
@@ -500,7 +500,7 @@ func encodeStrut(o StrutStyleOptions) ([]byte, int) {
 	byteCount := 4
 	if o.FontWeight != nil {
 		bitmask |= 1 << 0
-		putInt32(data[byteCount:], int32(o.FontWeight.value))
+		putInt32(data[byteCount:], int32(o.FontWeight.Value))
 		byteCount += 4
 	}
 	if o.FontStyle != nil {
