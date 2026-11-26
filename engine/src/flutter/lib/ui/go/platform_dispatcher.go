@@ -49,6 +49,11 @@ type PlatformDispatcher struct {
 	onReportTimings    TimingsCallback
 	frameData          FrameData
 	onFrameDataChanged VoidCallback
+
+	// platform_message.go
+	onPlatformMessage             PlatformMessageCallback
+	initialLifecycleState         string
+	initialLifecycleStateAccessed bool
 }
 
 // platformConfiguration is _PlatformConfiguration (the fields ported so far)

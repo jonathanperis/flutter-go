@@ -112,12 +112,12 @@ literals of imported structs.
 | `Duration` | `time.Duration` |
 | `List<T>`, `Map<K,V>`, `Set<T>` | `[]T`, `map[K]V`, `map[T]struct{}` |
 | `VoidCallback`, `ValueChanged<T>` | `func()`, `func(T)` |
-| `ByteData`, `Uint8List` | `[]byte` |
+| `ByteData`, `Uint8List` | `[]byte` (a nil slice is null; an empty non-nil slice is a zero-length ByteData) |
 | `Int32List`, `Int64List`, `Float32List`, `Float64List` | `[]int32`, `[]int64`, `[]float32`, `[]float64` |
 | `Endian` | `encoding/binary.ByteOrder` (omitted: the host's, as `Endian.host`) |
 | `Iterable<T>` | `iter.Seq[T]` (methods named `All()` return it) |
 | `Future<T>` | `async.Future[T]`, an interface (see "Futures" below); `await f` is `f.Await()` inside `async.Async(func() T {...})` |
-| `Stream<T>` | `async.Stream[T]`, an interface whose one method is `Listen`; Dart's other methods are generic functions (`async.StreamToList`). Ported: single-subscription streams, `StreamController`, `Stream.multi/fromIterable/fromFuture/empty` (not broadcast streams, transformations or `async*`) |
+| `Stream<T>` | `async.Stream[T]`, an interface whose one method is `Listen`; Dart's other methods are generic functions (`async.StreamToList`). Ported: single-subscription streams, `StreamController`, `StreamController.broadcast` → `NewStreamControllerBroadcast` (async and sync variants, `*BroadcastStreamController[T]`; its `onCancel` is a `func()`, its result ignored as in Dart), `Stream.multi/fromIterable/fromFuture/empty` (not `asBroadcastStream`, transformations or `async*`) |
 
 ## Futures
 
@@ -328,6 +328,26 @@ through it. One pattern, everywhere:
 flutter_release`, `-tags flutter_profile`); the default build is debug, as
 `flutter run` is.
 
+
+## Platform channel values (services codecs)
+
+A Dart `int` is a Go `int` (64-bit on every platform flutter-go targets):
+the standard codec decodes both its 32- and 64-bit integers as `int`, the
+JSON codec decodes integer literals as `int`; every Go integer type is
+accepted when encoding (a `uint64` above `math.MaxInt64` throws
+`ArgumentError`, as no Dart int holds it). `double` is `float64` (a `float32`
+is encoded as the double it widens to). Typed lists are `[]byte`,
+`[]int32`, `[]int64`, `[]float32`, `[]float64`; any other slice or array is a
+`List` (decoded: `[]any`); a nil slice or map is an empty list or map, only
+a nil interface or nil pointer is null (a non-nil pointer is its value). A
+`Map` is a Go map or a `[]dart.MapEntry[K, V]` (an ordered map, written in its
+order); a Go map is written in sorted key order (null, bools, numbers,
+strings, then the rest by their text). Decoded maps are `map[any]any`
+(standard codec) or `map[string]any` (JSON): their insertion order is lost.
+The standard codec merges keys as Dart's map does (an int and a double of the
+same value, 0.0 and -0.0; the first key is kept); a key Go can't hash (a
+list, typed data, a map) panics with `UnsupportedError`.
+
 ## Known divergences
 
 Each divergence is listed here when it is introduced.
@@ -440,6 +460,46 @@ Each divergence is listed here when it is introduced.
   `identical` can observe: Curve doesn't override `==`).
   `ElasticInCurve([period])` is `NewElasticInCurve(period ...float64)`;
   `Curve2D.generateSamples` returns `iter.Seq[Curve2DSample]`.
+- dart:ui: the top-level `channelBuffers` is `ui.ChannelBuffersInstance()`
+  (the type has the variable's Go name). `ChannelBuffers` is overridable
+  (Flutter's tests override `resize`/`allowOverflow`): a type embedding it
+  calls `SetSelf`. `RootIsolateToken.instance` is
+  `ui.RootIsolateTokenInstance()`, never nil (a Go program is one isolate).
+  ENGINE GAP: platform messages reach the embedder only through a client
+  implementing `ui.PlatformMessageHandler`; otherwise (src/app, tests) every
+  message gets an empty reply, posted to the sender's loop as the engine's
+  default PlatformView does. Replies are loop events (`Loop.RunPosted`).
+- dart:convert (`src/dart`): Go strings are read as WTF-8, so a lone
+  surrogate encodes as Dart's does (EF BF BD in UTF-8, `\udXXX` in JSON); a
+  lone surrogate decoded from a JSON `\u` escape becomes U+FFFD.
+- services: `MessageCodec[T]`'s `T?` is T's nil (`StringCodec` is a
+  `MessageCodec[*string]`). `StandardMessageCodec` is used by pointer and is
+  extended by embedding it (`SetSelf`; overridable `WriteValue`,
+  `ReadValue`, `ReadValueOfType`, `WriteSize`, `ReadSize`).
+  `PlatformException` and `MissingPluginException` are pointer errors
+  (thrown as panics, delivered as futures' errors; `errors.As`). Optional
+  positional parameters, when more than one (`MethodChannel(name, [codec,
+  binaryMessenger])`), are an options struct (`MethodChannelOptions`). A
+  channel is used by pointer; `OptionalMethodChannel` embeds `MethodChannel`
+  and its `&c.MethodChannel` behaves optionally (as `SystemChannels.platform`,
+  declared `MethodChannel`, does). `invokeMethod<T>` returns `Future[any]`
+  (the cast is the caller's); `invokeListMethod<T>`/`invokeMapMethod<K, V>`
+  are `MethodChannelInvokeListMethod[T]`/`MethodChannelInvokeMapMethod[K,
+  V]` and convert eagerly (Dart's `cast` is lazy). `SystemChannels` is a
+  package variable of a struct of channels. `BinaryMessenger.
+  HandlePlatformMessage` returns `Future[[]byte]` for every messenger (Dart:
+  `Future<void>`, which TestDefaultBinaryMessenger overrides as
+  `Future<ByteData?>`). ServicesBinding is partial (no keyboard,
+  restoration, text input, licenses from the asset bundle, view focus).
+  `BackgroundIsolateBinaryMessenger.send` panics (ENGINE GAP: no isolates).
+  The int/double key merge follows the VM on arm64, where the double 2^63
+  hashes as 2^63-1.
+- flutter_test: `TestDefaultBinaryMessengerBinding`'s covariant
+  `defaultBinaryMessenger` is `DefaultBinaryMessenger().(*TestDefaultBinaryMessenger)`;
+  the generic `setMockDecodedMessageHandler<T>` is
+  `TestDefaultBinaryMessengerSetMockDecodedMessageHandler[T]`. Go can't tell
+  which test is running, so `AddTearDown` (used by `setMockStreamHandler`)
+  registers with the test given to `SetCurrentTest(t)`.
 - curves: a curve that overrides `transform` itself (as `Split` does)
   defines `Transform` on its own type; `TransformInternal` overrides are
   reached through `self`.

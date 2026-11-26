@@ -46,6 +46,10 @@ type PlatformConfiguration struct {
 	client           PlatformConfigurationClient
 	lastFrameNumber  uint64
 	lastMicroseconds int64
+
+	// platform_message.go
+	pendingResponses map[int]PlatformMessageResponse
+	nextResponseID   int
 }
 
 // NewPlatformConfiguration creates the configuration of an engine whose

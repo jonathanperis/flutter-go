@@ -21,7 +21,10 @@ func DoubleToString(v float64) string {
 		return "NaN"
 	}
 	if v == math.Trunc(v) && math.Abs(v) < 1e21 {
-		return strconv.FormatFloat(v, 'f', 1, 64)
+		// Shortest round-trip digits, zero-padded (2^63 is
+		// "9223372036854775808.0" exactly but Dart prints
+		// "9223372036854776000.0").
+		return strconv.FormatFloat(v, 'f', -1, 64) + ".0"
 	}
 	a := math.Abs(v)
 	if a >= 1e-6 && a < 1e21 {
