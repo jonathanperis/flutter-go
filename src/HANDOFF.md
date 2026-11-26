@@ -209,6 +209,11 @@ Start here when continuing flutter-go in a new session.
      fields or passed as arguments that fuse after inlining (found by the
      paintImage difftest); ENGINE GAPs: AutomaticNotchedShape with a
      guest (Path.combine), invertColors on translucent image paints.
+  14. Re-verify the dart:ui compositing mutations (steps 1-8 of its
+     mutation run). A painting worker's `mut.sh` in the shared scratchpad
+     ran against the dart:ui worktree while that run was in progress, so
+     those results are unreliable. Re-run them on master. Agents now
+     prefix scratch files uniquely (rule added to the shared brief).
 
 ## Environment
 
