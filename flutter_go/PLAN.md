@@ -818,3 +818,107 @@ The standing goal is now full API parity with Flutter 3.50.1's Dart layer
   completed source through a microtask, and not reporting an unhandled
   error): the first is now caught by the synchronous_future difftest; the
   second is not observable in a difftest (Dart's zone reports it), noted.
+
+### foundation, finished (binding, SynchronousFuture, licenses, timeline, memory allocations, isolates, ...)
+- Ported from 3.50.1, one Go file per Dart file: binding (`BindingBase`
+  interface + embeddable `BindingBaseBase`, `Construct(self)` is the Dart
+  constructor; checkInstance, debugCheckZone, lock/unlock, reassemble, the
+  service-extension registry and the six foundation extensions),
+  synchronous_future, licenses, timeline (`FlutterTimeline` as a variable
+  of statics, `FlutterTimelineTimeSync`), memory_allocations, isolates
+  (`Compute`), consolidate_response, service_extensions, node
+  (`AbstractNode` + `AbstractNodeBase`), annotations, capabilities, and the
+  rest of debug (`DebugAssertAllFoundationVarsUnset`,
+  `DebugInstrumentAction`, `DebugDoublePrecision`, brightness/VM-service
+  variables, `DebugMaybeDispatchCreated/Disposed`). foundation: 99 → 137 of
+  137 top-level names; total 175 → 221 of 2792 (tested 127 → 162).
+- New support code, ported from the Dart SDK shipped with 3.50.1:
+  `flutter_go/dart`: `ToStringAsPrecision` (double-conversion's
+  ToPrecision rules: exact ties away from zero, exponential below 1e-6 or at
+  ≥ precision digits, "e+", signed -0), `DurationToString`, `JSONEncode`,
+  `StateError`/`ArgumentError`/`RangeError`/`UnimplementedError`.
+  `flutter_go/developer` (dart:developer: registerExtension/postEvent/
+  ServiceExtensionResponse, Timeline/TimelineTask/Flow with Dart's argument
+  checks and unbalanced-call StateErrors). `flutter_go/io`
+  (`HttpClientResponse`, `HttpClientResponseCompressionState`).
+  `flutter_go/async`: a Stream subset (`_BufferingStreamSubscription`'s
+  state machine, `_PendingEvents` one event per microtask, async and
+  internal sync `StreamController` with `addStream`, `Stream.multi`,
+  `fromIterable`, `fromFuture`, `empty`, `toList`) and `Loop.Post` /
+  `RunPosted` / `WaitPosted` for events from other goroutines (Compute's
+  result, like a port message).
+- dart:ui (all **partial**, only what foundation reads):
+  `platform_dispatcher.go` (`PlatformDispatcher`, `PlatformDispatcherInstance`,
+  `PlatformBrightness` with the configuration default light), `window.go`
+  (`Brightness`, the deprecated `SingletonFlutterWindow` and `Window` with
+  `PlatformDispatcher`/`PlatformBrightness` only), `painting.go` (`Image`
+  and `Picture` as opaque types with only their static
+  `onCreate`/`onDispose` hooks, `ImageEventCallback`,
+  `PictureEventCallback`). dart:ui exposed: 12 → 20 of 195.
+- **ENGINE GAP: no VM service.** `registerServiceExtension` registers in
+  `flutter_go/developer`'s registry; nothing but `developer.LookupExtension`
+  (tests, a future transport) calls a handler; `postEvent` returns as Dart's
+  does without a listener on the Extension stream (`extensionStreamHasListener`
+  is false); DevTools, `flutter attach`, hot reload's `ext.flutter.reassemble`
+  can't reach the app. **ENGINE GAP: no timeline recorder.** Timeline events
+  are dropped, as with the Dart stream disabled (FlutterTimeline's own
+  debug collection works). Not ported: `_initListenable` and the memory
+  allocation hooks into package:listen (not ported), `asStream`,
+  async* generators, broadcast streams, dart:io's HTTP client.
+- Design: Go has no zones, so the binding's zone is the current
+  `async.Loop`; `assert(() {...}())` blocks with side effects are
+  `if KDebugMode`; Dart's function identity (`removeListener`,
+  `debugPrint != debugPrintOverride`) is the closure pointer; the
+  isolate is a goroutine whose result is posted to the caller's loop
+  (`ComputeCallback` returns R: a goroutine has no event loop of its own).
+  `isCanvasKit/isSkwasm/isSkiaWeb` panic with UnimplementedError, as
+  `_capabilities_io.dart` throws (Flutter reads them only under kIsWeb).
+- Flutter's tests: annotations 3/3, double_precision 2/2, debug 4/4,
+  synchronous_future 1/1 (asStream and the future-returning whenComplete
+  action skipped), timeline 9/9, memory_allocations 6/7 (the publishers
+  test needs ChangeNotifier and real Pictures/Images), binding 1/1,
+  binding_2 1/1, reassemble 1/1, service_extensions 6/31 (the foundation
+  extensions; frame checks and the 25 extensions of other bindings
+  skipped), isolates "compute()" 8 of 24 expectations (plus the debugLabel call
+  without the name check) (Isolate.exit/kill,
+  async callbacks, unsendable values, debugName skipped) and 0/4 "closes all
+  ports" (they spawn a Dart VM), consolidate_response 10/10, licenses 4/4
+  (async* collectors as fromIterable). Plus own tests for every file
+  (node, capabilities, developer, checkInstance errors, lockEvents,
+  bool/numeric extensions, double.parse, timeline assertions, hooks).
+- Difftests, all exact: synchronous_future (10 scenes: then/await/chaining
+  of a user-defined future against core futures, timeout, whenComplete,
+  ignore), stream (10 scenes), double_precision (1098 values × 21
+  precisions, debugFormatDouble × 22, RangeError messages), licenses (418
+  texts: Flutter's test text, the repo's LICENSE files incl. the 1.3 MB
+  sky_engine LICENSE, 400 random texts, 65 of which make Flutter's parser
+  assert; plus the registry's delivery order), binding (75 log lines:
+  construction order, registrations, extension results/events/reassembles/
+  unlocks against microtasks and timers), memory_allocations (listener
+  add/remove during dispatch, hooks, toMap, reported errors, timeline
+  aggregation sums). Run the Dart side with
+  `flutter test test/<name>_test.dart` in difftest/flutter.
+- **Found:** an async function that throws after awaiting a
+  SynchronousFuture fails its future synchronously, before anyone can
+  listen, so Dart reports the error as uncaught (and delivers it to late
+  listeners too) — reproduced. Flutter's checkInstance asserts
+  `_debugInitializedType == null` before throwing "Binding mixin instance is
+  null but bindings are already initialized.", so in debug builds that
+  FlutterError is unreachable (a bare AssertionError). Flutter's
+  memory_allocations_test expects `hasListeners` false inside a listener
+  that removed the other one; it is true (verified in the difftest), and
+  the failed `expect` is swallowed by dispatchObjectEvent's error
+  reporting. A canceled subscription's `Future._nullFuture` belongs to the root zone,
+  so fake_async never runs its listeners (a stream scene had to drop one;
+  Go has no zones and runs them).
+- Mutations: 93 valid on the new code, 92 caught, 1
+  equivalent (skipping the `\n` of a CRLF in the blank-line state: the
+  second break is a no-op). Caught only after adding tests or scenes:
+  Duration.toString padding, JSON quoting and double formatting (unit
+  tests), a -1 content length kept as a total, addStream not paused before
+  the listener comes, pause not cancelling an already scheduled delivery
+  (two stream scenes). Plus, on the Future refactor, 11 mutations of the
+  foreign-future paths and SynchronousFuture (all caught; the sync-chain
+  rule, timeout of a failed future, a value arriving after the timeout and
+  SynchronousFuture.timeout needed extra scenes), and the 8 async ones
+  (still caught).

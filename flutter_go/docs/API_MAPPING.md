@@ -12,6 +12,8 @@ every ported library follows them, and `cmd/apiparity` checks the result.
 | `dart:ui` | `engine/src/flutter/lib/ui/go` (package `ui`) |
 | `package:flutter_test` | `packages/flutter_test/lib/src` (package `flutter_test`) |
 | `dart:async` (the subset Flutter's API uses) | `flutter_go/async` |
+| `dart:developer` (service extensions, timeline) | `flutter_go/developer` |
+| `dart:io` (the types Flutter's API mentions) | `flutter_go/io` |
 
 Go files sit beside the Dart files they replace and keep their base name
 (`friction_simulation.dart` → `friction_simulation.go`), so the two trees
@@ -91,7 +93,7 @@ literals of imported structs.
 | `Endian` | `encoding/binary.ByteOrder` (omitted: the host's, as `Endian.host`) |
 | `Iterable<T>` | `iter.Seq[T]` (methods named `All()` return it) |
 | `Future<T>` | `async.Future[T]`, an interface (see "Futures" below); `await f` is `f.Await()` inside `async.Async(func() T {...})` |
-| `Stream<T>` | `*async.Stream[T]` (not yet ported) |
+| `Stream<T>` | `async.Stream[T]`, an interface whose one method is `Listen`; Dart's other methods are generic functions (`async.StreamToList`). Ported: single-subscription streams, `StreamController`, `Stream.multi/fromIterable/fromFuture/empty` (not broadcast streams, transformations or `async*`) |
 
 ## Futures
 
@@ -124,6 +126,11 @@ user-defined future through its `then`, and `async` chains to one through
 `ThenAny` (`_chainForeignFuture`), so a future whose `then` calls back
 synchronously (SynchronousFuture) completes chained futures and resumes an
 awaiting coroutine synchronously, as in Dart.
+
+Events from other goroutines (an isolate's result, I/O) reach the event
+loop through `Loop.Post`, the one goroutine-safe `Loop` method; the loop's
+owner runs them with `RunPosted`/`WaitPosted` (Dart's event loop runs port
+messages as they arrive; the fake clock never runs them).
 
 ## Mixins and overridable methods
 
@@ -229,6 +236,35 @@ through it. One pattern, everywhere:
   column, className, method and source only). `PartialStackFrame.package`
   is a `dart.Pattern` (`dart.StringPattern("...")` or a `*regexp.Regexp`).
 
+## Bindings, zones and statics
+
+- `BindingBase` is an interface plus the embeddable `BindingBaseBase`. A
+  binding embeds it (and its mixins) and its constructor calls
+  `b.Construct(b)`, which is Dart's `BindingBase()` constructor: it sets
+  `self` and runs `InitInstances` and `InitServiceExtensions` through it.
+  Protected members are exported methods (Go has no `@protected`); named
+  required parameters (`registerServiceExtension(name:, callback:)`) are
+  positional.
+- Go has no zones: where Flutter records `Zone.current` (the binding's
+  zone, `debugCheckZone`), Go records the current `async.Loop`
+  (flutter_test gives each test its own FakeAsync zone, as flutter-go gives
+  it its own loop).
+- A class of static members whose Dart name must stay visible
+  (`FlutterTimeline`, `LicenseRegistry`) is a package-level variable whose
+  methods are the statics (`foundation.FlutterTimeline.StartSync`); a
+  generic static is a package function (`timeSync` →
+  `FlutterTimelineTimeSync`). Statics of other classes follow the statics
+  rule (`FlutterMemoryAllocations.instance` →
+  `FlutterMemoryAllocationsInstance`, `BindingBase.checkInstance` →
+  `BindingBaseCheckInstance`).
+- Dart compares functions by identity (`removeListener(listener)`,
+  `debugPrint != debugPrintThrottled`); Go compares the function values'
+  closure pointers: the same top-level function or the same closure value
+  is identical, a method value (`x.M`) is a new closure each time.
+- Dart's `assert(() {...}())` blocks with side effects (recording a type,
+  registering debug service extensions) run in debug builds only
+  (`KDebugMode`); plain assertions panic in every build, as before.
+
 ## Build modes
 
 `kReleaseMode` and `kProfileMode` come from build tags (`-tags
@@ -268,3 +304,27 @@ Each divergence is listed here when it is introduced.
 - print: `DebugPrintCallback` is `func(message string, opts
   ...DebugPrintOptions)`; Dart's null message is `"null"` (same output).
   `debugWordWrap` returns `iter.Seq[string]`.
+- foundation: `consolidateHttpClientResponseBytes`'s `autoUncompress`
+  (default true) is the option `DisableAutoUncompress`; its gzip decoder
+  decodes at the end instead of chunk by chunk (same bytes, same progress
+  reports). `HttpClientResponse` is an interface in `flutter_go/io`.
+- foundation: `compute` runs the callback on a goroutine and delivers the
+  result through `Loop.Post`; `ComputeCallback` returns `R`, not
+  `FutureOr<R>` (the event loop belongs to the calling goroutine), and
+  nothing is "unsendable". `ComputeImpl` is a generic func type.
+- foundation: `isCanvasKit`/`isSkwasm`/`isSkiaWeb` are the dart:io versions:
+  they panic with `UnimplementedError` (flutter-go is never a web build).
+- foundation: `LicenseEntry.packages/paragraphs` return `iter.Seq`;
+  annotations (`Category`, `DocumentationIcon`, `Summary`) are plain
+  structs (Go has no annotations).
+- foundation: `AbstractNode` (deprecated) is an interface plus the
+  embeddable `AbstractNodeBase`.
+- foundation: `SynchronousFuture.asStream` is not ported, and a
+  `WhenComplete` action can't return a future (see "Futures").
+- foundation: `BindingBase` does not install package:listen's
+  `Listenable.onError`, and `FlutterMemoryAllocations` does not hook
+  `Listenable.debugMaybeDispatchCreated/Disposed` (package:listen is not
+  ported).
+- dart:developer: no VM service and no timeline recorder (ENGINE GAP, see
+  PLAN.md); `developer.LookupExtension` is how a registered service
+  extension is invoked.

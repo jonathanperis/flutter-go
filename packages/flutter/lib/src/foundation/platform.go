@@ -68,3 +68,14 @@ func DefaultTargetPlatform() TargetPlatform {
 	}
 	return *result
 }
+
+// Name is the enum value's name (Dart's EnumName.name): "android", "iOS"...
+func (p TargetPlatform) Name() string {
+	return [...]string{"android", "fuchsia", "iOS", "linux", "macOS", "windows"}[p]
+}
+
+// TargetPlatformValues is TargetPlatform.values.
+var TargetPlatformValues = []TargetPlatform{
+	TargetPlatformAndroid, TargetPlatformFuchsia, TargetPlatformIOS,
+	TargetPlatformLinux, TargetPlatformMacOS, TargetPlatformWindows,
+}

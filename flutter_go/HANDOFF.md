@@ -26,14 +26,15 @@ Start here when continuing flutter-go in a new session.
      BoxConstraints, EdgeInsets and Alignment still have flutter-go names:
      port them as `ui.Color`, `rendering.BoxConstraints`,
      `painting.EdgeInsets`/`painting.Alignment`.
-  3. foundation: part 1 done (constants, object, platform, key,
-     basic_types, observer_list). Next: collections, bitfield, unicode,
-     print, serialization, stack_frame, persistent_hash_map, diagnostics,
-     assertions (FlutterError.reportError) all done; next binding. Also
-     port package:listen (ChangeNotifier...) and vector_math's Matrix4.
-     Then the rest of what the scheduler needs (`BindingBase`, `FlutterError`
-     reporting, `ChangeNotifier`/`Listenable`), and a minimal
-     `ui.PlatformDispatcher` (frame scheduling, `AppLifecycleState`).
+  3. Done: foundation, 137/137 top-level names (binding, SynchronousFuture,
+     licenses, timeline, memory_allocations, isolates, consolidate_response,
+     service_extensions, node, annotations, capabilities, debug), on an
+     `async.Future` interface, a Stream subset, `flutter_go/developer` and
+     `flutter_go/io`. Still to do for foundation users: package:listen
+     (ChangeNotifier, Listenable, ValueNotifier; then BindingBase's
+     `_initListenable` and the memory-allocation hooks) and vector_math's
+     Matrix4. `ui.PlatformDispatcher` is minimal (platformBrightness only):
+     the scheduler port adds frame scheduling and `AppLifecycleState`.
   4. Port `SchedulerBinding`/`Ticker`/`TickerFuture` into
      `packages/flutter/lib/src/scheduler` on `flutter_go/async`; move
      `animation` onto it (it still holds the old scheduler).

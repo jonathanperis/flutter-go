@@ -20,6 +20,7 @@ package async
 
 import (
 	"fmt"
+	"sync"
 	"time"
 )
 
@@ -35,6 +36,12 @@ type Loop struct {
 	// UncaughtError receives errors no one handles: a panic in a microtask
 	// or timer, or a failed Future without listeners. The default panics.
 	UncaughtError func(err error)
+
+	nullFut *future[Void]
+
+	postMu   sync.Mutex
+	posted   []func()
+	postedCh chan struct{}
 }
 
 func NewLoop() *Loop { return &Loop{} }
@@ -276,4 +283,56 @@ func asError(r any) error {
 		return err
 	}
 	return PanicError{r}
+}
+
+// ---- events from other goroutines ----
+
+// Post queues f to run on the loop as an event from outside the isolate,
+// like a message arriving on a ReceivePort (an isolate's result, I/O). It
+// is the one Loop method that is safe to call from any goroutine. Posted
+// events run only when the loop's owner calls RunPosted or WaitPosted (the
+// fake clock never runs them), each as its own event: microtasks are
+// drained after it.
+func (l *Loop) Post(f func()) {
+	l.postMu.Lock()
+	l.posted = append(l.posted, f)
+	ch := l.postedChannel()
+	l.postMu.Unlock()
+	select {
+	case ch <- struct{}{}:
+	default:
+	}
+}
+
+// RunPosted runs the events posted so far, in arrival order, and returns
+// how many ran.
+func (l *Loop) RunPosted() int {
+	l.postMu.Lock()
+	events := l.posted
+	l.posted = nil
+	l.postMu.Unlock()
+	for _, f := range events {
+		l.guard(f)
+		l.FlushMicrotasks()
+	}
+	return len(events)
+}
+
+// WaitPosted blocks until at least one event has been posted, then runs
+// the posted events (RunPosted).
+func (l *Loop) WaitPosted() {
+	l.postMu.Lock()
+	ch := l.postedChannel()
+	l.postMu.Unlock()
+	for l.RunPosted() == 0 {
+		<-ch
+	}
+}
+
+// postedChannel signals posts; call with postMu held.
+func (l *Loop) postedChannel() chan struct{} {
+	if l.postedCh == nil {
+		l.postedCh = make(chan struct{}, 1)
+	}
+	return l.postedCh
 }

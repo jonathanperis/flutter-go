@@ -32,3 +32,13 @@ func TruncDiv(a, b float64) float64 {
 	}
 	return q
 }
+
+// UnimplementedError is dart:core's UnimplementedError(message).
+type UnimplementedError struct{ Message string }
+
+func (e UnimplementedError) Error() string {
+	if e.Message == "" {
+		return "UnimplementedError"
+	}
+	return "UnimplementedError: " + e.Message
+}
