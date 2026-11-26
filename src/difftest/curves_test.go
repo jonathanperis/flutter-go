@@ -10,8 +10,8 @@ import (
 	"testing"
 
 	ui "github.com/jonathanperis/flutter-go/engine/src/flutter/lib/ui/go"
-	"github.com/jonathanperis/flutter-go/src/dart"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/animation"
+	"github.com/jonathanperis/flutter-go/src/dart"
 )
 
 // Same curves as flutter/test/curves_test.dart.

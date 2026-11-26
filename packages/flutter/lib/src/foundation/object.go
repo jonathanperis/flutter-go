@@ -12,9 +12,7 @@ func ObjectRuntimeType(object any, optimizedValue string) string {
 		}
 		return optimizedValue
 	}
-	t := reflect.TypeOf(object)
-	for t.Kind() == reflect.Pointer {
-		t = t.Elem()
-	}
-	return t.Name()
+	// Dart's runtimeType.toString(): a generic type prints its arguments
+	// with <> and Dart's names (ValueNotifier<int>, not ValueNotifier[int]).
+	return dartTypeName(reflect.TypeOf(object))
 }

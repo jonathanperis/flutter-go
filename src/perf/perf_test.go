@@ -14,10 +14,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jonathanperis/flutter-go/src/app"
-	"github.com/jonathanperis/flutter-go/src/impeller"
 	r "github.com/jonathanperis/flutter-go/packages/flutter/lib/src/rendering"
 	. "github.com/jonathanperis/flutter-go/packages/flutter/lib/src/widgets"
+	"github.com/jonathanperis/flutter-go/src/app"
+	"github.com/jonathanperis/flutter-go/src/impeller"
 )
 
 const rows, cols = 100, 100

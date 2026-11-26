@@ -17,6 +17,16 @@
 // The measure is deliberately strict and coarse: it counts top-level names
 // only (not members or parameters), and a name counts only in the package that
 // mirrors its Dart library.
+//
+// Re-exports of third-party packages (reexportedPackages: foundation's
+// `export 'package:listen/listen.dart' show ChangeNotifier, ...`) are
+// followed into the package's source in the pub cache, at the version
+// Flutter's pubspec.lock pins, and the shown names count for the library
+// that re-exports them: Flutter users reach them there, and the Go package
+// declares them as aliases (foundation/listen_exports.go). A Go test of the
+// package's port (src/pub/<package>) also counts as testing them.
+// Other package: exports (package:meta's annotations, which have no Go
+// counterpart; vector_math and characters, not ported yet) are not followed.
 package main
 
 import (
@@ -46,8 +56,15 @@ type Decl struct {
 	Name    string `json:"name"`
 	Kind    string `json:"kind"`
 	File    string `json:"file"`
+	Package string `json:"package,omitempty"` // the third-party package re-exported, if any
 	Exposed bool   `json:"exposed"`
 	Tested  bool   `json:"tested"`
+}
+
+// reexportedPackages are the third-party packages whose re-exported names
+// are counted, with the directory of their Go port.
+var reexportedPackages = map[string]string{
+	"listen": "src/pub/listen",
 }
 
 type Library struct {
@@ -77,7 +94,8 @@ func main() {
 		for _, d := range decls {
 			g := goName(d.Name)
 			d.Exposed = goNames[g]
-			d.Tested = d.Exposed && (mentions[pkg][g] || mentions["src/difftest"][g])
+			d.Tested = d.Exposed && (mentions[pkg][g] || mentions["src/difftest"][g] ||
+				d.Package != "" && mentions[reexportedPackages[d.Package]][g])
 			if d.Exposed {
 				lib.Exposed++
 			}
@@ -186,13 +204,41 @@ func names(list string) map[string]bool {
 	return m
 }
 
+// pubPackageLib returns the lib/ directory of a hosted package at the
+// version the Flutter checkout's pubspec.lock pins, in the pub cache
+// ($PUB_CACHE or ~/.pub-cache).
+func pubPackageLib(root, name string) string {
+	lock, err := os.ReadFile(filepath.Join(root, "pubspec.lock"))
+	if err != nil {
+		fatalf("%v", err)
+	}
+	m := regexp.MustCompile(`(?m)^  ` + regexp.QuoteMeta(name) + `:\n(?:    .*\n)*?    version: "([^"]+)"`).FindSubmatch(lock)
+	if m == nil {
+		fatalf("package %s is not in %s/pubspec.lock", name, root)
+	}
+	cache := os.Getenv("PUB_CACHE")
+	if cache == "" {
+		home, _ := os.UserHomeDir()
+		cache = filepath.Join(home, ".pub-cache")
+	}
+	dir := filepath.Join(cache, "hosted", "pub.dev", name+"-"+string(m[1]), "lib")
+	if _, err := os.Stat(dir); err != nil {
+		fatalf("%v (run `flutter pub get` in %s/packages/flutter)", err, root)
+	}
+	return dir
+}
+
+var packageURIRe = regexp.MustCompile(`^package:([a-z0-9_]+)/(.+)$`)
+
 // inventory returns the public declarations reachable from a library file
-// through relative exports and parts. Exports of other packages
-// (package:, dart:) are not followed: those names belong to their own library.
+// through relative exports and parts, and through exports of the packages
+// in reexportedPackages. Other exports (package:, dart:) are not followed:
+// those names belong to their own library.
 func inventory(entry, root string) []Decl {
 	seen := map[string]bool{}
 	var decls []Decl
 	have := map[string]bool{}
+	pkgOf := map[string]string{} // a pub package's lib/ directory → its name
 	var visit func(path string, f filter)
 	visit = func(path string, f filter) {
 		// An empty show set (export nothing) must not look like nil (no
@@ -208,17 +254,32 @@ func inventory(entry, root string) []Decl {
 			fatalf("%v", err)
 		}
 		rel, _ := filepath.Rel(root, path)
+		pkg := ""
+		for dir, name := range pkgOf {
+			if r, err := filepath.Rel(dir, path); err == nil && !strings.HasPrefix(r, "..") {
+				rel, pkg = "package:"+name+"/"+filepath.ToSlash(r), name
+			}
+		}
 		for _, st := range directives(string(src)) {
 			m := directiveRe.FindStringSubmatch(st)
-			if m == nil || strings.Contains(m[2], ":") {
+			if m == nil {
 				continue
 			}
-			target := filepath.Join(filepath.Dir(path), m[2])
-			if path != entry && filepath.Dir(target) == filepath.Dir(entry) {
-				continue // another public library re-exported; counted there
-			}
-			if path == entry && filepath.Dir(m[2]) == "." && m[1] == "export" {
+			var target string
+			if pm := packageURIRe.FindStringSubmatch(m[2]); pm != nil && m[1] == "export" && reexportedPackages[pm[1]] != "" {
+				lib := pubPackageLib(root, pm[1])
+				pkgOf[lib] = pm[1]
+				target = filepath.Join(lib, pm[2])
+			} else if strings.Contains(m[2], ":") {
 				continue
+			} else {
+				target = filepath.Join(filepath.Dir(path), m[2])
+				if path != entry && filepath.Dir(target) == filepath.Dir(entry) {
+					continue // another public library re-exported; counted there
+				}
+				if path == entry && filepath.Dir(m[2]) == "." && m[1] == "export" {
+					continue
+				}
 			}
 			g := f
 			if m[1] == "export" {
@@ -238,6 +299,7 @@ func inventory(entry, root string) []Decl {
 			}
 			have[d.Name] = true
 			d.File = rel
+			d.Package = pkg
 			decls = append(decls, d)
 		}
 	}
@@ -454,7 +516,8 @@ func markdown(libs []*Library) string {
 	b.WriteString("enums, mixins, typedefs, functions, constants) and whether the Go package of\n")
 	b.WriteString("the same name declares them. Members and parameters are not counted yet, so\n")
 	b.WriteString("\"exposed\" is an upper bound on real parity. \"Tested\" means a Go test mentions\n")
-	b.WriteString("the name.\n\n")
+	b.WriteString("the name. Names a library re-exports from a third-party package\n")
+	b.WriteString("(foundation's package:listen) count for that library.\n\n")
 	fmt.Fprintf(&b, "**Total: %d / %d exposed (%.1f%%), %d tested.**\n\n", exposed, total, pct(exposed, total), tested)
 	b.WriteString("| Flutter library | Go package directory | Declarations | Exposed | Tested |\n|---|---|---:|---:|---:|\n")
 	for _, l := range libs {
@@ -463,7 +526,11 @@ func markdown(libs []*Library) string {
 	for _, l := range libs {
 		fmt.Fprintf(&b, "\n## `%s`\n\n", l.Name)
 		var missing, done []string
+		reexported := map[string][]string{}
 		for _, d := range l.Decls {
+			if d.Package != "" {
+				reexported[d.Package] = append(reexported[d.Package], "`"+d.Name+"`")
+			}
 			s := "`" + d.Name + "`"
 			if d.Exposed {
 				if !d.Tested {
@@ -476,6 +543,14 @@ func markdown(libs []*Library) string {
 		}
 		fmt.Fprintf(&b, "**Exposed (%d):** %s\n\n", len(done), list(done))
 		fmt.Fprintf(&b, "**Missing (%d):** %s\n", len(missing), list(missing))
+		var pkgs []string
+		for p := range reexported {
+			pkgs = append(pkgs, p)
+		}
+		sort.Strings(pkgs)
+		for _, p := range pkgs {
+			fmt.Fprintf(&b, "\n**Re-exported from package:%s (Go: `%s`):** %s\n", p, reexportedPackages[p], list(reexported[p]))
+		}
 	}
 	return b.String()
 }

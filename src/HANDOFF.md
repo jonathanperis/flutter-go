@@ -35,6 +35,13 @@ Start here when continuing flutter-go in a new session.
      (ChangeNotifier, Listenable, ValueNotifier; then BindingBase's
      `_initListenable` and the memory-allocation hooks) and vector_math's
      Matrix4. `ui.PlatformDispatcher` is minimal (platformBrightness only):
+     `async.Future` interface, a Stream subset, `src/developer` and
+     `src/io`. Done: package:listen 1.0.1 in `src/pub/listen`
+     (ChangeNotifier, Listenable, ValueListenable, ValueNotifier, re-exported
+     by foundation as aliases; `_initListenable` and the memory-allocation
+     hooks). Still to do for foundation users: vector_math's Matrix4; move
+     the hand-rolled notifiers (`widgets.Notifier` in paint.go, animation's
+     listeners) onto `foundation.ChangeNotifier`. `ui.PlatformDispatcher` is minimal (platformBrightness only):
      the scheduler port adds frame scheduling and `AppLifecycleState`.
   4. Port `SchedulerBinding`/`Ticker`/`TickerFuture` into
      `packages/flutter/lib/src/scheduler` on `src/async`; move

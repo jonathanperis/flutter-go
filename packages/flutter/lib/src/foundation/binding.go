@@ -2,9 +2,6 @@ package foundation
 
 // Port of binding.dart (Flutter 3.50.1).
 //
-// Not ported: _initListenable (it installs Listenable.onError from
-// package:listen, not ported yet).
-//
 // Go has no zones: the "zone" a binding is initialized in is the current
 // async.Loop (flutter_test gives each test its own FakeAsync zone, as
 // flutter-go gives it its own loop), so DebugCheckZone compares loops.
@@ -26,6 +23,7 @@ import (
 	"github.com/jonathanperis/flutter-go/src/async"
 	"github.com/jonathanperis/flutter-go/src/dart"
 	"github.com/jonathanperis/flutter-go/src/developer"
+	"github.com/jonathanperis/flutter-go/src/pub/listen"
 )
 
 // ServiceExtensionCallback is the signature of a service extension: it
@@ -167,6 +165,42 @@ func (b *BindingBaseBase) InitInstances() {
 	if KDebugMode {
 		bindingDebugInitializedType = runtimeTypeOf(b.outer())
 		b.debugBindingZone = async.Current()
+	}
+	initListenable()
+}
+
+// initListenable is _initListenable: package:listen's errors go through
+// Flutter's error machinery. Assertion errors (a disposed notifier used)
+// are rethrown as FlutterErrors; a listener's error is reported with
+// FlutterErrorReportError.
+func initListenable() {
+	listen.ListenableOnError = func(err any, stackTrace dart.StackTrace, context listen.ErrorContext) {
+		switch context {
+		case listen.ErrorContextAssertion:
+			if fe, ok := err.(*FlutterError); ok {
+				panic(fe)
+			}
+			var message string
+			switch e := err.(type) {
+			case dart.StateError:
+				message = e.Message
+			case dart.AssertionFailure:
+				if msg := e.AssertionMessage(); msg != nil {
+					message = dartToString(msg)
+				} else {
+					message = dartToString(err)
+				}
+			default:
+				message = dartToString(err)
+			}
+			panic(NewFlutterError(message))
+		case listen.ErrorContextListener:
+			FlutterErrorReportError(NewFlutterErrorDetails(err, FlutterErrorDetailsOptions{
+				Stack:   stackTrace,
+				Library: strp("foundation library"),
+				Context: NewErrorDescription("while dispatching notifications for Listenable"),
+			}))
+		}
 	}
 }
 

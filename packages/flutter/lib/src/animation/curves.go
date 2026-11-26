@@ -33,8 +33,8 @@ import (
 	"strings"
 
 	ui "github.com/jonathanperis/flutter-go/engine/src/flutter/lib/ui/go"
-	"github.com/jonathanperis/flutter-go/src/dart"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/foundation"
+	"github.com/jonathanperis/flutter-go/src/dart"
 )
 
 // ParametricCurve is an abstract parametric curve: Transform maps t in

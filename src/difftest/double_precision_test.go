@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/jonathanperis/flutter-go/src/dart"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/foundation"
+	"github.com/jonathanperis/flutter-go/src/dart"
 )
 
 // Same values as flutter/test/double_precision_test.dart (read from its

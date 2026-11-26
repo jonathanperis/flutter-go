@@ -65,7 +65,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 	"unicode/utf16"
 
@@ -205,40 +204,9 @@ func intOr(p *int, def int) int {
 	return *p
 }
 
-var (
-	identityMu     sync.Mutex
-	identityHashes = map[uintptr]int{}
-	identityNext   = 0
-)
-
-// identityHashCode stands in for Dart's identityHashCode: a stable,
-// arbitrary-looking number per object (pointer-like values; other values
-// hash by content).
-func identityHashCode(object any) int {
-	v := reflect.ValueOf(object)
-	switch v.Kind() {
-	case reflect.Pointer, reflect.Map, reflect.Slice, reflect.Func, reflect.Chan, reflect.UnsafePointer:
-		identityMu.Lock()
-		defer identityMu.Unlock()
-		p := v.Pointer()
-		h, ok := identityHashes[p]
-		if !ok {
-			identityNext++
-			h = (identityNext * 0x9E3779B1) & 0x3FFFFFFF // spread consecutive ids
-			identityHashes[p] = h
-		}
-		return h
-	}
-	return int(hashString(fmt.Sprintf("%#v", object)))
-}
-
-func hashString(s string) uint32 {
-	h := uint32(2166136261)
-	for i := 0; i < len(s); i++ {
-		h = (h ^ uint32(s[i])) * 16777619
-	}
-	return h & 0x3FFFFFFF
-}
+// identityHashCode is Dart's identityHashCode (dart.IdentityHashCode, shared
+// with package:listen so both print the same hashes).
+func identityHashCode(object any) int { return dart.IdentityHashCode(object) }
 
 // ShortHash is shortHash: five hex digits identifying the object.
 func ShortHash(object any) string {

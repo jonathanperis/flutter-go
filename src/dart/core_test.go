@@ -79,9 +79,9 @@ func TestGoFrameLocation(t *testing.T) {
 		root + "/packages/flutter_test/lib/src/binding.go":          "package:flutter_test/src/binding.go",
 		root + "/packages/flutter/lib/foundation.go":                "package:flutter/foundation.go",
 		root + "/engine/src/flutter/lib/ui/go/geometry.go":          "dart:ui/geometry.go",
-		root + "/src/async/loop.go":                          "dart:async/loop.go",
-		root + "/src/dart/core.go":                           "dart:core/core.go",
-		root + "/src/app/app.go":                             "file://" + root + "/src/app/app.go",
+		root + "/src/async/loop.go":                                 "dart:async/loop.go",
+		root + "/src/dart/core.go":                                  "dart:core/core.go",
+		root + "/src/app/app.go":                                    "file://" + root + "/src/app/app.go",
 		"/usr/local/go/src/testing/testing.go":                      "file:///usr/local/go/src/testing/testing.go",
 		"/tmp/my app/main.go":                                       "file:///tmp/my%20app/main.go",
 	} {

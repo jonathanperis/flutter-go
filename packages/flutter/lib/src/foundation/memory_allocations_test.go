@@ -1,8 +1,9 @@
 // Port of packages/flutter/test/foundation/memory_allocations_test.dart.
 //
-// Ported: 6 of 7 tests. Skipped: "publishers in Flutter dispatch events in
-// debug mode" (it creates ValueNotifier/ChangeNotifier, from
-// package:listen, and real dart:ui Pictures and Images, neither ported).
+// Ported: all 7 tests; "publishers in Flutter dispatch events in debug
+// mode" without its Picture and Image events (real dart:ui Pictures and
+// Images are not ported): its ValueNotifier and ChangeNotifier events are
+// checked.
 // The PrintOverrideTestBinding / tester.takeException plumbing becomes a
 // replaced FlutterErrorOnError that counts the reported errors.
 //
@@ -254,4 +255,41 @@ func TestMemoryAllocationsSdkHooksAndEvents(t *testing.T) {
 
 	// No listener: dispatchObjectCreated does nothing.
 	ma.DispatchObjectCreated("lib", "C", "o")
+}
+
+// "publishers in Flutter dispatch events in debug mode", without its
+// Picture and Image: the ValueNotifier and ChangeNotifier events, with
+// their contents.
+func TestMemoryAllocationsPublishersDispatchEventsInDebugMode(t *testing.T) {
+	ma := memoryAllocationsSetUp(t)
+	var events []ObjectEvent
+	listener := func(e ObjectEvent) { events = append(events, e) }
+	ma.AddListener(listener)
+
+	valueNotifier := NewValueNotifier(true)
+	changeNotifier := NewChangeNotifier()
+	changeNotifier.AddListener(func() {})
+	valueNotifier.Dispose()
+	changeNotifier.Dispose()
+
+	ma.RemoveListener(listener)
+	checkSdkHandlersNotSet(t)
+	equal(t, ma.HasListeners(), false)
+
+	want := []struct {
+		created bool
+		object  any
+	}{{true, valueNotifier}, {true, changeNotifier}, {false, valueNotifier}, {false, changeNotifier}}
+	if len(events) != len(want) {
+		t.Fatalf("%d events, want %d", len(events), len(want))
+	}
+	for i, w := range want {
+		e := events[i]
+		if e.Object() != w.object {
+			t.Errorf("event %d: object %v", i, e.Object())
+		}
+		if c, ok := e.(*ObjectCreated); ok != w.created || ok && (c.Library != "foundation" || c.ClassName != "ChangeNotifier") {
+			t.Errorf("event %d: %#v", i, e)
+		}
+	}
 }

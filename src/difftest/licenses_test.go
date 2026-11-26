@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jonathanperis/flutter-go/src/async"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/foundation"
+	"github.com/jonathanperis/flutter-go/src/async"
 )
 
 func goParagraphs(text string) (out any) {

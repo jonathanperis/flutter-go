@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	. "github.com/jonathanperis/flutter-go/src/async"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/foundation"
+	. "github.com/jonathanperis/flutter-go/src/async"
 )
 
 // Same scenes as flutter/test/synchronous_future_test.dart.

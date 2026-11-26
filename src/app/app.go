@@ -9,11 +9,11 @@ import (
 
 	"github.com/go-gl/glfw/v3.3/glfw"
 
-	"github.com/jonathanperis/flutter-go/src/impeller"
-	"github.com/jonathanperis/flutter-go/src/platform/metal"
 	r "github.com/jonathanperis/flutter-go/packages/flutter/lib/src/rendering"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/services"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/widgets"
+	"github.com/jonathanperis/flutter-go/src/impeller"
+	"github.com/jonathanperis/flutter-go/src/platform/metal"
 )
 
 func init() { runtime.LockOSThread() } // Cocoa needs the main thread.

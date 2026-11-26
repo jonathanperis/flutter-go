@@ -12,10 +12,10 @@ import (
 
 	"github.com/go-gl/glfw/v3.3/glfw"
 
-	"github.com/jonathanperis/flutter-go/src/app"
-	"github.com/jonathanperis/flutter-go/src/platform/metal"
 	r "github.com/jonathanperis/flutter-go/packages/flutter/lib/src/rendering"
 	. "github.com/jonathanperis/flutter-go/packages/flutter/lib/src/widgets"
+	"github.com/jonathanperis/flutter-go/src/app"
+	"github.com/jonathanperis/flutter-go/src/platform/metal"
 )
 
 type todos struct{ initial []string }

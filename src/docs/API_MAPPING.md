@@ -15,6 +15,11 @@ every ported library follows them, and `cmd/apiparity` checks the result.
 | `dart:developer` (service extensions, timeline) | `src/developer` |
 | `dart:io` (the types Flutter's API mentions) | `src/io` |
 | `dart:core`, `dart:math` (the parts Flutter needs) | `src/dart` (`dart.Random`, `dart.Pow`, `dart.Sin`, `dart.ArgumentError`, `dart.DoubleToString`...) |
+| `dart:async` (the subset Flutter's API uses) | `src/async` |
+| `dart:developer` (service extensions, timeline) | `src/developer` |
+| `dart:io` (the types Flutter's API mentions) | `src/io` |
+| `dart:core`, `dart:math` (the parts Flutter needs) | `src/dart` (`dart.Random`, `dart.Pow`, `dart.Sin`, `dart.ArgumentError`, `dart.DoubleToString`...) |
+| Third-party Dart packages Flutter re-exports (`package:listen`) | `src/pub/<package>` (package `<package>`), files named after the package's `lib/src` files |
 
 Go files sit beside the Dart files they replace and keep their base name
 (`friction_simulation.dart` → `friction_simulation.go`), so the two trees
@@ -26,6 +31,23 @@ A name lives in the Go package that mirrors the Dart library declaring it.
 Flutter re-exports (for example `widgets` exporting `rendering`) are not
 repeated: import both packages.
 
+**Third-party Dart packages Flutter re-exports: `src/pub/<package>`.**
+Their code is not in the flutter/flutter tree, so the port mirrors pub's
+layout in flutter-go's own area (`src/pub/listen/listen.go` is
+`package:listen`'s `lib/src/listen.dart`), ported from the version Flutter's
+`pubspec.lock` pins (in the pub cache). Such a package holds the whole
+public API of the Dart package. Because Flutter users reach the re-exported
+names through Flutter's library (`foundation.dart`'s `export
+'package:listen/listen.dart' show ChangeNotifier, Listenable,
+ValueListenable, ValueNotifier`), the re-exporting Go package declares
+them too, in `<package>_exports.go` (`foundation/listen_exports.go`): type
+aliases (`foundation.ChangeNotifier = listen.ChangeNotifier`) and wrappers
+of the constructors and static functions (`foundation.NewValueNotifier`,
+`foundation.ListenableMerge`). Assignable statics can't be aliased (a Go
+variable has one name) and stay in the package: `Listenable.onError` is
+`listen.ListenableOnError`. `cmd/apiparity` counts the shown names for the
+re-exporting library.
+
 ## Declarations
 
 | Dart | Go | Example |
@@ -34,6 +56,7 @@ repeated: import both packages.
 | class `Foo` | type `Foo` | `Tolerance` → `physics.Tolerance` |
 | abstract class or interface implemented by user code | interface `Foo` (+ embeddable `FooBase` when it carries state or default methods) | `Simulation` → `physics.Simulation` + `physics.SimulationBase` |
 | mixin `Foo` | interface `Foo` + embeddable struct `FooMixin` | |
+| `mixin class Foo` (a mixin that is also a concrete class) | interface `Foo` + embeddable struct `FooMixin`; `Foo()` is `NewFoo() *FooMixin` | `ChangeNotifier` → `listen.ChangeNotifier` + `listen.ChangeNotifierMixin` |
 | enum `Foo { a, b }` | `type Foo int` with `FooA`, `FooB`; `String()` gives the Dart name | `SpringType.underDamped` → `physics.SpringTypeUnderDamped` |
 | typedef of a function | func type | `ValueChanged<T>` → `foundation.ValueChanged[T]` |
 | generic `Foo<T>` | generic `Foo[T]` | |
@@ -258,10 +281,22 @@ through it. One pattern, everywhere:
   rule (`FlutterMemoryAllocations.instance` →
   `FlutterMemoryAllocationsInstance`, `BindingBase.checkInstance` →
   `BindingBaseCheckInstance`).
-- Dart compares functions by identity (`removeListener(listener)`,
-  `debugPrint != debugPrintThrottled`); Go compares the function values'
-  closure pointers: the same top-level function or the same closure value
-  is identical, a method value (`x.M`) is a new closure each time.
+- **Listeners and function identity.** Listeners are plain Go funcs
+  (`AddListener(func())`, returning nothing, as in Dart), and Dart's `==`
+  on functions (`removeListener(listener)`, `debugPrint !=
+  debugPrintThrottled`) is `dart.FunctionsEqual`: the same top-level
+  function or the same closure value is equal; a method value of a
+  pointer receiver equals another of the same receiver and method, as
+  Dart's tear-offs do (`n.AddListener(s.handleChange)` ...
+  `n.RemoveListener(s.handleChange)` works, though Go allocates a new
+  closure for each `s.handleChange`; it compares the wrapper's code
+  pointer and the receiver it captured). Divergences: a method value of a
+  value receiver or of an interface (`i.M`) equals only the same closure
+  value (keep it in a variable to remove it); a func literal that captures
+  nothing is a single value however often it is evaluated (Dart creates a
+  new closure each time); a method promoted from an embedded pointer
+  (`outer.M`, `M` of the embedded `*Inner`) is the embedded value's
+  method value.
 - Dart's `assert(() {...}())` blocks with side effects (recording a type,
   registering debug service extensions) run in debug builds only
   (`KDebugMode`); plain assertions panic in every build, as before.
@@ -322,10 +357,33 @@ Each divergence is listed here when it is introduced.
   embeddable `AbstractNodeBase`.
 - foundation: `SynchronousFuture.asStream` is not ported, and a
   `WhenComplete` action can't return a future (see "Futures").
-- foundation: `BindingBase` does not install package:listen's
-  `Listenable.onError`, and `FlutterMemoryAllocations` does not hook
-  `Listenable.debugMaybeDispatchCreated/Disposed` (package:listen is not
-  ported).
+- foundation: `FlutterMemoryAllocationsInstance` is created when the
+  package is initialized (Dart creates it on first access), so its
+  constructor installs package:listen's creation/disposal hooks before any
+  use; they dispatch only while a listener is registered, so this is not
+  observable.
+- listen: `ChangeNotifier` is an interface (plus `ChangeNotifierMixin`,
+  see `mixin class` above) whose unexported method only types embedding
+  `ChangeNotifierMixin` have (Dart's statics read its private state). A
+  type embedding it calls `SetSelf(outer)`; one embedding `ValueNotifier`
+  calls `Construct(outer, value)` (Dart's `super(value)`, which also
+  dispatches the creation). Overrides of `NotifyListeners` and `Value` are
+  reached through `self`.
+- listen: `Listenable.merge`'s `Iterable<Listenable?>` is
+  `iter.Seq[Listenable]`; a nil entry, or a nil pointer in the interface,
+  is Dart's null.
+- listen: the default `ListenableOnError` rethrows the error, but a Go
+  panic carries no stack trace, so the original stack is not preserved
+  (Dart's `Error.throwWithStackTrace`).
+- listen: `AddListener(nil)` panics (Dart's `VoidCallback` is
+  non-nullable); `RemoveListener(nil)` does nothing.
+- listen: `ValueNotifier`'s `==` is the value's `Equal(T) bool` method when
+  it has one, Go's `==` otherwise; slices, maps and funcs compare by
+  identity (Dart's `List ==`); a struct with uncomparable fields and no
+  `Equal` is never equal (a Go value has no identity); in a
+  `ValueNotifier[any]`, `1` and `1.0` differ (Dart's `1 == 1.0` is true).
+  As in diagnostics, a nullable type argument prints without `?`
+  (`ValueNotifier[*int]` is `ValueNotifier<int>`, Dart says `<int?>`).
 - dart:developer: no VM service and no timeline recorder (ENGINE GAP, see
   PLAN.md); `developer.LookupExtension` is how a registered service
   extension is invoked.

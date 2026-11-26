@@ -4,8 +4,6 @@ package foundation
 // (print.go).
 
 import (
-	"unsafe"
-
 	"github.com/jonathanperis/flutter-go/engine/src/flutter/lib/ui/go"
 	"github.com/jonathanperis/flutter-go/src/async"
 	"github.com/jonathanperis/flutter-go/src/dart"
@@ -29,7 +27,7 @@ func DebugAssertAllFoundationVarsUnset(reason string, opts ...DebugAssertAllFoun
 	if len(opts) > 0 && opts[0].DebugPrintOverride != nil {
 		override = opts[0].DebugPrintOverride
 	}
-	if KDebugMode && (funcIdentity(DebugPrint) != funcIdentity(override) ||
+	if KDebugMode && (!dart.FunctionsEqual(DebugPrint, override) ||
 		DebugDefaultTargetPlatformOverride() != nil ||
 		DebugDoublePrecision != nil ||
 		DebugBrightnessOverride != nil) {
@@ -37,12 +35,6 @@ func DebugAssertAllFoundationVarsUnset(reason string, opts ...DebugAssertAllFoun
 	}
 	return true
 }
-
-// funcIdentity is the identity of a function value, Dart's == on functions:
-// the same top-level function, or the same closure value, is identical.
-// (A Go func literal that captures nothing is one value however often it
-// is evaluated; a method value is a new closure each time.)
-func funcIdentity[F any](f F) unsafe.Pointer { return *(*unsafe.Pointer)(unsafe.Pointer(&f)) }
 
 // DebugInstrumentationEnabled enables the logging of DebugInstrumentAction
 // (debug builds only).

@@ -5,8 +5,8 @@ import (
 
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/services"
 
-	"github.com/jonathanperis/flutter-go/src/impeller"
 	r "github.com/jonathanperis/flutter-go/packages/flutter/lib/src/rendering"
+	"github.com/jonathanperis/flutter-go/src/impeller"
 )
 
 // NewCanvas returns a rendering.Canvas that records into b. It needs no GPU.

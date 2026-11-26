@@ -2,9 +2,11 @@ package foundation
 
 // Port of memory_allocations.dart (Flutter 3.50.1).
 //
-// Not ported: the constructor's hooks into package:listen's
-// Listenable.debugMaybeDispatchCreated/Disposed (ChangeNotifier and
-// Listenable come from package:listen, not ported yet).
+// The instance is created when the package is initialized (Dart creates it
+// on first access); its constructor installs package:listen's
+// Listenable.debugMaybeDispatchCreated/Disposed hooks, so ChangeNotifiers
+// report their creation and disposal (dispatched only while a listener is
+// registered, so the earlier installation is not observable).
 
 import (
 	"iter"
@@ -12,6 +14,7 @@ import (
 
 	ui "github.com/jonathanperis/flutter-go/engine/src/flutter/lib/ui/go"
 	"github.com/jonathanperis/flutter-go/src/dart"
+	"github.com/jonathanperis/flutter-go/src/pub/listen"
 )
 
 // kMemoryAllocations is Dart's bool.fromEnvironment('flutter.memory_allocations')
@@ -100,7 +103,21 @@ type FlutterMemoryAllocations struct {
 
 // FlutterMemoryAllocationsInstance is FlutterMemoryAllocations.instance,
 // the singleton.
-var FlutterMemoryAllocationsInstance = &FlutterMemoryAllocations{}
+var FlutterMemoryAllocationsInstance = newFlutterMemoryAllocations()
+
+// newFlutterMemoryAllocations is FlutterMemoryAllocations._().
+func newFlutterMemoryAllocations() *FlutterMemoryAllocations {
+	m := &FlutterMemoryAllocations{}
+	if KFlutterMemoryAllocationsEnabled {
+		listen.ListenableDebugMaybeDispatchCreated = func(className string, object any) {
+			m.DispatchObjectCreated("foundation", className, object)
+		}
+		listen.ListenableDebugMaybeDispatchDisposed = func(object any) {
+			m.DispatchObjectDisposed(object)
+		}
+	}
+	return m
+}
 
 // AddListener registers listener; the first one subscribes to dart:ui's
 // Image and Picture creation/disposal hooks.
@@ -126,10 +143,9 @@ func (m *FlutterMemoryAllocations) RemoveListener(listener ObjectEventListener) 
 	if !m.hasListenerList {
 		return
 	}
-	id := funcIdentity(listener)
 	if m.activeDispatchLoops > 0 {
 		for i, l := range m.listeners {
-			if l != nil && funcIdentity(l) == id {
+			if l != nil && dart.FunctionsEqual(l, listener) {
 				m.listeners[i] = nil
 				m.listenersContainNulls = true
 			}
@@ -137,7 +153,7 @@ func (m *FlutterMemoryAllocations) RemoveListener(listener ObjectEventListener) 
 	} else {
 		kept := m.listeners[:0]
 		for _, l := range m.listeners {
-			if funcIdentity(l) != id {
+			if !dart.FunctionsEqual(l, listener) {
 				kept = append(kept, l)
 			}
 		}

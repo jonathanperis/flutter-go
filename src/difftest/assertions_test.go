@@ -25,9 +25,9 @@ import (
 	"testing"
 	"time"
 
+	f "github.com/jonathanperis/flutter-go/packages/flutter/lib/src/foundation"
 	"github.com/jonathanperis/flutter-go/src/async"
 	"github.com/jonathanperis/flutter-go/src/dart"
-	f "github.com/jonathanperis/flutter-go/packages/flutter/lib/src/foundation"
 )
 
 type MyException struct{ text string }

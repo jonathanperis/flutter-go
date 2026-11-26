@@ -1007,7 +1007,7 @@ The standing goal is now full API parity with Flutter 3.50.1's Dart layer
   `RangeError` with an optional message, `UnimplementedError`), with
   `NewArgumentErrorValue`/`NewRangeErrorRange` constructors.
 
-### Layout: `flutter_go/` renamed `src/`; `.github/` and `.vscode/` left out
+### Layout: `src/` renamed `src/`; `.github/` and `.vscode/` left out
 - At the user's request, flutter-go's own directory is now `src/` (import
   paths `github.com/jonathanperis/flutter-go/src/...`), and upstream's
   `.vscode/` is excluded from the mirror like the AI-agent configuration.
@@ -1017,3 +1017,102 @@ The standing goal is now full API parity with Flutter 3.50.1's Dart layer
   to `flutter/flutter`); five unguarded ones (tree-analyze,
   tool-test-general, mac-verify-binaries, revert, delete-bot-branches) would
   run, and fail, on pull requests to master.
+### package:listen (ChangeNotifier, Listenable, ValueListenable, ValueNotifier)
+- Flutter 3.50.1's foundation re-exports these four from `package:listen`
+  (`flutter/core-packages`), resolved to **1.0.1** by the checkout's
+  `pubspec.lock` (sha256 47501a08…); ported from
+  `~/.pub-cache/hosted/pub.dev/listen-1.0.1/lib/src/listen.dart` (the
+  difftest's own `flutter pub get` resolved the same 1.0.1).
+- **Placement rule (API_MAPPING):** third-party packages Flutter re-exports
+  live in `src/pub/<package>` (pub's layout, files named after
+  `lib/src`), with the whole public API (`ErrorContext`, `ErrorCallback`,
+  `ObjectCreated/DisposedCallback`, `VoidCallback`, the statics
+  `ListenableOnError`/`ListenableDebugMaybeDispatchCreated/Disposed`,
+  `ListenableMerge`...). Go has no re-exports: the re-exporting package
+  declares type aliases and constructor/static wrappers in
+  `<package>_exports.go` (`foundation/listen_exports.go`); assignable
+  statics stay in listen.
+- **Design.** `mixin class ChangeNotifier` → interface `ChangeNotifier` +
+  embeddable `ChangeNotifierMixin` (self pattern; `NewChangeNotifier()`
+  returns `*ChangeNotifierMixin`, printed as Dart's `ChangeNotifier`);
+  `ValueNotifier[T]` embeds it, and embedders call `Construct(self,
+  value)` (Dart's `super(value)`, which dispatches the creation with the
+  outer object). The listener list is Dart's fixed-length list
+  (len = Dart's `_listeners.length`), with the same growth (×2), shrink
+  thresholds (`count*2 <= length`), nulling during notifications, swap
+  compaction, reentrancy counters and no `finally` (an onError that throws
+  leaves the call depth incremented, as in Dart). Listener panics are
+  recovered with the panic's stack and passed to `ListenableOnError`.
+  `assert(() {...}())` blocks run in debug builds (a `debugMode` constant
+  from the same build tags as `KDebugMode`); the dispose-during-notify
+  assert is plain (always on).
+- **Listener identity:** `dart.FunctionsEqual` (new `src/dart/identity.go`,
+  with `IdentityHashCode` moved there from foundation so listen's
+  `ValueNotifier.toString` and foundation's `shortHash` agree). Same closure
+  pointer → equal; otherwise, when both are the compiler's method-value
+  wrapper for a pointer receiver (`pkg.(*T).M-fm`, cached by code pointer)
+  with the same code pointer, the captured receivers are compared, so
+  `n.RemoveListener(s.handle)` removes an earlier `n.AddListener(s.handle)`
+  as Dart's tear-off equality does. Foundation's `funcIdentity` (debugPrint
+  check, FlutterMemoryAllocations.removeListener) now uses it too.
+  Divergences (API_MAPPING): value-receiver and interface method values
+  only equal the same closure; a non-capturing func literal is one value.
+- **Foundation gaps closed:** `BindingBase.InitInstances` runs
+  `_initListenable` (assertion errors → FlutterError: rethrown as is,
+  StateError's message, AssertionError's message or toString; listener
+  errors → `FlutterErrorReportError` with library "foundation library" and
+  context "while dispatching notifications for Listenable");
+  `FlutterMemoryAllocations._()` installs the Listenable creation/disposal
+  hooks (library "foundation"). `ObjectRuntimeType` now prints generic
+  types as Dart does (`ValueNotifier<int>`, was `ValueNotifier[int]`).
+- Tests: listen's own `test/listen_test.dart` 25/25 (the default onError's
+  stack check dropped: a Go panic carries no stack); Flutter's
+  `change_notifier_test.dart` 22/22 (with the binding's onError installed
+  and reported errors collected, as tester.takeException);
+  memory_allocations "publishers…" now ported without its Picture/Image
+  events (7/7). Own tests: Dart's `_listeners` length/layout after growth,
+  removeAt and both compaction paths (lengths derived from Dart's
+  algorithm), nested-notification compaction, tear-off removal,
+  `RemoveListener(nil)` during a notification, creation/disposal hooks,
+  ValueNotifier equality (Equal method, NaN, ±0, slices, `any`, pointers),
+  toString, overrides through self, the binding's error mapping,
+  `FunctionsEqual`/`IdentityHashCode`.
+- **Difftest** (`difftest/listen_test.go` + `flutter/test/listen_test.dart`,
+  168 log lines, identical on the first run, hashes masked): basic
+  add/remove with duplicates, removal of earlier/later listeners and of the
+  mutator itself during a notification, duplicates removed once during a
+  notification, self removal and clearing everything, three-level nested
+  notifications with removal/addition and compaction, listener errors of
+  five kinds through a logging onError, an onError that throws (escapes
+  the notification), dispose during a notification, every use after
+  dispose (with a non-throwing onError the listener is still added and
+  called), the default onError (rethrow, then deferred removal and
+  dispose's depth assert), ValueNotifier skip rules and toString (double
+  incl. NaN/−0.0/∞/1e21, String, List identity, Object?, a class with
+  ==, an overridden notifyListeners), Listenable.merge (nulls, a source
+  twice, nested toString), tear-off removal, the binding's onError
+  (reports, FlutterError.toStringDeep, ValueNotifier set after dispose
+  keeps the value) and memory-allocation events. Not compared:
+  `ValueNotifier<Object?>.toString` (Go can't print the `?`) and
+  `1 == 1.0` in a `ValueNotifier<Object?>` (Go's typed values differ).
+- **Found:** with a non-throwing `Listenable.onError`, using a disposed
+  notifier only reports: `addListener` still adds (and `notify` then calls)
+  the listener — the difftest pins this. A `ValueNotifier` whose `value=`
+  throws after dispose has already stored the value.
+- Mutations: 59 valid on listen.go, identity.go, binding.go and
+  memory_allocations.go; 56 caught, 3 equivalent (the `count == 0` early
+  return, starting the swap search at `i` (that slot is null), a reordered
+  `count++`). Caught only after adding a test: skipping nil slots in
+  `removeListener` (Go can pass nil; Dart can't). Every compaction
+  threshold/counter mutation, the dispatch hooks, the onError routing and
+  the binding's message mapping are caught.
+- apiparity follows `export 'package:listen/...'` into the pub cache (the
+  version from pubspec.lock) and counts the shown names for foundation
+  (other package: exports — meta's annotations, vector_math, characters —
+  are still skipped). Parity: 237/2885 → 241/2889 exposed, 178 → 183
+  tested (the 4 listen names, and objectRuntimeType now tested);
+  foundation 141/141, 114 tested.
+- Not done: the old hand-rolled `widgets.Notifier` (paint.go, integer
+  listener ids) and animation's listener lists don't use ChangeNotifier
+  yet; release-build (`-tags flutter_release`) runs of the debug-only
+  tests fail, as foundation's already did.
