@@ -14,8 +14,8 @@ package services_test
 //     rest of each test is ported.
 //   - binding_test.dart: the licenses test (rootBundle LICENSES), the memory
 //     pressure test (asset caches), the textInput handler test (TextInput),
-//     the keyboard state test (HardwareKeyboard) and the view focus test
-//     (ViewFocusEvent) need libraries not ported yet.
+//     and the view focus test (ViewFocusEvent) need libraries not ported
+//     yet; the keyboard state test is in binding_keyboard_test.go.
 //   - lifecycle_test.dart: TestPlatformDispatcher's
 //     initialLifecycleStateTestValue doesn't exist yet; the two testWidgets
 //     are ported by sending the states on flutter/lifecycle, as the engine
