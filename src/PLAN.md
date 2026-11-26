@@ -1754,6 +1754,13 @@ The standing goal is now full API parity with Flutter 3.50.1's Dart layer
   Canvas.drawParagraph (the `ui.EngineDrawParagraph` stand-in is gone).
   TextSelection and FontLoader are services', not dart:ui's. dart:ui parity
   133 → 158 of 195 (no text.dart name missing).
+- **Decision (user, 2026-11-26): keep the vtable bridge.** The user
+  chose to keep calling txt/SkParagraph through the Impeller SDK's vtables
+  with layout mirrors of the engine headers, rather than compiling the
+  engine's txt sources from upstream/. The risk this carries: the mirrors
+  depend on undocumented SDK internals at IMPELLER_SHA 4d35714.
+  TestTypographyMirrorsMatchTheSDK guards them, and moving to a newer
+  tag must re-check them.
 - **How it maps to the engine.** The SDK's typography C API is a small
   subset (no boxes, positions, placeholders, strut, spacing, shadows,
   features or variations), but its ImpellerParagraphBuilder and
