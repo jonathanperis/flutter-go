@@ -97,10 +97,10 @@ func (c gbClock) Now() time.Time {
 func (c gbClock) Stopwatch() *dart.Stopwatch { return dart.NewStopwatchWithClock(c.loop.Elapsed) }
 
 type gbPD struct {
-	x, y, scrollX, scrollY      float64
+	x, y, scrollX, scrollY       float64
 	pointer, device, buttons, ms int
-	kind                        ui.PointerDeviceKind
-	signal                      *ui.PointerSignalKind
+	kind                         ui.PointerDeviceKind
+	signal                       *ui.PointerSignalKind
 }
 
 func gbData(change ui.PointerChange, o gbPD) ui.PointerData {
