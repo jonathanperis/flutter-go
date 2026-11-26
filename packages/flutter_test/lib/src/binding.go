@@ -87,8 +87,13 @@ func (b *AutomatedTestWidgetsFlutterBinding) InitServiceExtensions() {
 func (b *AutomatedTestWidgetsFlutterBinding) Unlocked() { b.GestureBindingMixin.Unlocked() }
 
 // DebugSamplingClock is the test clock (_TestSamplingClock): fake time on
-// the current test's event loop, from 2015-01-01 as flutter_test's clock.
+// the test's own event loop (testWidgets' FakeAsync clock, even inside a
+// nested FakeAsync such as testGesture's), from 2015-01-01 as
+// flutter_test's clock; outside a test, the current loop's.
 func (b *AutomatedTestWidgetsFlutterBinding) DebugSamplingClock() gestures.SamplingClock {
+	if b.tester != nil {
+		return testSamplingClock{loop: b.tester.loop}
+	}
 	return testSamplingClock{loop: async.Current()}
 }
 
