@@ -582,6 +582,74 @@ void scenes() {
     t.dispose();
     lp.dispose();
   });
+  scene('secondary-only callbacks, move with secondary button', () {
+    final s = TapGestureRecognizer()..onSecondaryTap = () { log('s onSecondaryTap'); };
+    down(<GestureRecognizer>[s], pdown(1, 10, 10, buttons: kSecondaryButton));
+    up(pup(1, 10, 10));
+    final t = tapRec('tap');
+    down(<GestureRecognizer>[t], pdown(2, 10, 10, buttons: kSecondaryButton));
+    move(pmove(2, 12, 10, buttons: kSecondaryButton, dx: 2));
+    up(pup(2, 12, 10));
+    s.dispose();
+    t.dispose();
+  });
+  scene('transformed tap', () {
+    final t = tapRec('tap');
+    final m = Matrix4.translationValues(5, -3, 0);
+    final PointerDownEvent d = pdown(1, 10, 10).transformed(m) as PointerDownEvent;
+    down(<GestureRecognizer>[t], d);
+    move(pmove(1, 12, 11, dx: 2, dy: 1));
+    up(pup(1, 12, 11));
+    t.dispose();
+  });
+  scene('double tap within double-tap slop, multitap without long tap', () {
+    final dt = doubleTapRec('dt');
+    down(<GestureRecognizer>[dt], pdown(1, 10, 10));
+    up(pup(1, 10, 10));
+    elapse(100);
+    down(<GestureRecognizer>[dt], pdown(2, 70, 10));
+    up(pup(2, 70, 10));
+    elapse(400);
+    dt.dispose();
+    final m = multiTapRec('m0');
+    down(<GestureRecognizer>[m], pdown(3, 10, 10));
+    elapse(1000);
+    up(pup(3, 10, 10));
+    m.dispose();
+  });
+  scene('serial taps with different buttons', () {
+    final SerialTapGestureRecognizer s = serialTapRec('s');
+    down(<GestureRecognizer>[s], pdown(1, 10, 10));
+    up(pup(1, 10, 10));
+    elapse(100);
+    down(<GestureRecognizer>[s], pdown(2, 10, 10, buttons: kSecondaryButton));
+    up(pup(2, 10, 10));
+    elapse(400);
+    s.dispose();
+  });
+  scene('long press with synthesized moves', () {
+    final lp = longPressRec('lp');
+    down(<GestureRecognizer>[lp], pdown(1, 10, 10, ms: 0));
+    elapse(600);
+    move(PointerMoveEvent(pointer: 1, position: const Offset(30, 10), delta: const Offset(20, 0),
+        timeStamp: const Duration(milliseconds: 610), synthesized: true));
+    move(pmove(1, 31, 10, ms: 620, dx: 1));
+    move(pmove(1, 33, 10, ms: 630, dx: 2));
+    up(pup(1, 33, 10, ms: 640));
+    lp.dispose();
+  });
+  scene('force press thresholds and rejection', () {
+    final f = forcePressRec('f');
+    final t = tapRec('tap');
+    down(<GestureRecognizer>[f, t], pdown(1, 10, 10, pressure: 0, pressureMax: 6));
+    move(pmove(1, 10, 10, pressure: 2.7, pressureMax: 6));
+    move(pmove(1, 10, 10, pressure: 3.2, pressureMax: 6));
+    up(pup(1, 10, 10));
+    down(<GestureRecognizer>[f, t], pdown(2, 10, 10, pressure: 0, pressureMax: 6));
+    up(pup(2, 10, 10));
+    f.dispose();
+    t.dispose();
+  });
   scene('details defaults', () {
     show('TapDownDetails', TapDownDetails());
     show('TapUpDetails', TapUpDetails(kind: PointerDeviceKind.mouse, globalPosition: const Offset(1, 2)));

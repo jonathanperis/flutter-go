@@ -21,6 +21,7 @@ import (
 	flutter_test "github.com/jonathanperis/flutter-go/packages/flutter_test/lib/src"
 	"github.com/jonathanperis/flutter-go/src/async"
 	"github.com/jonathanperis/flutter-go/src/dart"
+	vm "github.com/jonathanperis/flutter-go/src/pub/vector_math"
 )
 
 var (
@@ -646,6 +647,76 @@ func rtScenes() {
 		rtup(rtPUp(1, 10, 10))
 		t.Dispose()
 		lp.Dispose()
+	})
+	rtscene("secondary-only callbacks, move with secondary button", func() {
+		s := g.NewTapGestureRecognizer()
+		s.OnSecondaryTap = func() { rtlog("s onSecondaryTap") }
+		rtdown(rtRs(s), rtPDown(1, 10, 10, rtEv{buttons: g.KSecondaryButton}))
+		rtup(rtPUp(1, 10, 10))
+		t := rtTapRec("tap")
+		rtdown(rtRs(t), rtPDown(2, 10, 10, rtEv{buttons: g.KSecondaryButton}))
+		rtmove(rtPMove(2, 12, 10, rtEv{buttons: g.KSecondaryButton, dx: 2}))
+		rtup(rtPUp(2, 12, 10))
+		s.Dispose()
+		t.Dispose()
+	})
+	rtscene("transformed tap", func() {
+		t := rtTapRec("tap")
+		m := vm.NewMatrix4TranslationValues(5, -3, 0)
+		d := rtPDown(1, 10, 10).Transformed(m).(*g.PointerDownEvent)
+		rtdown(rtRs(t), d)
+		rtmove(rtPMove(1, 12, 11, rtEv{dx: 2, dy: 1}))
+		rtup(rtPUp(1, 12, 11))
+		t.Dispose()
+	})
+	rtscene("double tap within double-tap slop, multitap without long tap", func() {
+		dt := rtDoubleTapRec("dt")
+		rtdown(rtRs(dt), rtPDown(1, 10, 10))
+		rtup(rtPUp(1, 10, 10))
+		rtelapse(100)
+		rtdown(rtRs(dt), rtPDown(2, 70, 10))
+		rtup(rtPUp(2, 70, 10))
+		rtelapse(400)
+		dt.Dispose()
+		m := rtMultiTapRec("m0", 0)
+		rtdown(rtRs(m), rtPDown(3, 10, 10))
+		rtelapse(1000)
+		rtup(rtPUp(3, 10, 10))
+		m.Dispose()
+	})
+	rtscene("serial taps with different buttons", func() {
+		s := rtSerialTapRec("s")
+		rtdown(rtRs(s), rtPDown(1, 10, 10))
+		rtup(rtPUp(1, 10, 10))
+		rtelapse(100)
+		rtdown(rtRs(s), rtPDown(2, 10, 10, rtEv{buttons: g.KSecondaryButton}))
+		rtup(rtPUp(2, 10, 10))
+		rtelapse(400)
+		s.Dispose()
+	})
+	rtscene("long press with synthesized moves", func() {
+		lp := rtLongPressRec("lp")
+		rtdown(rtRs(lp), rtPDown(1, 10, 10, rtEv{ms: 0}))
+		rtelapse(600)
+		rtmove(g.NewPointerMoveEvent(g.PointerMoveEventOptions{Pointer: 1, Position: ui.NewOffset(30, 10),
+			Delta: ui.NewOffset(20, 0), TimeStamp: 610 * time.Millisecond, Synthesized: true}))
+		rtmove(rtPMove(1, 31, 10, rtEv{ms: 620, dx: 1}))
+		rtmove(rtPMove(1, 33, 10, rtEv{ms: 630, dx: 2}))
+		rtup(rtPUp(1, 33, 10, rtEv{ms: 640}))
+		lp.Dispose()
+	})
+	rtscene("force press thresholds and rejection", func() {
+		fp := rtForcePressRec("f")
+		t := rtTapRec("tap")
+		six := rtF(6)
+		rtdown(rtRs(fp, t), rtPDown(1, 10, 10, rtEv{pressure: rtF(0), pressureMax: six}))
+		rtmove(rtPMove(1, 10, 10, rtEv{pressure: rtF(2.7), pressureMax: six}))
+		rtmove(rtPMove(1, 10, 10, rtEv{pressure: rtF(3.2), pressureMax: six}))
+		rtup(rtPUp(1, 10, 10))
+		rtdown(rtRs(fp, t), rtPDown(2, 10, 10, rtEv{pressure: rtF(0), pressureMax: six}))
+		rtup(rtPUp(2, 10, 10))
+		fp.Dispose()
+		t.Dispose()
 	})
 	rtscene("details defaults", func() {
 		stylus := ui.PointerDeviceKindStylus
