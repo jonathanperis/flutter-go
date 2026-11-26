@@ -4,16 +4,49 @@ import (
 	"math"
 	"testing"
 	"time"
+
+	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/foundation"
+	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/scheduler"
 )
 
 const ms = time.Millisecond
 
-func frame(s *Scheduler, ts time.Duration) { s.BeginFrame(ts); s.EndFrame() }
+// testBinding is a SchedulerBinding for these tests (one per process, as
+// in Flutter); frames are driven by hand, as scheduler_tester.dart's tick.
+type testBinding struct {
+	scheduler.SchedulerBindingMixin
+}
+
+var binding *testBinding
+
+// newScheduler returns the binding (created once), which is also the
+// controllers' ticker provider.
+func newScheduler() *testBinding {
+	if binding == nil {
+		b := &testBinding{}
+		base := &foundation.BindingBaseBase{}
+		b.SchedulerBindingMixin.BindingBase = base
+		b.SetSelf(b)
+		base.Construct(b)
+		binding = b
+	}
+	return binding
+}
+
+func (*testBinding) CreateTicker(onTick scheduler.TickerCallback) *scheduler.Ticker {
+	return scheduler.NewTicker(onTick)
+}
+
+func (s *testBinding) BeginFrame(ts time.Duration) { s.HandleBeginFrame(&ts) }
+func (s *testBinding) EndFrame()                   { s.HandleDrawFrame() }
+
+func frame(s *testBinding, ts time.Duration) { s.BeginFrame(ts); s.EndFrame() }
 
 func TestForwardFromIdleStartsAtFirstTick(t *testing.T) {
-	s := NewScheduler()
+	s := newScheduler()
 	frame(s, 100*ms) // an idle frame; time passes
 	c := NewController(s, 200*ms)
+	t.Cleanup(c.Dispose)
 	var statuses []Status
 	c.AddStatusListener(func(st Status) { statuses = append(statuses, st) })
 	c.Forward() // outside a frame
@@ -38,8 +71,9 @@ func TestForwardFromIdleStartsAtFirstTick(t *testing.T) {
 }
 
 func TestStartedInsideFrameUsesFrameTimestamp(t *testing.T) {
-	s := NewScheduler()
+	s := newScheduler()
 	c := NewController(s, 100*ms)
+	t.Cleanup(c.Dispose)
 	s.BeginFrame(1000 * ms)
 	c.Forward() // e.g. from didUpdateWidget during build
 	s.EndFrame()
@@ -50,8 +84,9 @@ func TestStartedInsideFrameUsesFrameTimestamp(t *testing.T) {
 }
 
 func TestReverseDurationScalesWithDistance(t *testing.T) {
-	s := NewScheduler()
+	s := newScheduler()
 	c := NewController(s, 400*ms)
+	t.Cleanup(c.Dispose)
 	c.SetValue(0.25)
 	c.Reverse() // 0.25 of the range → 100ms
 	frame(s, 0)

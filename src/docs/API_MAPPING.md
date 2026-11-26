@@ -262,6 +262,27 @@ through it. One pattern, everywhere:
 
 ## Bindings, zones and statics
 
+- A binding mixin (`mixin SchedulerBinding on BindingBase`) is an
+  interface (`scheduler.SchedulerBinding`) plus an embeddable struct
+  (`SchedulerBindingMixin`) whose embedded `foundation.BindingBase` is the
+  binding it is mixed onto, Dart's `super` (a `*BindingBaseBase`, or the
+  mixin below it, so mixins stack in Dart's order). A binding embeds the
+  topmost mixin, sets the chain, calls the mixin's `SetSelf`, then
+  `Construct` on the base:
+
+  ```go
+  type MyBinding struct{ scheduler.SchedulerBindingMixin }
+
+  b := &MyBinding{}
+  base := &foundation.BindingBaseBase{}
+  b.SchedulerBindingMixin.BindingBase = base
+  b.SetSelf(b)
+  base.Construct(b)
+  ```
+- A binding can be constructed once per process, as in Dart. Go runs a
+  package's tests in one process, so tests that need a binding of their
+  own (each Dart test file has its own isolate) re-run themselves in a
+  child process (`isolated(t)` in the scheduler tests and difftests).
 - `BindingBase` is an interface plus the embeddable `BindingBaseBase`. A
   binding embeds it (and its mixins) and its constructor calls
   `b.Construct(b)`, which is Dart's `BindingBase()` constructor: it sets
@@ -310,6 +331,30 @@ flutter_release`, `-tags flutter_profile`); the default build is debug, as
 ## Known divergences
 
 Each divergence is listed here when it is introduced.
+
+- scheduler: `scheduleTask<T>` (a generic method) is the function
+  `scheduler.ScheduleTask[T](binding, task, priority, opts)`, and
+  `ScheduleTaskFuture` for a task returning a future (Dart's
+  `FutureOr<T>`). `SchedulingStrategy`'s required named parameters are
+  positional; `schedulingStrategy` is `SchedulingStrategy()` /
+  `SetSchedulingStrategy`. `handleBeginFrame(Duration?)` takes a
+  `*time.Duration`; `lifecycleState` and `debugGetRequestedPerformanceMode`
+  return pointers (nil is null).
+- scheduler: `Ticker` is a struct (Flutter extends it): a type embedding it
+  calls `SetSelf`, and `TickerProvider.CreateTicker` returns `*Ticker` (the
+  embedded one). `toString({debugIncludeStack})` is
+  `ToString(TickerToStringOptions{...})`; a `""` `DebugLabel` stands for
+  null (both print nothing), as does `""` for `addPostFrameCallback`'s
+  `debugLabel` (meaning the default, `"callback"`).
+- dart:ui: PlatformDispatcher callbacks are called directly (Go has no
+  zones to run them in). The `external` natives (`scheduleFrame`,
+  `endWarmUpFrame`, `setNeedsReportTimings`, `requestDartPerformanceMode`)
+  go to the embedder's `ui.PlatformConfigurationClient`, installed with
+  `ui.SetPlatformConfiguration`; the engine's frame
+  (`PlatformConfiguration::BeginFrame`: begin frame, drain microtasks, draw
+  frame) is `PlatformConfiguration.BeginFrame`. ENGINE GAP: no
+  `Dart_SetPerformanceMode` (the mode is only recorded) and no frame
+  timings are collected.
 
 - `physics.NearEqual` takes `float64`, not `double?`: Dart's null case
   (`nearEqual(null, null) == true`) has no Go equivalent.

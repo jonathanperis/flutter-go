@@ -46,6 +46,16 @@ Start here when continuing flutter-go in a new session.
   4. Port `SchedulerBinding`/`Ticker`/`TickerFuture` into
      `packages/flutter/lib/src/scheduler` on `src/async`; move
      `animation` onto it (it still holds the old scheduler).
+     Matrix4.
+  4. Done: scheduler, in full (SchedulerBinding as `SchedulerBindingMixin`
+     over `foundation.BindingBase`, Ticker, TickerFuture, Priority,
+     timeDilation), with dart:ui's frame entry points (PlatformDispatcher
+     onBeginFrame/onDrawFrame/scheduleFrame/onReportTimings and the engine's
+     `PlatformConfiguration.BeginFrame`, partial). `animation.Controller`,
+     widgets, the tester (`flutter_test.AutomatedTestWidgetsFlutterBinding`)
+     and the window runner (`src/app`) run on it. Next for it: port
+     AnimationController in full (it still is the ad-hoc `Controller`) and
+     TickerProviderStateMixin/TickerMode in widgets.
   5. Split `widgets` (gestures code) and `services` (text-editing model
      under non-Flutter names) by library.
 

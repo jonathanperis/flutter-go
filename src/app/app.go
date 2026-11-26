@@ -2,16 +2,19 @@
 package app
 
 import (
-	ui "github.com/jonathanperis/flutter-go/engine/src/flutter/lib/ui/go"
 	"log"
 	"runtime"
 	"time"
 
 	"github.com/go-gl/glfw/v3.3/glfw"
 
+	ui "github.com/jonathanperis/flutter-go/engine/src/flutter/lib/ui/go"
+	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/foundation"
 	r "github.com/jonathanperis/flutter-go/packages/flutter/lib/src/rendering"
+	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/scheduler"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/services"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/widgets"
+	"github.com/jonathanperis/flutter-go/src/async"
 	"github.com/jonathanperis/flutter-go/src/impeller"
 	"github.com/jonathanperis/flutter-go/src/platform/metal"
 )
@@ -57,7 +60,53 @@ type Options struct {
 	Window func(w *glfw.Window)
 }
 
+// appBinding is the app's binding (partial WidgetsFlutterBinding:
+// BindingBase and SchedulerBinding); its persistent frame callback draws
+// the tree into the frame being produced, as WidgetsBinding.drawFrame
+// does.
+type appBinding struct {
+	scheduler.SchedulerBindingMixin
+	// drawFrame is the rendering pipeline for the frame in progress.
+	drawFrame func()
+}
+
+var binding *appBinding
+
+func ensureBinding() *appBinding {
+	if binding == nil {
+		b := &appBinding{}
+		base := &foundation.BindingBaseBase{}
+		b.SchedulerBindingMixin.BindingBase = base
+		b.SetSelf(b)
+		base.Construct(b)
+		b.AddPersistentFrameCallback(func(time.Duration) {
+			if b.drawFrame != nil {
+				b.drawFrame()
+			}
+		})
+		binding = b
+	}
+	return binding
+}
+
+// engine is the embedder's side of dart:ui's PlatformConfiguration: the
+// framework's frame requests (PlatformDispatcher.scheduleFrame) set
+// needsFrame, and the run loop produces the frame at the next vsync.
+type engine struct{ needsFrame bool }
+
+func (e *engine) ScheduleFrame()             { e.needsFrame = true }
+func (e *engine) EndWarmUpFrame()            {}
+func (e *engine) SetNeedsReportTimings(bool) {} // ENGINE GAP: no frame timings are collected
+
 // Run shows root in a window until it is closed.
+//
+// Frames follow Flutter's engine protocol: the framework requests one
+// through SchedulerBinding.ScheduleFrame (PlatformDispatcher.scheduleFrame),
+// and the loop produces it with PlatformConfiguration.BeginFrame (begin
+// frame: transient callbacks; microtasks; draw frame: build, layout, paint)
+// before presenting, paced by Metal presentation (vsync). Between frames,
+// the event loop (src/async's current Loop, its clock following the
+// wall clock) runs timers and microtasks.
 func Run(root widgets.Widget, o Options) error {
 	if err := glfw.Init(); err != nil {
 		return err
@@ -84,13 +133,16 @@ func Run(root widgets.Widget, o Options) error {
 	defer tc.Release()
 	r.SetTextEngine(impellerText{tc})
 
-	needsFrame := true
-	owner := &widgets.BuildOwner{OnNeedsFrame: func() { needsFrame = true }}
-	epoch := time.Now() // frame timestamps are measured from here
+	eng := &engine{}
+	pc := ui.NewPlatformConfiguration(eng)
+	defer ui.SetPlatformConfiguration(pc)()
+	b := ensureBinding()
+	loop := async.Current()
+	owner := &widgets.BuildOwner{OnNeedsFrame: b.EnsureVisualUpdate}
+	epoch := time.Now().Add(-loop.Elapsed()) // frame timestamps and the loop's clock are measured from here
 	router := widgets.NewPointerRouter(owner)
 	owner.Platform = services.MacOS
 	owner.Clipboard = glfwClipboard{win}
-	owner.Scheduler().Clock = func() time.Duration { return time.Since(epoch) }
 	// Committed text (typing, and IME text once composition finishes).
 	win.SetCharCallback(func(_ *glfw.Window, ch rune) { owner.DispatchText(string(ch)) })
 	win.SetKeyCallback(func(_ *glfw.Window, k glfw.Key, _ int, a glfw.Action, m glfw.ModifierKey) {
@@ -108,6 +160,7 @@ func Run(root widgets.Widget, o Options) error {
 	ww, wh := win.GetSize()
 	owner.SetViewSize(ui.Size{Width: float64(ww), Height: float64(wh)})
 	owner.RunApp(root)
+	b.ScheduleFrame() // Flutter's runApp schedules a warm-up frame; here the first frame waits for the loop
 
 	// GLFW reports cursor positions in logical points, which is what layout uses.
 	win.SetMouseButtonCallback(func(w *glfw.Window, b glfw.MouseButton, a glfw.Action, _ glfw.ModifierKey) {
@@ -133,25 +186,37 @@ func Run(root widgets.Widget, o Options) error {
 		x, y := w.GetCursorPos()
 		router.Scroll(ui.Offset{Dx: x, Dy: y}, -yoff*WheelPixelsPerLine)
 	})
-	win.SetSizeCallback(func(*glfw.Window, int, int) { needsFrame = true })
+	// A resize needs a frame at the new size even if frames are disabled
+	// (Flutter's handleMetricsChanged: scheduleForcedFrame).
+	win.SetSizeCallback(func(*glfw.Window, int, int) { b.ScheduleForcedFrame() })
 	// The window system asks for a redraw when the window is first shown,
 	// uncovered, or changes screens. Without this, a frame drawn before the
-	// window was visible is never replaced.
-	win.SetRefreshCallback(func(*glfw.Window) { needsFrame = true })
+	// window was visible is never replaced. The tree itself is unchanged, so
+	// this is an engine-side frame (the framework repaints from its layers).
+	win.SetRefreshCallback(func(*glfw.Window) { eng.needsFrame = true })
 
 	paint := impeller.NewPaint()
 	defer paint.Release()
+	var frameNumber uint64
 	for frames := 0; !win.ShouldClose(); {
-		if needsFrame {
-			needsFrame = false
+		loop.ElapseTo(time.Since(epoch)) // timers due by now, with their microtasks
+		loop.RunPosted()
+		if eng.needsFrame {
+			eng.needsFrame = false
 			start := time.Now()
 			w, h := win.GetSize()
 			scale := layer.Scale()
-			b := impeller.NewDisplayListBuilder()
-			b.Scale(scale, scale)
-			owner.DrawFrameAt(start.Sub(epoch), ui.Size{Width: float64(w), Height: float64(h)}, &impellerCanvas{b, paint})
-			dl := b.Build()
-			b.Release()
+			dlb := impeller.NewDisplayListBuilder()
+			dlb.Scale(scale, scale)
+			b.drawFrame = func() {
+				owner.DrawFrame(ui.Size{Width: float64(w), Height: float64(h)}, &impellerCanvas{dlb, paint})
+			}
+			frameNumber++
+			b.EnsureFrameCallbacksRegistered() // a refresh can come before the framework asked for a frame
+			pc.BeginFrame(start.Sub(epoch), frameNumber)
+			b.drawFrame = nil
+			dl := dlb.Build()
+			dlb.Release()
 			cpu := time.Since(start)
 			err := layer.Present(ctx.Handle(), dl.Handle())
 			dl.Release()
@@ -180,15 +245,15 @@ func Run(root widgets.Widget, o Options) error {
 				break
 			}
 		}
-		if needsFrame {
+		if eng.needsFrame || loop.MicrotaskCount() > 0 {
 			glfw.PollEvents() // animating: don't sleep; presenting paces us to the display
-		} else if next, ok := owner.Scheduler().NextTimer(); ok {
+		} else if next, ok := loop.NextDeadline(); ok {
 			// Sleep until input or the next timer (e.g. cursor blink).
 			glfw.WaitEventsTimeout(max(0.001, (next - time.Since(epoch)).Seconds()))
 		} else {
 			glfw.WaitEvents()
 		}
-		owner.Scheduler().RunTimers(time.Since(epoch))
+		loop.FlushMicrotasks() // microtasks queued by input handlers
 	}
 	if rr := owner.RenderRoot(); rr != nil {
 		r.Dispose(rr)

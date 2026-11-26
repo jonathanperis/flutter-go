@@ -3,6 +3,8 @@ package widgets
 import (
 	"time"
 
+	"github.com/jonathanperis/flutter-go/src/async"
+
 	r "github.com/jonathanperis/flutter-go/packages/flutter/lib/src/rendering"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/services"
 )
@@ -95,7 +97,7 @@ type textFieldState struct {
 	own          *TextEditingController
 	focused      bool
 	caretVisible bool
-	blinkTimer   int
+	blinkTimer   *async.Timer
 	render       *r.RenderEditable
 }
 
@@ -188,9 +190,8 @@ func (s *textFieldState) restartBlink() {
 }
 
 func (s *textFieldState) scheduleBlink() {
-	sched := s.Context().Scheduler()
-	s.blinkTimer = sched.AfterFunc(CursorBlinkHalfPeriod, func() {
-		s.blinkTimer = 0
+	s.blinkTimer = async.NewTimer(CursorBlinkHalfPeriod, func() {
+		s.blinkTimer = nil
 		if !s.focused || !s.Context().mounted {
 			return
 		}
@@ -201,9 +202,9 @@ func (s *textFieldState) scheduleBlink() {
 }
 
 func (s *textFieldState) stopBlink() {
-	if s.blinkTimer != 0 {
-		s.Context().Scheduler().CancelTimer(s.blinkTimer)
-		s.blinkTimer = 0
+	if s.blinkTimer != nil {
+		s.blinkTimer.Cancel()
+		s.blinkTimer = nil
 	}
 }
 

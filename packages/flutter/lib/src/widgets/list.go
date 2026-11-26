@@ -62,8 +62,12 @@ func (e *Element) attachController(c *ScrollController) {
 		}
 		c = e.ownScroll
 	}
+	if old := e.scrollCtl; old != nil && old != c {
+		old.goIdle() // the old position is disposed with its activity
+	}
+	e.scrollCtl = c
 	list := e.render.(*r.RenderFixedExtentList)
-	c.sched = e.Scheduler()
+	c.vsync = e.Vsync()
 	if c.DevicePixelRatio == 0 {
 		c.DevicePixelRatio = e.owner.DevicePixelRatio
 	}

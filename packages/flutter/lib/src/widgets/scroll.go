@@ -8,6 +8,7 @@ import (
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/animation"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/physics"
 	r "github.com/jonathanperis/flutter-go/packages/flutter/lib/src/rendering"
+	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/scheduler"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/services"
 )
 
@@ -40,7 +41,7 @@ var (
 type ScrollController struct {
 	list    *r.RenderFixedExtentList
 	initial float64
-	sched   *animation.Scheduler
+	vsync   scheduler.TickerProvider // set when attached
 	anim    *animation.Controller
 	// DevicePixelRatio sets physics tolerances (Flutter's toleranceFor).
 	// flutter_test uses 3; 0 means 1.
@@ -250,7 +251,7 @@ func (c *ScrollController) createBallisticSimulation(v float64) physics.Simulati
 // goBallistic starts a ballistic activity at velocity v (px/s, positive
 // scrolls content up), or goes idle if the physics say nothing to do.
 func (c *ScrollController) goBallistic(v float64) {
-	if c.list == nil || c.sched == nil {
+	if c.list == nil || c.vsync == nil {
 		return
 	}
 	c.goIdle()
@@ -258,7 +259,7 @@ func (c *ScrollController) goBallistic(v float64) {
 	if sim == nil {
 		return
 	}
-	a := animation.NewUnboundedController(c.sched, c.list.ScrollOffset())
+	a := animation.NewUnboundedController(c.vsync, c.list.ScrollOffset())
 	c.anim = a
 	a.AddListener(func() {
 		// BallisticScrollActivity.applyMoveTo: stop if the physics refuse.
@@ -293,12 +294,12 @@ func (c *ScrollController) JumpTo(offset float64) {
 // AnimateTo scrolls to offset over d with curve (a DrivenScrollActivity):
 // it stops if the physics refuse a position, then settles.
 func (c *ScrollController) AnimateTo(offset float64, d time.Duration, curve animation.Curve) {
-	if c.list == nil || c.sched == nil {
+	if c.list == nil || c.vsync == nil {
 		c.JumpTo(offset)
 		return
 	}
 	c.goIdle()
-	a := animation.NewUnboundedController(c.sched, c.list.ScrollOffset())
+	a := animation.NewUnboundedController(c.vsync, c.list.ScrollOffset())
 	c.anim = a
 	a.AddListener(func() {
 		if c.setPixels(a.Value()) != 0 {

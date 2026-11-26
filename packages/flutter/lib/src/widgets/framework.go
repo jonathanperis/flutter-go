@@ -14,10 +14,9 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
-	"time"
 
-	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/animation"
 	r "github.com/jonathanperis/flutter-go/packages/flutter/lib/src/rendering"
+	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/scheduler"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/services"
 )
 
@@ -112,6 +111,7 @@ type Element struct {
 	render    r.RenderBox       // own render object (kindRender and kindLazy)
 	lazy      map[int]*Element  // live items by index (kindLazy only)
 	ownScroll *ScrollController // used when a ListViewBuilder has none
+	scrollCtl *ScrollController // the controller attached to a ListViewBuilder
 	// inherited maps each InheritedWidget type to the nearest ancestor
 	// element providing it (shared with the parent unless e provides one).
 	inherited map[reflect.Type]*Element
@@ -487,6 +487,11 @@ func (e *Element) unmount() {
 	if s, ok := e.state.(disposer); ok {
 		s.Dispose()
 	}
+	if e.scrollCtl != nil {
+		// Scrollable's dispose: the position's activity (its animation)
+		// is disposed.
+		e.scrollCtl.goIdle()
+	}
 	if d, ok := e.render.(r.Disposer); ok {
 		d.Dispose()
 	}
@@ -505,15 +510,17 @@ func (e *Element) Walk(visit func(*Element)) {
 
 // BuildOwner tracks dirty elements and the root of the tree.
 type BuildOwner struct {
-	dirty        []*Element
-	root         *Element
-	rootRender   *r.RenderView
+	dirty      []*Element
+	root       *Element
+	rootRender *r.RenderView
+	// OnNeedsFrame is called when a build, layout or paint is needed
+	// (Flutter's onBuildScheduled / requestVisualUpdate): drivers point it
+	// at SchedulerBinding.EnsureVisualUpdate.
 	OnNeedsFrame func()
 	// Builds counts Build calls, for tests and benchmarks.
 	Builds int
 	// Repainted is how many repaint boundaries the last frame repainted.
 	Repainted int
-	sched     *animation.Scheduler
 	// DevicePixelRatio is physical pixels per logical pixel (sets scroll
 	// physics tolerances). 0 means 1.
 	DevicePixelRatio float64
@@ -528,21 +535,16 @@ type BuildOwner struct {
 	pendingRoot *rootWidget
 }
 
-// Scheduler returns the frame scheduler that drives tickers.
-func (o *BuildOwner) Scheduler() *animation.Scheduler {
-	if o.sched == nil {
-		o.sched = animation.NewScheduler()
-		o.sched.RequestFrame = func() {
-			if o.OnNeedsFrame != nil {
-				o.OnNeedsFrame()
-			}
-		}
-	}
-	return o.sched
-}
+// Vsync is the TickerProvider for animations of e's subtree (Flutter's
+// TickerProviderStateMixin, without TickerMode muting yet): its tickers
+// tick with SchedulerBinding's frames.
+func (e *Element) Vsync() scheduler.TickerProvider { return tickerProvider{} }
 
-// Scheduler returns the frame scheduler (Flutter's TickerProvider/vsync).
-func (e *Element) Scheduler() *animation.Scheduler { return e.owner.Scheduler() }
+type tickerProvider struct{}
+
+func (tickerProvider) CreateTicker(onTick scheduler.TickerCallback) *scheduler.Ticker {
+	return scheduler.NewTicker(onTick)
+}
 
 func (o *BuildOwner) scheduleBuild(e *Element) {
 	o.dirty = append(o.dirty, e)
@@ -617,16 +619,12 @@ func (o *BuildOwner) BuildScope() {
 	}
 }
 
-// DrawFrame draws a frame at the current timestamp (no time passes).
+// DrawFrame builds, lays out and paints the tree into cv at size: the
+// rendering pipeline that Flutter's WidgetsBinding.drawFrame runs as a
+// persistent frame callback, after SchedulerBinding has run the transient
+// callbacks (tickers) in HandleBeginFrame. Drivers (flutter_test's tester,
+// src/app) call it from their binding's persistent frame callback.
 func (o *BuildOwner) DrawFrame(size r.Size, cv r.Canvas) {
-	o.DrawFrameAt(o.Scheduler().Now(), size, cv)
-}
-
-// DrawFrameAt runs one frame at timestamp ts: tickers, then build, layout
-// and paint, in Flutter's order.
-func (o *BuildOwner) DrawFrameAt(ts time.Duration, size r.Size, cv r.Canvas) {
-	s := o.Scheduler()
-	s.BeginFrame(ts)
 	if size != o.viewSize {
 		// The view changed size: update MediaQuery; its dependents rebuild.
 		o.viewSize = size
@@ -638,7 +636,6 @@ func (o *BuildOwner) DrawFrameAt(ts time.Duration, size r.Size, cv r.Canvas) {
 	o.BuildScope()
 	r.Layout(o.rootRender, r.Tight(size))
 	o.Repainted = r.Composite(o.rootRender, cv, r.Offset{})
-	s.EndFrame()
 }
 
 // rootWidget hosts the app's widget under the owner's root render object.

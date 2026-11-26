@@ -61,6 +61,9 @@ func TestBindingMatchesFlutter(t *testing.T) {
 	if err != nil {
 		t.Skipf("no reference (%v); run scripts/difftest.sh", err)
 	}
+	if !isolated(t) { // it constructs its own binding
+		return
+	}
 	var ref struct{ Log []string }
 	if err := json.Unmarshal(data, &ref); err != nil {
 		t.Fatal(err)

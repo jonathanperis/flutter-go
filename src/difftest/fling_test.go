@@ -29,7 +29,7 @@ func runFling(t *testing.T, start, velocity float64) [][2]float64 {
 	var s [][2]float64
 	sample := func() [2]float64 {
 		sched := 0.0
-		if tester.Owner.Scheduler().HasScheduledFrame() {
+		if tester.Binding().HasScheduledFrame() {
 			sched = 1
 		}
 		return [2]float64{c.Offset(), sched}

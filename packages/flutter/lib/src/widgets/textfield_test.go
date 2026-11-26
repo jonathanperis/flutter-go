@@ -26,7 +26,7 @@ func TestCaretBlinksWithTimersNotFrames(t *testing.T) {
 	if !caretDrawn(tester) {
 		t.Fatal("caret should be visible right after focus")
 	}
-	if tester.Owner.Scheduler().HasScheduledFrame() {
+	if tester.Binding().HasScheduledFrame() {
 		t.Fatal("blinking must not keep frames scheduled (Flutter uses a Timer)")
 	}
 	tester.Pump(499 * time.Millisecond)

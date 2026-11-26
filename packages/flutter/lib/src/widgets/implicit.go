@@ -35,7 +35,7 @@ type animatedBoxState struct {
 func targetOf(w AnimatedBox) boxValues { return boxValues{w.Width, w.Height, w.Color} }
 
 func (s *animatedBoxState) InitState() {
-	s.ctrl = animation.NewController(s.Context().Scheduler(), s.Widget().Duration)
+	s.ctrl = animation.NewController(s.Context().Vsync(), s.Widget().Duration)
 	s.ctrl.AddListener(func() { s.SetState(nil) })
 	s.begin, s.end = targetOf(s.Widget()), targetOf(s.Widget())
 }

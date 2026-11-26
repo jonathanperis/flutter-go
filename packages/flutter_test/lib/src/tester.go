@@ -4,12 +4,14 @@
 package flutter_test
 
 import (
-	ui "github.com/jonathanperis/flutter-go/engine/src/flutter/lib/ui/go"
 	"math"
 	"testing"
 	"time"
 
+	ui "github.com/jonathanperis/flutter-go/engine/src/flutter/lib/ui/go"
+	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/foundation"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/services"
+	"github.com/jonathanperis/flutter-go/src/async"
 
 	r "github.com/jonathanperis/flutter-go/packages/flutter/lib/src/rendering"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/widgets"
@@ -22,55 +24,85 @@ type Tester struct {
 	Size   r.Size
 	// Canvas holds the last frame's paint commands.
 	Canvas *r.Recorder
-	// Now is the fake clock (frame timestamp).
-	Now time.Duration
 	// eventTime overrides pointer event timestamps (seconds) when >= 0.
 	eventTime float64
+
+	binding     *AutomatedTestWidgetsFlutterBinding
+	loop        *async.Loop // the test's fake event loop (FakeAsync)
+	restoreLoop func()
+	lastSize    ui.Size // Size when last pumped (a change is a metrics change)
+
+	previousOnError  foundation.FlutterExceptionHandler
+	pendingException *foundation.FlutterErrorDetails
 }
 
-// New creates a tester with Flutter's default test surface (800×600).
+// TakeException returns the exception reported (to FlutterErrorOnError)
+// since the last call, and clears it; nil if there was none.
+func (t *Tester) TakeException() any {
+	e := t.pendingException
+	t.pendingException = nil
+	if e == nil {
+		return nil
+	}
+	return e.Exception
+}
+
+// New creates a tester with Flutter's default test surface (800×600), in
+// AutomatedTestWidgetsFlutterBinding with a fresh fake event loop (made
+// current until the test ends, as testWidgets runs the body in its own
+// FakeAsync zone). When the test ends, the tree is unmounted and
+// flutter_test's post-test invariants are checked.
 func New(t testing.TB) *Tester {
 	r.SetTextEngine(r.FixedTextEngine{})
+	binding := AutomatedTestWidgetsFlutterBindingEnsureInitialized()
 	// flutter_test's default view: 800×600 logical pixels at DPR 3.
 	o := &widgets.BuildOwner{DevicePixelRatio: 3}
-	tt := &Tester{t: t, Owner: o, router: widgets.NewPointerRouter(o), Size: ui.Size{Width: 800, Height: 600}}
+	tt := &Tester{t: t, Owner: o, router: widgets.NewPointerRouter(o), Size: ui.Size{Width: 800, Height: 600},
+		binding: binding, loop: async.NewLoop()}
 	o.SetViewSize(tt.Size)
 	tt.router.Now = func() float64 {
 		if tt.eventTime >= 0 {
 			return tt.eventTime
 		}
-		return tt.Now.Seconds()
+		return tt.Now().Seconds()
 	}
-	tt.router.Clock = func() float64 { return tt.Now.Seconds() }
+	tt.router.Clock = func() float64 { return tt.Now().Seconds() }
 	tt.eventTime = -1
 	o.Clipboard = &MemoryClipboard{}
-	o.Scheduler().Clock = func() time.Duration { return tt.Now }
+	o.OnNeedsFrame = binding.EnsureVisualUpdate
+	binding.startTest(tt)
+	t.Cleanup(func() { binding.postTest(tt) })
 	return tt
 }
 
-// PumpWidget mounts w as the root and draws a frame.
+// Binding is the binding the test runs in.
+func (t *Tester) Binding() *AutomatedTestWidgetsFlutterBinding { return t.binding }
+
+// Loop is the test's fake event loop.
+func (t *Tester) Loop() *async.Loop { return t.loop }
+
+// Now is the fake clock: the time elapsed since the test started.
+func (t *Tester) Now() time.Duration { return t.loop.Elapsed() }
+
+// PumpWidget mounts w as the root, schedules a frame and pumps it
+// (flutter_test's pumpWidget).
 func (t *Tester) PumpWidget(w widgets.Widget) {
 	t.Owner.RunApp(w)
+	t.binding.ScheduleFrame()
 	t.Pump()
 }
 
-// Pump advances the fake clock by d (optional, default 0) and draws a frame,
-// like flutter_test's tester.pump(duration).
-func (t *Tester) Pump(d ...time.Duration) {
-	t.Canvas = &r.Recorder{}
-	if len(d) > 0 {
-		t.Now += d[0]
-	}
-	t.Owner.Scheduler().RunTimers(t.Now) // fake-async timers fire as time passes
-	t.Owner.DrawFrameAt(t.Now, t.Size, t.Canvas)
-}
+// Pump advances the fake clock by d (optional, default 0), firing due
+// timers, and draws a frame if one is scheduled, like flutter_test's
+// tester.pump(duration) (see AutomatedTestWidgetsFlutterBinding.Pump).
+func (t *Tester) Pump(d ...time.Duration) { t.binding.Pump(d...) }
 
-// PumpAndSettle pumps 16ms frames until no animation is scheduled, like
+// PumpAndSettle pumps 16ms frames until no frame is scheduled, like
 // flutter_test's pumpAndSettle. It fails after 10 seconds of fake time.
 func (t *Tester) PumpAndSettle() {
 	t.t.Helper()
 	t.Pump()
-	for i := 0; t.Owner.Scheduler().HasScheduledFrame() || t.Owner.NeedsBuild(); i++ {
+	for i := 0; t.binding.HasScheduledFrame() || t.Owner.NeedsBuild(); i++ {
 		if i > 625 {
 			t.t.Fatal("PumpAndSettle timed out")
 		}

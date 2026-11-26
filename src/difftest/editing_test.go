@@ -64,7 +64,7 @@ func loadEditing(t *testing.T) (map[string][]editOp, map[string][][3]any) {
 }
 
 // compareEditing runs each scene through step and compares every state.
-func compareEditing(t *testing.T, step func(scene string, op editOp) services.Value) {
+func compareEditing(t *testing.T, step func(t *testing.T, scene string, op editOp) services.Value) {
 	scenes, want := loadEditing(t)
 	names := make([]string, 0, len(scenes))
 	for n := range scenes {
@@ -74,7 +74,7 @@ func compareEditing(t *testing.T, step func(scene string, op editOp) services.Va
 	for _, name := range names {
 		t.Run(name, func(t *testing.T) {
 			for i, op := range scenes[name] {
-				v := step(name, op)
+				v := step(t, name, op)
 				got := fmt.Sprintf("%q %d %d", v.Text, v.Selection.Base, v.Selection.Extent)
 				w := want[name][i]
 				exp := fmt.Sprintf("%q %d %d", w[0], int(w[1].(float64)), int(w[2].(float64)))
@@ -101,7 +101,7 @@ func platformFor(scene string) services.Platform {
 // TestEditingModelMatchesFlutter checks the textedit package on its own.
 func TestEditingModelMatchesFlutter(t *testing.T) {
 	values := map[string]services.Value{}
-	compareEditing(t, func(scene string, op editOp) services.Value {
+	compareEditing(t, func(t *testing.T, scene string, op editOp) services.Value {
 		v := values[scene]
 		if op.Type != nil {
 			v = services.InsertText(v, *op.Type)
@@ -118,7 +118,7 @@ func TestEditingModelMatchesFlutter(t *testing.T) {
 func TestTextFieldMatchesFlutter(t *testing.T) {
 	fields := map[string]*flutter_test.Tester{}
 	ctrls := map[string]*widgets.TextEditingController{}
-	compareEditing(t, func(scene string, op editOp) services.Value {
+	compareEditing(t, func(t *testing.T, scene string, op editOp) services.Value {
 		tester, ok := fields[scene]
 		if !ok {
 			tester = flutter_test.New(t)

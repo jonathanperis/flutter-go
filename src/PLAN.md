@@ -1116,3 +1116,101 @@ The standing goal is now full API parity with Flutter 3.50.1's Dart layer
   listener ids) and animation's listener lists don't use ChangeNotifier
   yet; release-build (`-tags flutter_release`) runs of the debug-only
   tests fail, as foundation's already did.
+### scheduler (P2), and the frame loop moved onto it
+- `packages/flutter/lib/src/scheduler` ports binding, debug, priority,
+  service_extensions and ticker (3.50.1), one Go file per Dart file:
+  SchedulerBinding (interface + `SchedulerBindingMixin`, whose embedded
+  `foundation.BindingBase` is Dart's `super`, so mixins stack in Dart's
+  order; see API_MAPPING), transient/persistent/post-frame callbacks,
+  SchedulerPhase incl. midFrameMicrotasks, scheduleFrame/Forced/WarmUp
+  (with the engine frame postponed during a warm-up frame), the epoch and
+  timeDilation (Dart's `(us / dilation).round()`, half away from zero),
+  endOfFrame, lifecycle and framesEnabled, performance-mode requests,
+  timings callbacks (+ `Flutter.Frame` events), the task queue with
+  package:collection 1.19.1's `HeapPriorityQueue` ported (its tie order is
+  observable and matched), the timeDilation service extension, the frame
+  banners; Ticker (self pattern, muted, forceFrames, absorbTicker),
+  TickerFuture (a user-defined `async.Future`), TickerCanceled. scheduler:
+  0 → 16 of 16; dart:ui 20 → 28 of 195; total 237 → 261 of 2885 (tested
+  178 → 195).
+- **dart:ui (partial):** PlatformDispatcher gains onBeginFrame,
+  onDrawFrame, onReportTimings, scheduleFrame, scheduleWarmUpFrame (two
+  `Timer.run`s), requestDartPerformanceMode, frameData/onFrameDataChanged;
+  FrameTiming, FramePhase, AppLifecycleState, DartPerformanceMode,
+  FrameData, VoidCallback/FrameCallback/TimingsCallback. The embedder side
+  (`platform_configuration.go`) ports hooks.dart's `_beginFrame`/
+  `_drawFrame`/`_reportTimings` and the engine's
+  `PlatformConfiguration::BeginFrame` (begin frame, **drain microtasks**,
+  draw frame; time-travel clamp; frame number) and the natives, which go to
+  a `PlatformConfigurationClient` the embedder installs. ENGINE GAP: no
+  Dart_SetPerformanceMode, no frame timings collected.
+- **Migration:** `animation.go`'s ad-hoc Scheduler/Ticker are gone.
+  `Controller` takes a `scheduler.TickerProvider` (stop on completion is
+  `canceled: false`, interruptions `canceled: true`, as
+  AnimationController); widgets get `Element.Vsync()`; the cursor blink is
+  an `async.Timer`; `BuildOwner.DrawFrame(size, canvas)` is only the
+  rendering pipeline, run from a binding's persistent frame callback.
+  - The tester is `flutter_test.AutomatedTestWidgetsFlutterBinding`
+    (partial: BindingBase + SchedulerBinding), a process-wide singleton as
+    in flutter_test; each `Tester` gets its own `async.Loop` (FakeAsync).
+    `Pump` is flutter_test's: elapse; if a frame is scheduled, flush
+    microtasks, `handleBeginFrame(2015-01-01 + elapsed)`, flush microtasks,
+    `handleDrawFrame`; flush microtasks. Frames are drawn only when
+    scheduled (builds and render dirties call `EnsureVisualUpdate`);
+    `PumpWidget` = attach + scheduleFrame + pump; a `Size` change forces a
+    frame (handleMetricsChanged). After each test it unmounts the tree with
+    a warm-up frame and a pump (flutter_test's post-test runApp) and fails
+    the test on leftover transient callbacks, pending timers or
+    timeDilation ≠ 1. Exceptions caught by the scheduler (reported to
+    FlutterError.onError) are re-raised at the end of `Pump`
+    (`TakeException` takes them instead).
+  - The window runner (`src/app`) installs a
+    PlatformConfigurationClient: `scheduleFrame` sets needsFrame; the loop
+    advances the main `async.Loop` to the wall clock (timers, microtasks),
+    then produces the frame with `PlatformConfiguration.BeginFrame` at
+    vsync; resize forces a frame. Checked with cmd/animate (16.7 ms frame
+    intervals while animating) and cmd/counter.
+- **Found:** the post-test unmount exposed a real leak: a ScrollController
+  passed by the user kept its ballistic animation (and ticker) running
+  after the list was unmounted; Flutter disposes the position's activity.
+  Fixed (`goIdle` on unmount / controller swap). A Dart quirk the difftest
+  had to avoid: while a task is refused by the scheduling strategy,
+  `handleEventLoopCallback` returns true and `_runTasks` re-arms
+  `Timer.run`, so the event loop spins (fake_async's `elapse` never
+  returns).
+- Bindings are per process; Go runs a package's tests in one process, so
+  tests that build their own binding re-run themselves in a child process
+  (the foundation binding difftest now does too).
+- **Flutter's tests:** scheduler_test 8/9 (the warm-up-interleaving test is
+  skipped upstream as flaky; ported as a Go test where the engine frame
+  arrives in a microtask between the two warm-up timers), ticker_test 7/7,
+  animation_test 2/2, binding_test 5/5, performance_mode_test 4/4,
+  debug_test 1/1, priority_test 1/1, time_dilation_test 1/1,
+  benchmarks_test 0/1 (LiveTestWidgetsFlutterBinding/benchmarkWidgets not
+  ported; its microtask rule is checked on the tester), plus the
+  timeDilation test of foundation's service_extensions_test, engine-path
+  tests and dart:ui platform_configuration tests.
+- **Difftest** (`difftest/scheduler_test.go` + `flutter/test/scheduler_test.dart`):
+  a BindingBase+SchedulerBinding in fake_async, 11 scenes, 1000 log lines
+  compared **exactly**: callback order and the phase each sees, microtasks
+  and futures relative to frames, timers, raw/adjusted time stamps,
+  ensureVisualUpdate per phase, cancel semantics, endOfFrame from each
+  phase, tickers started in each phase (frame time vs first tick),
+  muting (incl. from inside the tick), stop/restart inside onTick,
+  TickerFuture complete/cancel/dispose/orCancel/whenCompleteOrCancel/
+  await/timeout, absorbTicker, timeDilation with odd microseconds and
+  rounding ties, task order by priority (4 tie patterns), strategies,
+  locking, lifecycle transitions, forced frames, warm-up frames (and an
+  engine frame inside one), errors (library/context/collector), timings,
+  performance mode, frame banners. All existing difftests (animations,
+  fling, bouncing, drag_fling, lists, editing, repaint, inherited...) pass
+  unchanged.
+- Mutations: 61 valid, 59 caught, 2 equivalent (`isFirstTask` guard:
+  duplicate timers are deduplicated by `_hasRequestedAnEventLoopCallback`;
+  never clearing `_removedIds`: ids are never reused). Caught only after
+  adding cases: rounding ties of the epoch, the heap's last-left-child tie,
+  warm-up resetEpoch/reschedule, the postponed frame's
+  hasScheduledFrame reset (a Go engine test; unobservable from Dart),
+  inactive enabling frames, duplicate event-loop callbacks, banner
+  microsecond padding, muting from inside a tick, orCancel first read after
+  a cancel, the tester's clock epoch.
