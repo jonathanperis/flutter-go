@@ -42,7 +42,7 @@ func NewOffsetFromDirection(direction float64, distance ...float64) Offset {
 	if len(distance) > 0 {
 		d = distance[0]
 	}
-	return Offset{d * dart.Cos(direction), d * dart.Sin(direction)}
+	return Offset{float64(d * dart.Cos(direction)), float64(d * dart.Sin(direction))}
 }
 
 func (o Offset) components() (float64, float64) { return o.Dx, o.Dy }
@@ -152,8 +152,10 @@ func (s Size) Sub(other OffsetBase) OffsetBase {
 	panic("ui: Size.Sub: argument must be an Offset or a Size")
 }
 
-func (s Size) Add(other Offset) Size    { return Size{s.Width + other.Dx, s.Height + other.Dy} }
-func (s Size) Mul(operand float64) Size { return Size{s.Width * operand, s.Height * operand} }
+func (s Size) Add(other Offset) Size { return Size{s.Width + other.Dx, s.Height + other.Dy} }
+func (s Size) Mul(operand float64) Size {
+	return Size{float64(s.Width * operand), float64(s.Height * operand)}
+}
 func (s Size) Div(operand float64) Size { return Size{s.Width / operand, s.Height / operand} }
 func (s Size) TruncDiv(operand float64) Size {
 	return Size{dart.TruncDiv(s.Width, operand), dart.TruncDiv(s.Height, operand)}
@@ -307,9 +309,9 @@ func RectLerp(a, b *Rect, t float64) *Rect {
 		return nil
 	case b == nil:
 		k := 1.0 - t
-		return &Rect{a.Left * k, a.Top * k, a.Right * k, a.Bottom * k}
+		return &Rect{float64(a.Left * k), float64(a.Top * k), float64(a.Right * k), float64(a.Bottom * k)}
 	case a == nil:
-		return &Rect{b.Left * t, b.Top * t, b.Right * t, b.Bottom * t}
+		return &Rect{float64(b.Left * t), float64(b.Top * t), float64(b.Right * t), float64(b.Bottom * t)}
 	}
 	return &Rect{lerpDouble(a.Left, b.Left, t), lerpDouble(a.Top, b.Top, t),
 		lerpDouble(a.Right, b.Right, t), lerpDouble(a.Bottom, b.Bottom, t)}
@@ -355,10 +357,12 @@ func (r Radius) ClampValues(o RadiusClampValuesOptions) Radius {
 		ClampDouble(r.Y, or(o.MinimumY, -inf), or(o.MaximumY, inf))}
 }
 
-func (r Radius) Neg() Radius                { return Radius{-r.X, -r.Y} }
-func (r Radius) Sub(other Radius) Radius    { return Radius{r.X - other.X, r.Y - other.Y} }
-func (r Radius) Add(other Radius) Radius    { return Radius{r.X + other.X, r.Y + other.Y} }
-func (r Radius) Mul(operand float64) Radius { return Radius{r.X * operand, r.Y * operand} }
+func (r Radius) Neg() Radius             { return Radius{-r.X, -r.Y} }
+func (r Radius) Sub(other Radius) Radius { return Radius{r.X - other.X, r.Y - other.Y} }
+func (r Radius) Add(other Radius) Radius { return Radius{r.X + other.X, r.Y + other.Y} }
+func (r Radius) Mul(operand float64) Radius {
+	return Radius{float64(r.X * operand), float64(r.Y * operand)}
+}
 func (r Radius) Div(operand float64) Radius { return Radius{r.X / operand, r.Y / operand} }
 func (r Radius) TruncDiv(operand float64) Radius {
 	return Radius{dart.TruncDiv(r.X, operand), dart.TruncDiv(r.Y, operand)}
@@ -374,9 +378,9 @@ func RadiusLerp(a, b *Radius, t float64) *Radius {
 		return nil
 	case b == nil:
 		k := 1.0 - t
-		return &Radius{a.X * k, a.Y * k}
+		return &Radius{float64(a.X * k), float64(a.Y * k)}
 	case a == nil:
-		return &Radius{b.X * t, b.Y * t}
+		return &Radius{float64(b.X * t), float64(b.Y * t)}
 	}
 	return &Radius{lerpDouble(a.X, b.X, t), lerpDouble(a.Y, b.Y, t)}
 }
@@ -521,8 +525,8 @@ func (r rrectLike) scaleRadii() rrectLike {
 	scale = getMin(scale, r.BrRadiusX, r.BlRadiusX, r.Width())
 	if scale < 1.0 {
 		return rrectLike{r.Left, r.Top, r.Right, r.Bottom,
-			r.TlRadiusX * scale, r.TlRadiusY * scale, r.TrRadiusX * scale, r.TrRadiusY * scale,
-			r.BrRadiusX * scale, r.BrRadiusY * scale, r.BlRadiusX * scale, r.BlRadiusY * scale}
+			float64(r.TlRadiusX * scale), float64(r.TlRadiusY * scale), float64(r.TrRadiusX * scale), float64(r.TrRadiusY * scale),
+			float64(r.BrRadiusX * scale), float64(r.BrRadiusY * scale), float64(r.BlRadiusX * scale), float64(r.BlRadiusY * scale)}
 	}
 	return r
 }
@@ -530,8 +534,8 @@ func (r rrectLike) scaleRadii() rrectLike {
 func (r rrectLike) lerpTo(b *rrectLike, t float64) rrectLike {
 	if b == nil {
 		k := 1.0 - t
-		m := func(v float64) float64 { return math.Max(0, v*k) }
-		return rrectLike{r.Left * k, r.Top * k, r.Right * k, r.Bottom * k,
+		m := func(v float64) float64 { return math.Max(0, float64(v*k)) }
+		return rrectLike{float64(r.Left * k), float64(r.Top * k), float64(r.Right * k), float64(r.Bottom * k),
 			m(r.TlRadiusX), m(r.TlRadiusY), m(r.TrRadiusX), m(r.TrRadiusY),
 			m(r.BrRadiusX), m(r.BrRadiusY), m(r.BlRadiusX), m(r.BlRadiusY)}
 	}
