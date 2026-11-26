@@ -327,7 +327,7 @@ void main() {
       lines.add('hash ${jsonEncode(s)} ${s.hashCode}');
     }
     // runeToLowerCase.
-    for (final int c in codePoints.where((int c) => c <= 0x10ffff)) {
+    for (final int c in <int>[...codePoints.where((int c) => c <= 0x10ffff), 0xff21, 0xd7ff, 0x10400]) {
       lines.add('runeToLowerCase $c ${guard(() => runeToLowerCase(c))}');
     }
   });

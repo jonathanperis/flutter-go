@@ -384,7 +384,7 @@ func rawKeyEventDataLines() []string {
 	for _, s := range append(append(append([]string{}, webCodes...), rawStrings...), "hello world", strings.Repeat("a", 100)) {
 		lines = append(lines, fmt.Sprintf("hash %s %d", dart.JSONEncode(s), dart.StringHashCode(s)))
 	}
-	for _, c := range rawCodePoints {
+	for _, c := range append(append([]int{}, rawCodePoints...), 0xff21, 0xd7ff, 0x10400) {
 		if c <= 0x10ffff {
 			lines = append(lines, fmt.Sprintf("runeToLowerCase %d %s", c, keyGuard(func() any { return services.RuneToLowerCase(c) })))
 		}

@@ -291,6 +291,18 @@ func TestRawKeyboardSidedModifiersWithoutASide(t *testing.T) {
 	}
 }
 
+// Own test: on macOS the Fn key is not a modifier, so a key on the Fn
+// position (here with a logical key the embedder specified) stays pressed
+// through the modifier synchronization.
+func TestRawKeyboardFnIsNotAModifierOnMacOS(t *testing.T) {
+	keyTest(t, noVariant, func() {
+		sendRawMessage(&[]dart.MapEntry[string, any]{e("type", "keydown"), e("keymap", "macos"), e("keyCode", 0x3f),
+			e("characters", ""), e("charactersIgnoringModifiers", ""), e("modifiers", 0), e("specifiedLogicalKey", 0x61)})
+		expectKeysPressed(services.LogicalKeyboardKeyKeyA)
+		expectSet("physical", services.RawKeyboardInstance.PhysicalKeysPressed(), services.PhysicalKeyboardKeyFn)
+	})
+}
+
 func TestRawKeyboardRepeatEvents(t *testing.T) {
 	keyTest(t, noVariant, func() {
 		expectKeysPressed()

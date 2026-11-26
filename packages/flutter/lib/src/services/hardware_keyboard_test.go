@@ -415,4 +415,30 @@ func TestIrregularKeyEventsAreProcessed(t *testing.T) {
 	})
 }
 
+// Own test: in raw key data mode, an Android event's source gives the
+// converted key events' device type.
+func TestRawKeyDataDeviceTypes(t *testing.T) {
+	keyTest(t, noVariant, func() {
+		var got []ui.KeyEventDeviceType
+		services.HardwareKeyboardInstance().AddHandler(func(e services.KeyEvent) bool {
+			got = append(got, e.DeviceType())
+			return false
+		})
+		manager := ensureInitialized().KeyEventManager()
+		for _, source := range []int{0x101, 0x201, 0x401, 0x01000010, 0x02000001, 0x7} {
+			for _, typ := range []string{"keydown", "keyup"} {
+				manager.HandleRawKeyMessage(map[string]any{"type": typ, "keymap": "android", "keyCode": 29,
+					"scanCode": 30, "plainCodePoint": 97, "codePoint": 97, "metaState": 0, "source": source}).Await()
+			}
+		}
+		want := []ui.KeyEventDeviceType{ui.KeyEventDeviceTypeKeyboard, ui.KeyEventDeviceTypeKeyboard,
+			ui.KeyEventDeviceTypeDirectionalPad, ui.KeyEventDeviceTypeDirectionalPad,
+			ui.KeyEventDeviceTypeGamepad, ui.KeyEventDeviceTypeGamepad,
+			ui.KeyEventDeviceTypeJoystick, ui.KeyEventDeviceTypeJoystick,
+			ui.KeyEventDeviceTypeHdmi, ui.KeyEventDeviceTypeHdmi,
+			ui.KeyEventDeviceTypeKeyboard, ui.KeyEventDeviceTypeKeyboard}
+		expect(slicesEqual(got, want), "device types %v", got)
+	})
+}
+
 var _ = time.Duration(0)

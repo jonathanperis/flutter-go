@@ -345,6 +345,18 @@ func TestKeyCodeMapsMatchTheEngine(t *testing.T) {
 	}
 }
 
+// Own tests: Latin-1 upper-case labels give lower-case logical keys, and
+// function-key characters (U+F700..U+F7FF) are not sent as characters.
+func TestEmbedderLatin1AndFunctionKeys(t *testing.T) {
+	r, events := newTestResponder()
+	r.handleEvent(ev(nsEventTypeKeyDown, 0x100, "É", "É", false, 0x0e), func(bool) {})
+	checkEvent(t, (*events)[0], ui.KeyEventTypeDown, services.PhysicalKeyboardKeyKeyE.UsbHidUsage, 0xe9, s("É"), false)
+	*events = nil
+	r.handleEvent(ev(nsEventTypeKeyDown, 0x100, "", "", false, 0x7b), func(bool) {})
+	checkEvent(t, (*events)[0], ui.KeyEventTypeDown, services.PhysicalKeyboardKeyArrowLeft.UsbHidUsage,
+		services.LogicalKeyboardKeyArrowLeft.KeyID, nil, false)
+}
+
 func nullReplyCheck(t *testing.T, r *channelKeyResponder, replies *[]func(map[string]any)) {
 	handled := false
 	r.handleEvent(ev(nsEventTypeKeyUp, 0, "a", "a", false, kKeyCodeKeyA), func(h bool) { handled = h })
