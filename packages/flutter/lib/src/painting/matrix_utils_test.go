@@ -1,14 +1,11 @@
 package painting
 
 // Port of packages/flutter/test/painting/matrix_utils_test.dart (Flutter
-// 3.50.1), for the part of matrix_utils.dart ported so far:
-// "MatrixUtils.getAsTranslation()" (adapted: Matrix4.rotationX/rotateX are
-// not ported in vector_math yet, so those three checks are skipped;
-// translate/scale are translateByDouble/scaleByDouble). Skipped, their
-// functions not ported yet: transformRect (2 tests + 2), multiplyInPlace,
-// the cylindricalProjectionTransform tests (4), forceToPoint. Plus own
-// tests of getAsScale, matrixEquals, isIdentity, transformPoint,
-// debugDescribeTransform and TransformProperty.
+// 3.50.1), all 10 tests. Adapted: Dart's deprecated translate/scale are
+// the vector_math port's Translate/Scale; within<Rect>(distance) is a
+// per-edge tolerance check. Plus own tests of getAsScale, matrixEquals,
+// isIdentity, transformPoint, inverseTransformRect, debugDescribeTransform
+// and TransformProperty. Skipped: none.
 
 import (
 	"math"
