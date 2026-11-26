@@ -697,4 +697,3 @@ func (m mixedEdgeInsets) Resolve(direction *ui.TextDirection) EdgeInsets {
 	}
 	return EdgeInsets{m.start + m.left, m.top, m.end + m.right, m.bottom}
 }
-
