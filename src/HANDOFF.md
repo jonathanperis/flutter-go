@@ -189,6 +189,27 @@ Start here when continuing flutter-go in a new session.
      saveLayer bounds), texture registry, platform views, performance
      overlay, superellipse clips (path approximation, ≤2 MSAA samples).
 
+  13. Done (P4): painting except text, 121/134 (geometry values,
+     borders and every shape border, notched shapes, gradients, shadows,
+     Decoration/BoxDecoration/ShapeDecoration, DecorationImage/paintImage,
+     FlutterLogo, the image subsystem with ImageCache/ImageProvider/
+     AssetImage/NetworkImage, PaintingBinding (in the test binding),
+     ShaderWarmUp, debug, MatrixUtils, colors, TextScaler); flutter_test's
+     TestRecordingCanvas and `paints` matcher; rendering's EdgeInsets/
+     Alignment/Axis placeholders replaced by painting's. Next for it: the
+     text item — TextPainter, TextStyle, StrutStyle, TextSpan/InlineSpan/
+     PlaceholderSpan (Accumulator, InlineSpanSemanticsInformation,
+     combineSemanticsInfo, PlaceholderDimensions, WordBoundary — then
+     drop widgets' editable_text.go stand-in — lerpFontVariations) and
+     FlutterLogoDecoration's "Flutter" label; rendering on painting
+     (RenderDecoratedBox with BoxPainter, RenderImage, the `...Geometry`
+     types resolved with a text direction in RenderPadding/
+     RenderPositionedBox, TestRecordingPaintingContext and `paints` on
+     RenderObjects); fmacheck should flag products stored in struct
+     fields or passed as arguments that fuse after inlining (found by the
+     paintImage difftest); ENGINE GAPs: AutomaticNotchedShape with a
+     guest (Path.combine), invertColors on translucent image paints.
+
 ## Environment
 
 | Need | Where |

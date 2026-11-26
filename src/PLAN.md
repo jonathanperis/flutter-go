@@ -2099,3 +2099,93 @@ The standing goal is now full API parity with Flutter 3.50.1's Dart layer
   UTF-16 caret after EnterText, TextEditingValue's range assertions.
 - **Parity:** master 722 → 944 of 2888 exposed (tested 540 → 682); services
   31 → 211/211, widgets 31 → 73 (the bridge's declarations).
+
+### painting (P4), everything but text
+
+- **Scope.** Every file of packages/flutter/lib/src/painting except the
+  Paragraph-dependent text files: basic_types, alignment,
+  fractional_offset, geometry, box_fit, edge_insets, border_radius, colors,
+  clip, paint_utilities, matrix_utils (completed; vector_math gained
+  rotationX/Y, rotate*, getTranslation, Mul), borders, box_border and every
+  shape border (circle, oval, rounded rectangle and superellipse, stadium,
+  beveled, continuous, star, linear) with their private lerp
+  intermediates, notched_shapes, gradient, box_shadow, decoration,
+  decoration_image (paintImage), box_decoration, shape_decoration,
+  flutter_logo, image_stream, image_cache, image_provider (asset, file,
+  memory, network via src/io's HttpClient, ResizeImage), image_resolution,
+  image_decoder, binding (PaintingBinding in the test binding, in Dart's
+  `with` order), shader_warm_up, debug; text_scaler and text_painter's
+  enums/kDefaultFontSize. Left for the text item: TextPainter, TextStyle,
+  StrutStyle, TextSpan/InlineSpan/PlaceholderSpan (with Accumulator,
+  InlineSpanSemanticsInformation, combineSemanticsInfo,
+  PlaceholderDimensions, WordBoundary, lerpFontVariations) and
+  FlutterLogoDecoration's "Flutter" label. painting parity 3 → 121 of 134
+  (total 944 → 1062 of 2888, tested 682 → 788).
+- **flutter_test**: TestRecordingCanvas and mock_canvas's `paints`
+  PaintPattern (painter functions only: RenderObject/Finder/PaintingContext
+  targets wait for rendering), CoversSameAreaAs/IsPathThat, createTestImage,
+  RunAsync/AwaitFuture. The test binding now disables shadows as
+  Flutter's does (`disableShadows`), and checks the painting debug
+  variables after each test.
+- **rendering/widgets:** the EdgeInsets/Alignment/Axis placeholders are
+  gone; RenderPadding/RenderPositionedBox use painting's types (alignChild
+  is now Flutter's `alongOffset(size - childSize)`).
+- **Difftests (all exact unless pixels):** painting_alignment (10,833
+  cases: lerps incl. mixed, operators, resolve and its FlutterError text,
+  inscribe, 19×19 applyBoxFit, ~1,700 positionDependentBox),
+  painting_edge_insets (3,293), painting_colors (HSV/HSL over 4096-color
+  and 3136-point grids, swatches, ColorProperty JSON, MatrixUtils over 18
+  matrices × 10 rects incl. perspective, paintZigZag), painting_borders
+  (10,558: every border lerp pair through the intermediates, paths as
+  bounds/metrics/contains grids, recorded paint calls),
+  painting_gradients (3,599: gradient lerps, createShader errors,
+  BoxShadow, DecorationImage, 1,536 paintImage recordings, FlutterLogo),
+  painting_decorations (9,646: Box/ShapeDecoration lerps, clip paths,
+  hit tests, painter calls incl. shader caching), painting_images (cache
+  LRU/byte eviction, statuses, listener order, error reports, multi-frame
+  timing under timeDilation, AssetImage variants 6 manifests × 23 DPRs,
+  ResizeImage sizes), painting_text_scaler (713 lines). Pixels on Impeller
+  (vs flutter_tester's Vulkan/SwiftShader): painting_borders_pixels (37
+  scenes), painting_decorations_pixels (26), painting_box_decorations_pixels
+  (26): straight edges, gradients and shadows within 0–2; AA curves and
+  diagonals differ by one MSAA sample (64, rarely 2); drawCircle ≤9;
+  FilterQuality.none at 2.5× differs ≤16 at texel-boundary ties; every
+  pixel differing by more than 2 must lie on an edge.
+- **Found by the difftests:** Dart's double `~/` is `(a/b).truncate()`:
+  it saturates to ±2^63, throws only for Infinity/NaN, and gives +0.0
+  (src/dart's TruncDiv was wrong three ways); Go fused products stored in
+  struct-literal fields or passed as call arguments into later
+  subtractions after cross-package inlining (`Size.Mul`, `Radius.Mul`,
+  RectLerp/RadiusLerp null branches, RRect scaling — paintImage got
+  -7.1e-15 instead of 0), which fmacheck doesn't flag yet (a gap to close; the
+  sites are wrapped in float64() by hand); empty Dart lists passed to
+  diagnostics must be non-nil Go slices; Alignment's toString patterns
+  treat -0.0 as 0.0; paintImage only reports oversized images above the
+  128 KB allowance; `math.Pi/3` in a Go test is folded exactly (fmacheck
+  doesn't scan tests).
+- **Flutter quirks kept (difftest-confirmed):** BorderSide.scale drops
+  strokeAlign; LinearBorder.scale drops its edges;
+  ContinuousRectangleBorder swaps the radius axes; StarBorder compares
+  radians with 180; BoxDecoration's scale/lerp drop backgroundBlendMode
+  and its painter caches the gradient shader per rect only (a text
+  direction change reuses a stale shader); `BorderRadiusDirectional.zero`
+  draws an rrect where `BorderRadius.zero` draws a rect; ColorSwatch.lerp
+  rounds the primary through 8-bit channels; `paints..image()` always
+  fails in 3.50.1; a clamped TextScaler with an infinite max asserts on
+  scale(0) (0 × ∞ is NaN in clampDouble).
+- **Mutations:** A1 56 (54 caught, 2 equivalent), A2 54/54, images ~52
+  (1 equivalent), colors/matrices/test helpers 82 (77 caught, 5
+  equivalent), borders 76 (72, 4 equivalent), gradients/decorations 83/83,
+  box/shape decorations 65 (63, 2 equivalent), text_scaler 22 (20, 2
+  equivalent: the redundant `!max.isNaN` assert and the collapsed-range
+  value, which is the same from either end). Each equivalent one is
+  argued in the worker notes above (e.g. halving is exact, `<=` at a
+  clamp boundary gives the same value).
+- **ENGINE GAPs:** AutomaticNotchedShape with a guest (Path.combine);
+  invertColors with a translucent paint on an image differs from Flutter
+  (excluded from the pixel test); no timeline events from ImageCache/
+  ShaderWarmUp; flutter_tester's Vulkan applies a difference blend with a
+  seam along a rect's diagonal (its reference, not ours).
+- **Process note:** workers share the scratchpad; one overwrote another's
+  generic `mut.sh` and a mutation ran against the wrong worktree. Use
+  unique script names per worker.
