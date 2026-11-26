@@ -261,34 +261,103 @@ through it. One pattern, everywhere:
   column, className, method and source only). `PartialStackFrame.package`
   is a `dart.Pattern` (`dart.StringPattern("...")` or a `*regexp.Regexp`).
 
-## Bindings, zones and statics
+## Bindings
 
-- A binding mixin (`mixin SchedulerBinding on BindingBase`) is an
-  interface (`scheduler.SchedulerBinding`) plus an embeddable struct
-  (`SchedulerBindingMixin`) whose embedded `foundation.BindingBase` is the
-  binding it is mixed onto, Dart's `super` (a `*BindingBaseBase`, or the
-  mixin below it, so mixins stack in Dart's order). A binding embeds the
-  topmost mixin, sets the chain, calls the mixin's `SetSelf`, then
-  `Construct` on the base:
+Flutter composes its bindings as mixins on `BindingBase`
+(`WidgetsFlutterBinding extends BindingBase with GestureBinding,
+SchedulerBinding, ServicesBinding, PaintingBinding, SemanticsBinding,
+RendererBinding, WidgetsBinding`), and Dart's mixin linearization decides
+which override runs and where each `super` call goes. Go has no mixins, so
+one pattern (`foundation/binding_mixins.go`) stands for it, for every
+binding and every combination of mixins:
+
+- `BindingBase` is an interface plus the embeddable `BindingBaseBase`. A
+  binding mixin (`mixin SchedulerBinding on BindingBase`) is an interface
+  (`scheduler.SchedulerBinding`, embedding `foundation.BindingBase` and the
+  interfaces of its other `on` types) plus an embeddable struct
+  (`scheduler.SchedulerBindingMixin`) with the mixin's state and methods.
+  The struct embeds nothing: it keeps `self`, the binding it is mixed into,
+  set by `SetSelf`, and calls every overridable method through it.
+- A binding class embeds `foundation.BindingBaseBase`, then the mixin
+  structs in Dart's `with` order; its constructor points each mixin at the
+  binding (`SetSelf`) and calls `Construct(self, mixins...)` with pointers
+  to the embedded mixins in `with` order. `Construct` is Dart's
+  `BindingBase()` constructor: it records the mixins and runs
+  `InitInstances` and `InitServiceExtensions` through `self`.
+- A method that several mixins define (or a mixin and `BindingBase`:
+  `InitInstances`, `InitServiceExtensions`, `Unlocked`, a mixin's method a
+  later mixin overrides) is ambiguous in Go and isn't promoted; the binding
+  class defines it, calling the last mixin in `with` order that defines it
+  (Dart's most-derived override). The compiler lists them: the binding
+  doesn't implement the mixins' interfaces until they are all defined.
+- Dart's `super.m()` inside a mixin is `foundation.BindingSuper[I](m.self,
+  m).M()`: the closest mixin before `m` in `with` order implementing `I`
+  (an interface with `M`), else `BindingBaseBase`. For `BindingBase`'s own
+  methods, `foundation.BindingBaseSuper(m.self, m)` is a `BindingBase`
+  whose every method goes to `super`. So the chain follows the binding's
+  actual composition, as Dart's linearization does: `initInstances` runs
+  `BindingBase`'s first, then each mixin's in `with` order (each calls
+  super first), and so do `initServiceExtensions` and `unlocked`. A binding
+  class overriding a method calls the most-derived mixin's method as its
+  super (or `BindingSuper` with a nil mixin).
+- `X.instance` is `XInstance()` (`scheduler.SchedulerBindingInstance()`),
+  set in the mixin's `InitInstances` to `self`, and checked with
+  `foundation.BindingBaseCheckInstance`.
+- A Go binding with a fixed composition that other bindings extend (Dart:
+  `class TestBinding extends WidgetsFlutterBinding`) is a struct embedding
+  the base and the mixins, with the forwarding methods; the extending
+  binding embeds it, overrides at depth 0, and calls `SetSelf`/`Construct`
+  with itself.
 
   ```go
-  type MyBinding struct{ scheduler.SchedulerBindingMixin }
+  type MyBinding struct {
+  	foundation.BindingBaseBase
+  	gestures.GestureBindingMixin
+  	scheduler.SchedulerBindingMixin
+  	services.ServicesBindingMixin
+  	semantics.SemanticsBindingMixin
+  }
 
-  b := &MyBinding{}
-  base := &foundation.BindingBaseBase{}
-  b.SchedulerBindingMixin.BindingBase = base
-  b.SetSelf(b)
-  base.Construct(b)
+  func NewMyBinding() *MyBinding {
+  	b := &MyBinding{}
+  	b.GestureBindingMixin.SetSelf(b)
+  	b.SchedulerBindingMixin.SetSelf(b)
+  	b.ServicesBindingMixin.SetSelf(b)
+  	b.SemanticsBindingMixin.SetSelf(b)
+  	b.Construct(b, &b.GestureBindingMixin, &b.SchedulerBindingMixin,
+  		&b.ServicesBindingMixin, &b.SemanticsBindingMixin)
+  	return b
+  }
+
+  // Defined by several mixins: the last one in `with` order.
+  func (b *MyBinding) InitInstances()         { b.SemanticsBindingMixin.InitInstances() }
+  func (b *MyBinding) InitServiceExtensions() { b.ServicesBindingMixin.InitServiceExtensions() }
+  func (b *MyBinding) Unlocked()              { b.SchedulerBindingMixin.Unlocked() }
+
+  // Abstract in SemanticsBinding (RendererBinding implements it).
+  func (b *MyBinding) PerformSemanticsAction(action ui.SemanticsActionEvent) {}
   ```
+
+  and inside a mixin:
+
+  ```go
+  func (m *ServicesBindingMixin) InitInstances() {
+  	foundation.BindingBaseSuper(m.outer(), m).InitInstances() // super.initInstances()
+  	servicesBindingInstance = m.outer()                       // _instance = this
+  	...
+  }
+  ```
+- ServicesBinding registers its channel handlers in `InitInstances`, and
+  `ChannelBuffers` drains what was buffered meanwhile in a microtask: flush
+  the event loop after constructing a binding with it.
+
+## Zones and statics
+
 - A binding can be constructed once per process, as in Dart. Go runs a
   package's tests in one process, so tests that need a binding of their
   own (each Dart test file has its own isolate) re-run themselves in a
   child process (`isolated(t)` in the scheduler tests and difftests).
-- `BindingBase` is an interface plus the embeddable `BindingBaseBase`. A
-  binding embeds it (and its mixins) and its constructor calls
-  `b.Construct(b)`, which is Dart's `BindingBase()` constructor: it sets
-  `self` and runs `InitInstances` and `InitServiceExtensions` through it.
-  Protected members are exported methods (Go has no `@protected`); named
+- Protected members are exported methods (Go has no `@protected`); named
   required parameters (`registerServiceExtension(name:, callback:)`) are
   positional.
 - Go has no zones: where Flutter records `Zone.current` (the binding's
@@ -567,15 +636,6 @@ Each divergence is listed here when it is introduced.
   foundation's `EnumProperty`/`describeEnum` use `Name()` and `dartToString`
   uses `String()` as is. Enums without `Name()` (foundation's own) keep
   returning the bare name from `String()`.
-- Stacking two binding mixins that each need the binding as `self`
-  (`BindingBase with SchedulerBinding, SemanticsBinding`): Go can't embed
-  both (their promoted `BindingBase` methods, including the unexported
-  `bindingBase()`, would be ambiguous), so the binding embeds the lower
-  mixin and keeps the upper one as a field whose `BindingBase` is the lower
-  mixin, forwards the upper mixin's interface methods to it, and calls the
-  upper mixin's `InitInstances` from its own (see the semantics tests'
-  `testBinding`). `semantics.SemanticsBinding` has no unexported method so
-  forwarding types implement it.
 - semantics: `Set`s and `Map`s whose iteration order is observable keep
   Dart's insertion order: `SemanticsNode.Tags`, `controlsNodes` and
   `tagsForChildren` are slices without duplicates (nil is null); a custom

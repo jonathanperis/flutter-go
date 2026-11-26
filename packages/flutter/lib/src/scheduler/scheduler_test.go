@@ -28,7 +28,7 @@ import (
 )
 
 type testSchedulerBinding struct {
-	SchedulerBindingMixin
+	schedulerOnlyBinding
 	eventsDispatched map[string][]map[string]any
 
 	additionalHandleBeginFrame func()
@@ -70,7 +70,7 @@ func (b *testSchedulerBinding) registerFrameCallbacks() { b.EnsureFrameCallbacks
 
 func newTestSchedulerBinding() *testSchedulerBinding {
 	b := &testSchedulerBinding{eventsDispatched: map[string][]map[string]any{}}
-	construct(b, &b.SchedulerBindingMixin)
+	construct(b, &b.schedulerOnlyBinding)
 	return b
 }
 

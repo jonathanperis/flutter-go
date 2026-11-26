@@ -23,21 +23,29 @@ import (
 
 // channelsBinding is the services part of TestWidgetsFlutterBinding.
 type channelsBinding struct {
+	foundation.BindingBaseBase
+	scheduler.SchedulerBindingMixin
+	services.ServicesBindingMixin
 	flutter_test.TestDefaultBinaryMessengerBindingMixin
+}
+
+func (b *channelsBinding) InitInstances() { b.TestDefaultBinaryMessengerBindingMixin.InitInstances() }
+func (b *channelsBinding) InitServiceExtensions() {
+	b.ServicesBindingMixin.InitServiceExtensions()
+}
+func (b *channelsBinding) Unlocked() { b.SchedulerBindingMixin.Unlocked() }
+func (b *channelsBinding) CreateBinaryMessenger() services.BinaryMessenger {
+	return b.TestDefaultBinaryMessengerBindingMixin.CreateBinaryMessenger()
 }
 
 func newChannelsBinding() {
 	loop := async.NewLoop()
 	defer async.SetCurrent(loop)()
 	b := &channelsBinding{}
-	base := &foundation.BindingBaseBase{}
-	sched := &scheduler.SchedulerBindingMixin{BindingBase: base}
-	svc := &services.ServicesBindingMixin{SchedulerBinding: sched}
-	b.TestDefaultBinaryMessengerBindingMixin.ServicesBinding = svc
-	sched.SetSelf(b)
-	svc.SetSelf(b)
+	b.SchedulerBindingMixin.SetSelf(b)
+	b.ServicesBindingMixin.SetSelf(b)
 	b.TestDefaultBinaryMessengerBindingMixin.SetSelf(b)
-	base.Construct(b)
+	b.Construct(b, &b.SchedulerBindingMixin, &b.ServicesBindingMixin, &b.TestDefaultBinaryMessengerBindingMixin)
 	loop.FlushMicrotasks()
 	loop.RunPosted()
 }

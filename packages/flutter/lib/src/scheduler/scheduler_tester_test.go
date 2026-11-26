@@ -56,25 +56,35 @@ func fakeAsync(t testing.TB) *async.Loop {
 	return loop
 }
 
-// construct runs a binding's construction: mixin is the binding's embedded
-// SchedulerBindingMixin, on top of a BindingBase.
-func construct(b scheduler.SchedulerBinding, mixin *scheduler.SchedulerBindingMixin) {
-	base := &foundation.BindingBaseBase{}
-	mixin.BindingBase = base
-	mixin.SetSelf(b)
-	base.Construct(b)
+// schedulerOnlyBinding is `BindingBase with SchedulerBinding`; test
+// bindings embed it (Dart: extend it) and override its methods.
+type schedulerOnlyBinding struct {
+	foundation.BindingBaseBase
+	scheduler.SchedulerBindingMixin
+}
+
+func (b *schedulerOnlyBinding) InitInstances() { b.SchedulerBindingMixin.InitInstances() }
+func (b *schedulerOnlyBinding) InitServiceExtensions() {
+	b.SchedulerBindingMixin.InitServiceExtensions()
+}
+func (b *schedulerOnlyBinding) Unlocked() { b.SchedulerBindingMixin.Unlocked() }
+
+// construct runs the construction of self, a binding embedding b.
+func construct(self scheduler.SchedulerBinding, b *schedulerOnlyBinding) {
+	b.SchedulerBindingMixin.SetSelf(self)
+	b.Construct(self, &b.SchedulerBindingMixin)
 }
 
 // plainBinding is a binding of BindingBase and SchedulerBinding only (the
 // scheduler part of WidgetsFlutterBinding, and animation_test.dart's
 // TestSchedulerBinding).
 type plainBinding struct {
-	scheduler.SchedulerBindingMixin
+	schedulerOnlyBinding
 }
 
 func newPlainBinding() *plainBinding {
 	b := &plainBinding{}
-	construct(b, &b.SchedulerBindingMixin)
+	construct(b, &b.schedulerOnlyBinding)
 	return b
 }
 

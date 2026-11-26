@@ -23,8 +23,12 @@ import (
 )
 
 type schedBinding struct {
+	foundation.BindingBaseBase
 	SchedulerBindingMixin
 }
+
+func (b *schedBinding) InitInstances()         { b.SchedulerBindingMixin.InitInstances() }
+func (b *schedBinding) InitServiceExtensions() { b.SchedulerBindingMixin.InitServiceExtensions() }
 
 var (
 	sLog     []string
@@ -768,11 +772,9 @@ func TestSchedulerMatchesFlutter(t *testing.T) {
 		slog("reported: " + d.ExceptionAsString() + " | " + libStr(d) + " | " + describeContext(d))
 	}
 	b := &schedBinding{}
-	base := &foundation.BindingBaseBase{}
-	b.SchedulerBindingMixin.BindingBase = base
-	b.SetSelf(b)
+	b.SchedulerBindingMixin.SetSelf(b)
 	sBinding = b
-	base.Construct(b)
+	b.Construct(b, &b.SchedulerBindingMixin)
 	slog("constructed locked=" + boolStr(b.Locked()) + " phase=" + sPhase() + " timeDilation=" + dart.DoubleToString(TimeDilation()))
 	sceneFrameOrder()
 	sceneEndOfFrame()

@@ -6,9 +6,8 @@ package scheduler
 // Port of binding.dart (Flutter 3.50.1).
 //
 // SchedulerBinding is a mixin on BindingBase: here the interface
-// SchedulerBinding plus the embeddable SchedulerBindingMixin, whose embedded
-// foundation.BindingBase is the binding it is mixed onto ("super"). See
-// SchedulerBindingMixin for how a binding is assembled.
+// SchedulerBinding plus the embeddable SchedulerBindingMixin (see
+// foundation/binding_mixins.go for how a binding combines mixins).
 //
 // The event loop is src/async: Timer.run is async.TimerRun,
 // Completers are async.Completer, and the microtasks drained between
@@ -398,24 +397,26 @@ type SchedulerBinding interface {
 }
 
 // SchedulerBindingMixin is SchedulerBinding's state and methods, to embed
-// in a binding. Its embedded foundation.BindingBase is the binding it is
-// mixed onto (Dart's "super": a *foundation.BindingBaseBase, or the mixin
-// below it), whose methods it overrides and calls. A binding embeds the
-// topmost mixin, calls SetSelf with itself, then constructs the base:
+// in a binding after foundation.BindingBaseBase (and the mixins before it
+// in Dart's `with` order). The binding calls SetSelf with itself and passes
+// &b.SchedulerBindingMixin to Construct:
 //
-//	type MyBinding struct{ scheduler.SchedulerBindingMixin }
+//	type MyBinding struct {
+//		foundation.BindingBaseBase
+//		scheduler.SchedulerBindingMixin
+//	}
 //
 //	func NewMyBinding() *MyBinding {
 //		b := &MyBinding{}
-//		base := &foundation.BindingBaseBase{}
-//		b.SchedulerBindingMixin.BindingBase = base
-//		b.SetSelf(b)
-//		base.Construct(b)
+//		b.SchedulerBindingMixin.SetSelf(b)
+//		b.Construct(b, &b.SchedulerBindingMixin)
 //		return b
 //	}
+//
+//	func (b *MyBinding) InitInstances()         { b.SchedulerBindingMixin.InitInstances() }
+//	func (b *MyBinding) InitServiceExtensions() { b.SchedulerBindingMixin.InitServiceExtensions() }
+//	func (b *MyBinding) Unlocked()              { b.SchedulerBindingMixin.Unlocked() }
 type SchedulerBindingMixin struct {
-	foundation.BindingBase
-
 	self SchedulerBinding
 
 	timingsCallbacks        []ui.TimingsCallback
@@ -472,7 +473,7 @@ func (m *SchedulerBindingMixin) outer() SchedulerBinding {
 func (m *SchedulerBindingMixin) schedulerBinding() *SchedulerBindingMixin { return m }
 
 func (m *SchedulerBindingMixin) InitInstances() {
-	m.BindingBase.InitInstances()
+	foundation.BindingBaseSuper(m.outer(), m).InitInstances()
 	schedulerBindingInstance = m.outer()
 
 	if !foundation.KReleaseMode {
@@ -549,7 +550,7 @@ func (m *SchedulerBindingMixin) executeTimingsCallbacksImpl(timings []ui.FrameTi
 }
 
 func (m *SchedulerBindingMixin) InitServiceExtensions() {
-	m.BindingBase.InitServiceExtensions()
+	foundation.BindingBaseSuper(m.outer(), m).InitServiceExtensions()
 
 	if !foundation.KReleaseMode {
 		m.outer().RegisterNumericServiceExtension(SchedulerServiceExtensionsTimeDilation.Name(),
@@ -634,7 +635,7 @@ func scheduleTask[T any](s SchedulerBinding, complete func(*async.Completer[T]),
 }
 
 func (m *SchedulerBindingMixin) Unlocked() {
-	m.BindingBase.Unlocked()
+	foundation.BindingBaseSuper(m.outer(), m).Unlocked()
 	if m.taskQueue.isNotEmpty() {
 		m.ensureEventLoopCallback()
 	}

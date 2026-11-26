@@ -15,11 +15,11 @@ import (
 )
 
 // SemanticsBinding is the glue between the semantics layer and the Flutter
-// engine (a mixin on BindingBase). A binding embeds SemanticsBindingMixin,
-// whose embedded BindingBase is the binding below it, calls SetSelf, and
-// implements PerformSemanticsAction (abstract in Dart). SemanticsBinding
-// uses SchedulerBinding.instance, so a binding with it also has the
-// scheduler binding.
+// engine (a mixin on BindingBase). A binding embeds SemanticsBindingMixin
+// (see foundation/binding_mixins.go), calls SetSelf, passes it to
+// Construct, and implements PerformSemanticsAction (abstract in Dart).
+// SemanticsBinding uses SchedulerBinding.instance, so a binding with it
+// also has the scheduler binding.
 type SemanticsBinding interface {
 	foundation.BindingBase
 
@@ -43,11 +43,10 @@ type SemanticsBinding interface {
 	DisableAnimations() bool
 }
 
-// SemanticsBindingMixin is the SemanticsBinding mixin: embed it (setting
-// BindingBase to the binding below it) and call SetSelf with the binding.
+// SemanticsBindingMixin is the SemanticsBinding mixin: embed it, call
+// SetSelf with the binding and pass it to Construct (see
+// foundation/binding_mixins.go).
 type SemanticsBindingMixin struct {
-	foundation.BindingBase
-
 	self SemanticsBinding
 
 	semanticsEnabled         *foundation.ValueNotifier[bool]
@@ -78,7 +77,7 @@ func SemanticsBindingInstance() SemanticsBinding {
 // InitInstances sets the instance, reads the accessibility features and
 // installs the platform dispatcher's semantics callbacks.
 func (m *SemanticsBindingMixin) InitInstances() {
-	m.BindingBase.InitInstances()
+	foundation.BindingBaseSuper(m.outer(), m).InitInstances()
 	semanticsBindingInstance = m.outer()
 	pd := m.outer().PlatformDispatcher()
 	m.accessibilityFeatures = pd.AccessibilityFeatures()

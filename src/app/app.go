@@ -65,20 +65,23 @@ type Options struct {
 // the tree into the frame being produced, as WidgetsBinding.drawFrame
 // does.
 type appBinding struct {
+	foundation.BindingBaseBase
 	scheduler.SchedulerBindingMixin
 	// drawFrame is the rendering pipeline for the frame in progress.
 	drawFrame func()
 }
+
+func (b *appBinding) InitInstances()         { b.SchedulerBindingMixin.InitInstances() }
+func (b *appBinding) InitServiceExtensions() { b.SchedulerBindingMixin.InitServiceExtensions() }
+func (b *appBinding) Unlocked()              { b.SchedulerBindingMixin.Unlocked() }
 
 var binding *appBinding
 
 func ensureBinding() *appBinding {
 	if binding == nil {
 		b := &appBinding{}
-		base := &foundation.BindingBaseBase{}
-		b.SchedulerBindingMixin.BindingBase = base
-		b.SetSelf(b)
-		base.Construct(b)
+		b.SchedulerBindingMixin.SetSelf(b)
+		b.Construct(b, &b.SchedulerBindingMixin)
 		b.AddPersistentFrameCallback(func(time.Duration) {
 			if b.drawFrame != nil {
 				b.drawFrame()
