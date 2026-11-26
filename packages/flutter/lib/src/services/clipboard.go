@@ -45,8 +45,8 @@ func (clipboard) GetData(format string) async.Future[*ClipboardData] {
 		if r == nil {
 			return nil
 		}
-		result := r.(map[string]any)
-		text, ok := result["text"].(string)
+		result := r.(*dart.LinkedMap)
+		text, ok := result.Lookup("text").(string)
 		if !ok {
 			panic(dart.TypeError{Message: "type 'Null' is not a subtype of type 'String' in type cast"})
 		}
@@ -63,6 +63,6 @@ func (clipboard) HasStrings() async.Future[bool] {
 		if r == nil {
 			return false
 		}
-		return r.(map[string]any)["value"].(bool)
+		return r.(*dart.LinkedMap).Lookup("value").(bool)
 	})
 }

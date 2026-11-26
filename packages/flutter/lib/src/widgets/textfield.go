@@ -314,7 +314,7 @@ func (s *textFieldState) PerformAction(action services.TextInputAction) {
 	}
 }
 
-func (s *textFieldState) PerformPrivateCommand(string, map[string]any)         {}
+func (s *textFieldState) PerformPrivateCommand(string, *dart.LinkedMap)        {}
 func (s *textFieldState) UpdateFloatingCursor(services.RawFloatingCursorPoint) {}
 func (s *textFieldState) ShowAutocorrectionPromptRect(int, int)                {}
 func (s *textFieldState) InsertContent(services.KeyboardInsertedContent)       {}

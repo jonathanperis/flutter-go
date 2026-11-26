@@ -14,6 +14,7 @@ import (
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/services"
 	flutter_test "github.com/jonathanperis/flutter-go/packages/flutter_test/lib/src"
 	"github.com/jonathanperis/flutter-go/src/async"
+	"github.com/jonathanperis/flutter-go/src/dart"
 )
 
 type client struct {
@@ -27,7 +28,7 @@ func (c *client) CurrentTextEditingValue() *services.TextEditingValue  { return 
 func (c *client) CurrentAutofillScope() services.AutofillScope         { return nil }
 func (c *client) UpdateEditingValue(v services.TextEditingValue)       { c.value = v }
 func (c *client) PerformAction(a services.TextInputAction)             { c.actions = append(c.actions, a) }
-func (c *client) PerformPrivateCommand(string, map[string]any)         {}
+func (c *client) PerformPrivateCommand(string, *dart.LinkedMap)        {}
 func (c *client) UpdateFloatingCursor(services.RawFloatingCursorPoint) {}
 func (c *client) ShowAutocorrectionPromptRect(int, int)                {}
 func (c *client) ConnectionClosed()                                    { c.closed = true }
@@ -42,14 +43,14 @@ func TestTestTextInputRecordsTheFrameworksCalls(t *testing.T) {
 	c := &client{}
 	connection := services.TextInputAttach(c, services.NewTextInputConfiguration())
 	tester.Pump()
-	if !input.HasAnyClients() || input.SetClientArgs["inputAction"] != "TextInputAction.done" {
+	if !input.HasAnyClients() || input.SetClientArgs.Lookup("inputAction") != "TextInputAction.done" {
 		t.Fatalf("setClient: %v", input.SetClientArgs)
 	}
 	connection.Show()
 	sel := services.NewTextSelectionCollapsed(2)
 	connection.SetEditingState(services.NewTextEditingValue(services.TextEditingValueOptions{Text: "ab", Selection: &sel}))
 	tester.Pump()
-	if !input.IsVisible() || input.EditingState["text"] != "ab" || input.EditingState["selectionBase"] != 2 {
+	if !input.IsVisible() || input.EditingState.Lookup("text") != "ab" || input.EditingState.Lookup("selectionBase") != 2 {
 		t.Fatalf("show/setEditingState: %v %v", input.IsVisible(), input.EditingState)
 	}
 

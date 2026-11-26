@@ -24,10 +24,10 @@ type TestTextInput struct {
 	Log []services.MethodCall
 	// SetClientArgs are the arguments of the last TextInput.setClient or
 	// TextInput.updateConfig call (nil: null).
-	SetClientArgs map[string]any
+	SetClientArgs *dart.LinkedMap
 	// EditingState is the last value sent with TextInput.setEditingState
 	// (nil: null).
-	EditingState map[string]any
+	EditingState *dart.LinkedMap
 
 	client    *int
 	isVisible bool
@@ -109,9 +109,9 @@ func (t *TestTextInput) handleTextInputCall(methodCall services.MethodCall) asyn
 			arguments := methodCall.Arguments.([]any)
 			client := arguments[0].(int)
 			t.client = &client
-			t.SetClientArgs = arguments[1].(map[string]any)
+			t.SetClientArgs = arguments[1].(*dart.LinkedMap)
 		case "TextInput.updateConfig":
-			t.SetClientArgs = methodCall.Arguments.(map[string]any)
+			t.SetClientArgs = methodCall.Arguments.(*dart.LinkedMap)
 		case "TextInput.clearClient":
 			t.client = nil
 			t.isVisible = false
@@ -120,7 +120,7 @@ func (t *TestTextInput) handleTextInputCall(methodCall services.MethodCall) asyn
 				t.OnCleared()
 			}
 		case "TextInput.setEditingState":
-			t.EditingState = methodCall.Arguments.(map[string]any)
+			t.EditingState = methodCall.Arguments.(*dart.LinkedMap)
 		case "TextInput.show":
 			t.isVisible = true
 			if !foundation.KIsWeb && foundation.DefaultTargetPlatform() == foundation.TargetPlatformMacOS && t.keyHandler == nil {

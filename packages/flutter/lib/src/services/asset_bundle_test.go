@@ -265,9 +265,9 @@ func TestLoadStructuredBinaryDataLoadsBytes(t *testing.T) {
 		assetManifest := services.AssetBundleLoadStructuredBinaryData(bundle, "AssetManifest.bin", func(data []byte) any {
 			return services.NewStandardMessageCodec().DecodeMessage(data)
 		}).Await()
-		m := assetManifest.(map[any]any)
-		expect(len(m) == 1, "manifest %v", m)
-		one, ok := m["one"].([]any)
+		m := assetManifest.(*dart.LinkedMap)
+		expect(m.Len() == 1, "manifest %v", m)
+		one, ok := m.Lookup("one").([]any)
 		expect(ok && len(one) == 0, "manifest %v", m)
 	})
 }

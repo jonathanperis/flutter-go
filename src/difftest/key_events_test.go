@@ -279,7 +279,9 @@ func keyDataScene(t *testing.T, l *keyEventsLog) {
 	}
 	str := func(s string) *string { return &s }
 	keydata := func(d ui.KeyData) { l.add(fmt.Sprintf("  keydata %v", manager.HandleKeyData(d))) }
-	reply := func(m map[string]any) { l.add("  reply " + replyString(manager.HandleRawKeyMessage(m).Await())) }
+	reply := func(m map[string]any) {
+		l.add("  reply " + replyString(manager.HandleRawKeyMessage(linkedOf(m)).Await()))
+	}
 	down, up, rep := ui.KeyEventTypeDown, ui.KeyEventTypeUp, ui.KeyEventTypeRepeat
 	pA, lA := services.PhysicalKeyboardKeyKeyA.UsbHidUsage, services.LogicalKeyboardKeyKeyA.KeyID
 	pCaps, lCaps := services.PhysicalKeyboardKeyCapsLock.UsbHidUsage, services.LogicalKeyboardKeyCapsLock.KeyID
@@ -326,6 +328,38 @@ func keyDataScene(t *testing.T, l *keyEventsLog) {
 	l.reset()
 }
 
+// syncKeyboardStateScene answers getKeyboardState with maps whose keys are
+// not in increasing order: HardwareKeyboard records the pressed keys in the
+// reply's order (the last reply adds to the keys already pressed).
+func syncKeyboardStateScene(t *testing.T, l *keyEventsLog) {
+	tester := flutter_test.New(t)
+	l.add("scene sync keyboard state")
+	messenger := flutter_test.TestDefaultBinaryMessengerBindingInstance().DefaultBinaryMessenger().(*flutter_test.TestDefaultBinaryMessenger)
+	states := []*dart.LinkedMap{
+		dart.NewLinkedMapOf(0x7001d, 0x7a, 0x700e1, 0x200000102, 0x70004, 0x61),
+		dart.NewLinkedMapOf(0x700e0, 0x200000100, 0x7001e, 0x31, 0x7001d, 0x7a, 0x700e2, 0x200000104),
+		dart.NewLinkedMapOf(0x70039, 0x100000104, 0x7001e, 0x21, 0x70004, 0x41),
+	}
+	for i, state := range states {
+		messenger.SetMockMethodCallHandler(services.SystemChannels.Keyboard, func(call services.MethodCall) async.Future[any] {
+			return async.Async(func() any {
+				l.add("  call " + call.Method)
+				return state
+			})
+		})
+		if i != 2 {
+			services.HardwareKeyboardInstance().ClearState()
+		}
+		l.add(fmt.Sprintf("step sync %d", i))
+		awaitOn(tester, services.HardwareKeyboardInstance().SyncKeyboardState())
+		l.logState()
+	}
+	messenger.SetMockMethodCallHandler(services.SystemChannels.Keyboard, func(services.MethodCall) async.Future[any] {
+		return async.Async(func() any { return &dart.LinkedMap{} })
+	})
+	l.reset()
+}
+
 // dartJSON encodes an ordered map as Dart's jsonEncode does.
 func dartJSON(entries []dart.MapEntry[string, any]) string {
 	var parts []string
@@ -349,6 +383,7 @@ func TestKeyEventsMatchFlutter(t *testing.T) {
 		}
 	}
 	t.Run("key data sequences", func(t *testing.T) { keyDataScene(t, l) })
+	t.Run("sync keyboard state", func(t *testing.T) { syncKeyboardStateScene(t, l) })
 	isUp := false
 	for _, platform := range keyPlatforms {
 		for _, key := range []services.LogicalKeyboardKey{services.LogicalKeyboardKeyKeyA, services.LogicalKeyboardKeyShift,

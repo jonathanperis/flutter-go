@@ -11,7 +11,6 @@ import (
 	"math"
 	"os"
 	"runtime"
-	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -74,19 +73,11 @@ func codecDesc(v any) string {
 			s = append(s, codecDesc(e))
 		}
 		return "List:[" + strings.Join(s, ",") + "]"
-	case map[any]any:
+	case *dart.LinkedMap:
 		var s []string
-		for k, e := range x {
+		for k, e := range x.Entries() {
 			s = append(s, codecDesc(k)+"="+codecDesc(e))
 		}
-		slices.Sort(s)
-		return "Map:{" + strings.Join(s, ",") + "}"
-	case map[string]any:
-		var s []string
-		for k, e := range x {
-			s = append(s, codecDesc(k)+"="+codecDesc(e))
-		}
-		slices.Sort(s)
 		return "Map:{" + strings.Join(s, ",") + "}"
 	}
 	return fmt.Sprintf("other:%v", v)

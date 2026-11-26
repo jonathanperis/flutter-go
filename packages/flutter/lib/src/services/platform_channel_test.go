@@ -99,9 +99,9 @@ func methodTest(t *testing.T, body func(channel *services.MethodChannel, optiona
 
 func sayHelloHandler(result func(args any) any) services.MessageHandler {
 	return bytesHandler(func(message []byte) []byte {
-		methodCall := jsonMessage.DecodeMessage(message).(map[string]any)
-		if methodCall["method"] == "sayHello" {
-			return jsonMessage.EncodeMessage([]any{result(methodCall["args"])})
+		methodCall := jsonMessage.DecodeMessage(message).(*dart.LinkedMap)
+		if methodCall.Lookup("method") == "sayHello" {
+			return jsonMessage.EncodeMessage([]any{result(methodCall.Lookup("args"))})
 		}
 		return jsonMessage.EncodeMessage([]any{"unknown", nil, nil})
 	})
@@ -139,15 +139,19 @@ func TestMethodChannelCanInvokeMapMethodAndGetResult(t *testing.T) {
 	methodTest(t, func(channel *services.MethodChannel, _ *services.OptionalMethodChannel) {
 		messenger().SetMockMessageHandler("ch7", sayHelloHandler(func(args any) any { return map[string]string{dart.ToString(args): "world"} }))
 		result := services.MethodChannelInvokeMapMethod[string, string](channel, "sayHello", "hello").Await()
-		expect(reflect.DeepEqual(result, map[string]string{"hello": "world"}), "result %v", result)
-		// Own: a standard-codec map (map[any]any).
+		expect(decodedEqual(result, map[string]string{"hello": "world"}), "result %v", result)
+		// Own: a standard-codec map, in the platform's order.
 		std := services.NewMethodChannel("ch7std")
 		messenger().SetMockMethodCallHandler(std, func(services.MethodCall) async.Future[any] {
-			return async.FutureValue[any](map[any]any{1: "x"})
+			return async.FutureValue[any](dart.NewLinkedMapOf(3, "z", 1, "x", 2, "y"))
 		})
 		defer messenger().SetMockMethodCallHandler(std, nil)
 		r2 := services.MethodChannelInvokeMapMethod[int, string](std, "m").Await()
-		expect(reflect.DeepEqual(r2, map[int]string{1: "x"}), "result %v", r2)
+		expect(r2.String() == "{3: z, 1: x, 2: y}", "result %v", r2)
+		// Own: an entry of another type fails the future.
+		err1 := awaitError(services.MethodChannelInvokeMapMethod[int, int](std, "m"))
+		var valueError dart.TypeError
+		expect(errors.As(err1, &valueError) && valueError.Message == "type 'String' is not a subtype of type 'int' in type cast", "err %v", err1)
 		messenger().SetMockMethodCallHandler(std, func(services.MethodCall) async.Future[any] {
 			return async.FutureValue[any]("not a map")
 		})
@@ -174,7 +178,7 @@ func TestMethodChannelCanInvokeMethodAndGetError(t *testing.T) {
 		var e *services.PlatformException
 		expect(errors.As(err, &e), "err %v", err)
 		expect(e.Code == "bad" && *e.Message == "Something happened" &&
-			reflect.DeepEqual(e.Details, map[string]any{"a": 42, "b": 3.14}), "e %v", e)
+			decodedEqual(e.Details, map[string]any{"a": 42, "b": 3.14}), "e %v", e)
 	})
 }
 
@@ -492,8 +496,8 @@ func TestCallingExitApplicationSendsAMethodCallToTheEngine(t *testing.T) {
 		response := binding.ExitApplication(ui.AppExitTypeRequired).Await()
 		expect(sentMessage, "not sent")
 		expect(methodCall != nil, "no call")
-		expect(methodCall.Arguments.(map[string]any)["type"] == "required", "args %v", methodCall.Arguments)
-		expect(methodCall.Arguments.(map[string]any)["exitCode"] == 0, "args %v", methodCall.Arguments)
+		expect(methodCall.Arguments.(*dart.LinkedMap).Lookup("type") == "required", "args %v", methodCall.Arguments)
+		expect(methodCall.Arguments.(*dart.LinkedMap).Lookup("exitCode") == 0, "args %v", methodCall.Arguments)
 		expect(response == ui.AppExitResponseCancel, "response %v", response)
 		// Own: no reply (null) is cancel; another response is exit.
 		messenger().SetMockMessageHandler("flutter/platform", bytesHandler(func([]byte) []byte { return jsonMethod.EncodeSuccessEnvelope(nil) }))
@@ -510,14 +514,14 @@ func TestDefaultHandleRequestAppExitReturnsExit(t *testing.T) {
 	runAsync(t, func() {
 		incomingCall := services.NewMethodCall("System.requestAppExit", []any{map[string]any{"type": "cancelable"}})
 		receivedReply := false
-		var result map[string]any
+		var result *dart.LinkedMap
 		binding.DefaultBinaryMessenger().HandlePlatformMessage("flutter/platform", jsonMethod.EncodeMethodCall(incomingCall),
 			func(message []byte) {
-				result = jsonMessage.DecodeMessage(message).([]any)[0].(map[string]any)
+				result = jsonMessage.DecodeMessage(message).([]any)[0].(*dart.LinkedMap)
 				receivedReply = true
 			}).Await()
 		expect(receivedReply, "no reply")
-		expect(result != nil && result["response"] == "exit", "result %v", result)
+		expect(result != nil && result.Lookup("response") == "exit", "result %v", result)
 	})
 }
 

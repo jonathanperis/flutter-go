@@ -25,8 +25,8 @@ String bits(double v) {
   return hex(b);
 }
 
-// desc is a canonical, type-tagged description of a decoded value (maps
-// sorted by their entries' descriptions, since Go maps are unordered).
+// desc is a canonical, type-tagged description of a decoded value (maps in
+// their iteration order, which flutter-go's decoded maps keep).
 String desc(Object? v) {
   if (v == null) {
     return 'null';
@@ -63,7 +63,7 @@ String desc(Object? v) {
   }
   if (v is Map) {
     final List<String> entries =
-        v.entries.map((MapEntry<Object?, Object?> e) => '${desc(e.key)}=${desc(e.value)}').toList()..sort();
+        v.entries.map((MapEntry<Object?, Object?> e) => '${desc(e.key)}=${desc(e.value)}').toList();
     return 'Map:{${entries.join(',')}}';
   }
   return 'other:$v';

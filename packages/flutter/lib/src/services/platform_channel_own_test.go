@@ -102,7 +102,7 @@ func TestAllMessagesHandlerAndKeyboardMock(t *testing.T) {
 			"replies %q %q seen %v", reply, reply2, seen)
 		// flutter/keyboard's getKeyboardState mock answers an empty map.
 		state := services.MethodChannelInvokeMapMethod[int, int](services.SystemChannels.Keyboard, "getKeyboardState").Await()
-		expect(state != nil && len(state) == 0, "state %v", state)
+		expect(state != nil && state.IsEmpty(), "state %v", state)
 	})
 }
 

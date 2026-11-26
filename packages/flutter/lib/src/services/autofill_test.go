@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/services"
+	"github.com/jonathanperis/flutter-go/src/dart"
 )
 
 // fakeAutofillClient is FakeAutofillClient.
@@ -90,7 +91,7 @@ func TestAutofillClientsSendConfigurationAndRespondToUpdateEditingStateWithTag(t
 
 		text2 := tev("Text 2")
 		channel.incoming(call("TextInputClient.updateEditingStateWithTag", []any{0,
-			map[string]any{client2.AutofillID(): jsonMessage.DecodeMessage(jsonMessage.EncodeMessage(text2.ToJSON()))}})).Await()
+			dart.NewLinkedMapOf(client2.AutofillID(), jsonMessage.DecodeMessage(jsonMessage.EncodeMessage(text2.ToJSON())))})).Await()
 		expect(client2.currentTextEditingValue.Equal(text2), "%v", client2.currentTextEditingValue)
 	})
 }

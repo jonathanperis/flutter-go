@@ -26,7 +26,7 @@ order; named ones as option fields); the parameters of a missing member are miss
 
 Worklists of every missing declaration, member and parameter: [parity/](parity/).
 
-**Total: 1093 / 2938 declarations exposed (37.2%), 882 tested; 6677 / 31668 members exposed (21.1%), 4237 tested; 4972 / 23066 parameters exposed (21.6%); 30 divergent.**
+**Total: 1093 / 2938 declarations exposed (37.2%), 882 tested; 6677 / 31668 members exposed (21.1%), 4238 tested; 4972 / 23066 parameters exposed (21.6%); 30 divergent.**
 
 | Flutter library | Go package directory | Declarations | Exposed | Tested | Members | Members exposed | Members tested | Parameters | Parameters exposed | Divergent | Worklist |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
@@ -36,7 +36,7 @@ Worklists of every missing declaration, member and parameter: [parity/](parity/)
 | `scheduler` | `packages/flutter/lib/src/scheduler` | 20 | 20 (100%) | 15 | 82 | 81 (99%) | 68 | 41 | 40 (98%) | 1 | [scheduler.md](parity/scheduler.md) |
 | `semantics` | `packages/flutter/lib/src/semantics` | 37 | 37 (100%) | 30 | 517 | 517 (100%) | 234 | 213 | 213 (100%) | 3 | [semantics.md](parity/semantics.md) |
 | `animation` | `packages/flutter/lib/src/animation` | 54 | 54 (100%) | 54 | 303 | 303 (100%) | 208 | 181 | 181 (100%) | 7 | [animation.md](parity/animation.md) |
-| `services` | `packages/flutter/lib/src/services` | 213 | 213 (100%) | 164 | 1968 | 1965 (100%) | 853 | 737 | 728 (99%) | 8 | [services.md](parity/services.md) |
+| `services` | `packages/flutter/lib/src/services` | 213 | 213 (100%) | 164 | 1968 | 1965 (100%) | 854 | 737 | 728 (99%) | 8 | [services.md](parity/services.md) |
 | `gestures` | `packages/flutter/lib/src/gestures` | 193 | 193 (100%) | 127 | 630 | 628 (100%) | 445 | 771 | 761 (99%) | 0 | [gestures.md](parity/gestures.md) |
 | `painting` | `packages/flutter/lib/src/painting` | 137 | 136 (99%) | 126 | 1163 | 1132 (97%) | 895 | 1376 | 1332 (97%) | 0 | [painting.md](parity/painting.md) |
 | `rendering` | `packages/flutter/lib/src/rendering` | 330 | 16 (5%) | 9 | 2601 | 31 (1%) | 4 | 2224 | 13 (1%) | 0 | [rendering.md](parity/rendering.md) |

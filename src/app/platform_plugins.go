@@ -44,8 +44,8 @@ func handlePlatformChannel(window *glfw.Window, message *ui.PlatformMessage) {
 	switch call.Method {
 	case "Clipboard.setData":
 		text := ""
-		if args, ok := call.Arguments.(map[string]any); ok {
-			text, _ = args["text"].(string)
+		if args, ok := call.Arguments.(*dart.LinkedMap); ok {
+			text, _ = args.Lookup("text").(string)
 		}
 		window.SetClipboardString(text)
 		message.Response.Complete(codec.EncodeSuccessEnvelope(nil))

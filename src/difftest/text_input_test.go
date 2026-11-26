@@ -71,7 +71,7 @@ func (c *tiClient) PerformAction(action services.TextInputAction) {
 func (c *tiClient) InsertContent(content services.KeyboardInsertedContent) {
 	c.add("insertContent " + content.String() + " " + strconv.FormatBool(content.HasData()))
 }
-func (c *tiClient) PerformPrivateCommand(action string, data map[string]any) {
+func (c *tiClient) PerformPrivateCommand(action string, data *dart.LinkedMap) {
 	c.add("performPrivateCommand " + action + " " + dart.JSONEncode(data))
 }
 func (c *tiClient) UpdateFloatingCursor(point services.RawFloatingCursorPoint) {
@@ -306,7 +306,7 @@ func tiEditingValues() {
 	for _, v := range values {
 		j := dart.JSONEncode(v.ToJSON())
 		tiAdd("value " + v.String() + " " + j + " " + strconv.FormatBool(v.IsComposingRangeValid()))
-		tiAdd("fromJSON " + services.NewTextEditingValueFromJSON(tiJSONMessage.DecodeMessage([]byte(j)).(map[string]any)).String())
+		tiAdd("fromJSON " + services.NewTextEditingValueFromJSON(tiJSONMessage.DecodeMessage([]byte(j)).(*dart.LinkedMap)).String())
 	}
 	for _, j := range []string{
 		`{"text": "abc"}`,
@@ -321,7 +321,7 @@ func tiEditingValues() {
 					tiAdd("fromJSON " + j + " throws " + dart.ToString(r.(dart.AssertionFailure).AssertionMessage()))
 				}
 			}()
-			v := services.NewTextEditingValueFromJSON(tiJSONMessage.DecodeMessage([]byte(j)).(map[string]any))
+			v := services.NewTextEditingValueFromJSON(tiJSONMessage.DecodeMessage([]byte(j)).(*dart.LinkedMap))
 			tiAdd("fromJSON " + j + " -> " + v.String() + " " + dart.JSONEncode(v.ToJSON()))
 		}()
 	}
@@ -540,8 +540,8 @@ func tiPlatformScene() {
 			case "Clipboard.getData":
 				return tiJSONMethod.EncodeSuccessEnvelope(clipboard)
 			case "Clipboard.hasStrings":
-				data, _ := clipboard.(map[string]any)
-				return tiJSONMethod.EncodeSuccessEnvelope(map[string]any{"value": data["text"] != nil})
+				data, _ := clipboard.(*dart.LinkedMap)
+				return tiJSONMethod.EncodeSuccessEnvelope(map[string]any{"value": data != nil && data.Lookup("text") != nil})
 			}
 			return tiJSONMethod.EncodeSuccessEnvelope(nil)
 		})

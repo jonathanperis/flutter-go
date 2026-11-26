@@ -248,7 +248,7 @@ func jsonTypeName(v any) string {
 		return "double"
 	case []any:
 		return "List<dynamic>"
-	case map[string]any:
+	case *dart.LinkedMap:
 		return "_Map<String, dynamic>"
 	}
 	return "Object"
@@ -257,15 +257,15 @@ func jsonTypeName(v any) string {
 // updateUserSettingsData is _updateUserSettingsData: the settings as JSON.
 func (p *PlatformDispatcher) updateUserSettingsData(jsonData string) {
 	decoded := dart.JSONDecode(jsonData)
-	data, ok := decoded.(map[string]any)
+	data, ok := decoded.(*dart.LinkedMap)
 	if !ok {
 		panic(dart.TypeError{Message: "type '" + jsonTypeName(decoded) + "' is not a subtype of type 'Map<String, Object?>' in type cast"})
 	}
-	if len(data) == 0 {
+	if data.IsEmpty() {
 		return
 	}
 	var textScaleFactor float64
-	switch n := jsonNullCheck(data["textScaleFactor"]).(type) {
+	switch n := jsonNullCheck(data.Lookup("textScaleFactor")).(type) {
 	case int:
 		textScaleFactor = float64(n)
 	case float64:
@@ -273,32 +273,32 @@ func (p *PlatformDispatcher) updateUserSettingsData(jsonData string) {
 	default:
 		panic(dart.TypeError{Message: "type '" + jsonTypeName(n) + "' is not a subtype of type 'num' in type cast"})
 	}
-	alwaysUse24HourFormat := *jsonAs[bool](jsonNullCheck(data["alwaysUse24HourFormat"]), "bool")
-	if v := jsonAs[bool](data["nativeSpellCheckServiceDefined"], "bool?"); v != nil {
+	alwaysUse24HourFormat := *jsonAs[bool](jsonNullCheck(data.Lookup("alwaysUse24HourFormat")), "bool")
+	if v := jsonAs[bool](data.Lookup("nativeSpellCheckServiceDefined"), "bool?"); v != nil {
 		p.settings.nativeSpellCheckServiceDefined = *v
 	} else {
 		p.settings.nativeSpellCheckServiceDefined = false
 	}
-	if v := jsonAs[bool](data["supportsShowingSystemContextMenu"], "bool?"); v != nil {
+	if v := jsonAs[bool](data.Lookup("supportsShowingSystemContextMenu"), "bool?"); v != nil {
 		p.settings.supportsShowingSystemContextMenu = *v
 	} else {
 		p.settings.supportsShowingSystemContextMenu = false
 	}
 	// This field is optional.
-	if v := jsonAs[bool](data["brieflyShowPassword"], "bool?"); v != nil {
+	if v := jsonAs[bool](data.Lookup("brieflyShowPassword"), "bool?"); v != nil {
 		p.settings.brieflyShowPassword = *v
 	}
 	var platformBrightness Brightness
-	switch data["platformBrightness"] {
+	switch data.Lookup("platformBrightness") {
 	case "dark":
 		platformBrightness = BrightnessDark
 	case "light":
 		platformBrightness = BrightnessLight
 	default:
-		panic(dart.StateError{Message: dart.ToString(data["platformBrightness"]) + " is not a valid platformBrightness."})
+		panic(dart.StateError{Message: dart.ToString(data.Lookup("platformBrightness")) + " is not a valid platformBrightness."})
 	}
-	systemFontFamily := jsonAs[string](data["systemFontFamily"], "String?")
-	configurationID := jsonAs[int](data["configurationId"], "int?")
+	systemFontFamily := jsonAs[string](data.Lookup("systemFontFamily"), "String?")
+	configurationID := jsonAs[int](data.Lookup("configurationId"), "int?")
 	previous := p.configuration
 	platformBrightnessChanged := previous.platformBrightness != platformBrightness
 	textScaleFactorChanged := previous.textScaleFactor != textScaleFactor

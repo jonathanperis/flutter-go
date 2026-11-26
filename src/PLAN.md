@@ -2363,3 +2363,98 @@ measures every public member and parameter, by API_MAPPING's rules:
   the same worktree on disjoint files (test files only, bugs reported
   rather than fixed); mutations need the difftest package rebuilt each
   time (~3 min each), so long batches run as one background job.
+
+### Decoded maps keep Dart's insertion order (approved API divergence)
+
+- **Why.** Dart's Maps are LinkedHashMaps: the codecs' decoded maps
+  iterate in the order the message lists them, and Flutter's code reads
+  that order (process text lists the platform's actions in it, keyboard
+  state sync records pressed keys in it, autofill visits tags in it, the
+  standard codec writes a decoded map back in it). Go maps have none, so
+  the codecs decoded into `map[any]any`/`map[string]any` and callers
+  sorted (process text by id, keyboard sync by key, autofill tags by
+  name). The user approved an order-preserving map type in the API.
+- **Design.** `*dart.LinkedMap` (src/dart/linked_map.go, extended from the
+  restoration port's type; dart:core's default Map, so it lives in
+  `src/dart`; Flutter has no map type of its own to put in foundation):
+  Get/Lookup/Set/Remove/PutIfAbsent/AddAll/Clear/ContainsKey/Len,
+  `Keys()`/`Values()` as `iter.Seq[any]`, `Entries()` as
+  `iter.Seq2[any, any]`, Dart's toString (with `{...}` for a map inside
+  itself), `ConcurrentModificationError` when changed while iterated,
+  `NewLinkedMapOf(k, v, ...)` as a literal. Keys follow the VM's
+  `_equals`/`hashCode` (compact_hash.dart): an int and a double match when
+  `==` holds and the hashes agree (the double hashes as its saturating
+  int cast, so 2^63 matches the largest int; 2^53+1 and 2^53.0 don't),
+  the first key is kept, NaN never matches, lists/typed data/maps by
+  identity (Go slices by backing array, length and capacity; the codec
+  gives decoded empty lists their own arrays, since Go's zero-size
+  allocations share one address). Dart `Remove` is kept as Dart's name
+  (not `Delete`). A Go map and `[]dart.MapEntry` stay accepted when
+  encoding (a Go map sorted, as before). Documented in API_MAPPING
+  ("Platform channel values", the Types table, dart:core, services); no
+  `api_divergences.json` entry: no Flutter name changes, only the Go type
+  of decoded values and of the parameters that receive them.
+- **Ported.** message_codecs.dart's map read (`<Object?, Object?>{}`
+  filled in message order) and write (`value.forEach`), for the standard
+  and JSON codecs (`dart.JSONDecode`/`JSONUTF8Decode` build the map; the
+  JSON encoder writes a `*LinkedMap` in order, `_Map len:N` in its
+  errors, with cycle detection). The restoration port's private
+  `orderedStandardMessageCodec` is gone (the codec does it).
+  `invokeMapMethod<K, V>` returns the decoded map itself (entries checked
+  against K and V at once).
+- **Callers moved** (every consumer of a decoded map): services' text
+  input (fromJSON factories, private command data, floating cursor,
+  deltas, inserted content, autofill tags in message order), raw keyboard
+  (`RawKeyEventFromMessage(*dart.LinkedMap)`, `handleRawKeyMessage`),
+  keyboard state sync (reply order), process text (platform order),
+  spell check, clipboard, system/accessibility messages, app exit,
+  platform views' resize, restoration, asset manifest, predictive back
+  (MapLookup accepts `*LinkedMap`); painting's fontsChange; dart:ui's user
+  settings JSON; flutter_test's TestTextInput (`SetClientArgs`,
+  `EditingState`), key simulation reply; widgets' interim TextField;
+  src/app's clipboard and key responder replies. Test helpers compare
+  maps as package:matcher's `equals` (by key), which is what the ported
+  Flutter tests assert. Workarounds removed: process text's sort,
+  keyboard sync's sort, autofill's sorted tags. Kept: the generated
+  keyboard tables' `K<Map>Keys` slices (Dart const literals, not decoded
+  maps); outgoing maps built as `[]dart.MapEntry` (toJSON, toMap, channel
+  arguments) are unchanged.
+- **Tests.** message_codecs_test.go's map tests now use LinkedMap
+  literals as Dart's do (composite messages, objects produced from the
+  codec, a list key decoding to two keys); new message_codecs_maps_test.go
+  (insertion-order writes, decoding in message order with every key type,
+  nested maps through the method codec, JSON objects and method calls,
+  process text and keyboard sync following the reply's order); LinkedMap
+  unit tests (order, removal/reinsertion, key semantics incl. 2^63/2^53,
+  NaN and identity, cycles, concurrent modification); JSON encode/decode
+  tests.
+- **Difftests (exact).** New message_codec_maps (134 cases): 40 maps over
+  16 key types (strings, ints incl. the largest, doubles, bools, null,
+  lists, Uint8List/Int32List/Float64List, maps) in pseudo-random orders
+  (an LCG shared with Dart), all 24 orders of four keys through the
+  standard and JSON codecs, 12 nested maps (also as method-call
+  arguments and envelopes), merging keys in both orders (int/double,
+  zeros, duplicates, equal lists, empty lists and typed data, equal maps,
+  NaN, 2^63/2^53), a decoded map changed (remove, re-add, replace,
+  putIfAbsent, addAll) and written again, JSON objects with duplicate and
+  non-ASCII keys, JSON method calls/envelopes/error details — bytes,
+  iteration order, toString and re-encoded bytes. message_codecs and
+  dart_convert now describe maps in iteration order on both sides
+  (they sorted before). undo_scribe_misc's process-text scene gets two
+  unsorted replies; key_events gets a "sync keyboard state" scene
+  (getKeyboardState replies in unsorted orders, one added to the existing
+  state). All matched on the first run.
+- **Mutations:** 22 valid: 21 caught, 1 equivalent. Caught: iteration
+  reversed, sorted by key text, or in Go-map order (an index map ranged
+  over); setting an existing key moving it last; int/double keys never
+  merging; 2^63 not merging with the largest int; list keys by content;
+  Remove not reindexing, not counting as a modification; no
+  ConcurrentModificationError; no `{...}` for a self-containing map; the
+  standard codec writing maps in reverse or decoding them sorted; decoded
+  empty lists sharing an address; JSON decoding objects in reverse or
+  writing a LinkedMap in reverse; process text sorting by id; keyboard
+  sync sorting keys; autofill tags visited sorted (missed by the ported
+  tests, caught after adding TestAutofillTagsFollowTheMessageOrder);
+  invokeMapMethod skipping its entry casts. Equivalent: reindexing NaN
+  keys in Remove (a NaN key never matches, so the extra index entries are
+  never found).

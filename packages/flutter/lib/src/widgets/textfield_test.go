@@ -11,6 +11,7 @@ import (
 	. "github.com/jonathanperis/flutter-go/packages/flutter/lib/src/widgets"
 	"github.com/jonathanperis/flutter-go/packages/flutter_test/lib/src"
 	"github.com/jonathanperis/flutter-go/src/async"
+	"github.com/jonathanperis/flutter-go/src/dart"
 )
 
 func caretDrawn(t *flutter_test.Tester) bool {
@@ -72,7 +73,7 @@ func TestClipboardAndSubmit(t *testing.T) {
 	messenger.SetMockMethodCallHandler(services.SystemChannels.Platform, func(call services.MethodCall) async.Future[any] {
 		switch call.Method {
 		case "Clipboard.setData":
-			s := call.Arguments.(map[string]any)["text"].(string)
+			s := call.Arguments.(*dart.LinkedMap).Lookup("text").(string)
 			clip = &s
 		case "Clipboard.getData":
 			if clip != nil {

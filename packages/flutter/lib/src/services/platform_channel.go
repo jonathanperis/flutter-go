@@ -334,29 +334,27 @@ func MethodChannelInvokeListMethod[T any](c *MethodChannel, method string, argum
 }
 
 // MethodChannelInvokeMapMethod is MethodChannel.invokeMapMethod<K, V>: an
-// InvokeMethod whose result (a map, or nil) is converted to map[K]V (at
-// once, see MethodChannelInvokeListMethod).
-func MethodChannelInvokeMapMethod[K comparable, V any](c *MethodChannel, method string, arguments ...any) async.Future[map[K]V] {
-	return async.Async(func() map[K]V {
+// InvokeMethod whose result (a map, or nil) is cast to Map<K, V>. The
+// result is the decoded *dart.LinkedMap itself, in the platform's order;
+// Dart casts its entries lazily (one of another type fails when read), Go
+// checks every key and value against K and V at once, so a wrong entry
+// fails the future.
+func MethodChannelInvokeMapMethod[K, V any](c *MethodChannel, method string, arguments ...any) async.Future[*dart.LinkedMap] {
+	return async.Async(func() *dart.LinkedMap {
 		result := c.InvokeMethod(method, arguments...).Await()
 		if result == nil {
 			return nil
 		}
-		out := map[K]V{}
-		switch m := result.(type) {
-		case map[string]any:
-			for k, v := range m {
-				out[castElement[K](k)] = castElement[V](v)
-			}
-		case map[any]any:
-			for k, v := range m {
-				out[castElement[K](k)] = castElement[V](v)
-			}
-		default:
+		m, ok := result.(*dart.LinkedMap)
+		if !ok {
 			panic(dart.TypeError{Message: "type '" + foundation.ObjectRuntimeType(result, "Object") +
 				"' is not a subtype of type 'Map<dynamic, dynamic>?' in type cast"})
 		}
-		return out
+		for k, v := range m.Entries() {
+			castElement[K](k)
+			castElement[V](v)
+		}
+		return m
 	})
 }
 

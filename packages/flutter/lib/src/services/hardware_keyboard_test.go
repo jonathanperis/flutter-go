@@ -249,10 +249,10 @@ func TestPostponeSynthesizedKeyEventsWhenTheQueueIsNotEmpty(t *testing.T) {
 		expect(!b.KeyEventManager().HandleKeyData(ui.KeyData{Type: ui.KeyEventTypeUp,
 			Logical: services.LogicalKeyboardKeyCapsLock.KeyID, Physical: services.PhysicalKeyboardKeyCapsLock.UsbHidUsage,
 			Synthesized: true}), "handled")
-		result := b.KeyEventManager().HandleRawKeyMessage(map[string]any{
+		result := b.KeyEventManager().HandleRawKeyMessage(linkedOf(map[string]any{
 			"type": "keydown", "keymap": "macos", "keyCode": 0x00000039, "characters": "",
 			"charactersIgnoringModifiers": "", "modifiers": 0x10000,
-		}).Await()
+		})).Await()
 		expect(result["handled"] == false && len(result) == 1, "result %v", result)
 		expect(slicesEqual(logs, []string{"RawKeyDownEvent", "KeyDownEvent", "KeyUpEvent"}), "logs %v", logs)
 	})
@@ -276,13 +276,13 @@ func TestEmptyKeyDataYieldsNoEventButTriggersInference(t *testing.T) {
 		b.KeyEventManager().HandleKeyData(ui.KeyData{Type: ui.KeyEventTypeDown, Character: &a})
 		message := map[string]any{"type": "keydown", "keymap": "windows", "keyCode": 0x04, "scanCode": 0x04,
 			"characterCodePoint": 0, "modifiers": 0}
-		b.KeyEventManager().HandleRawKeyMessage(message).Await()
+		b.KeyEventManager().HandleRawKeyMessage(linkedOf(message)).Await()
 		expect(len(events) == 0, "events %d", len(events))
 		expect(len(rawEvents) == 1, "raw events %d", len(rawEvents))
 		// Another key data proves the mode (otherwise it asserts).
 		quote := `"`
 		b.KeyEventManager().HandleKeyData(ui.KeyData{Type: ui.KeyEventTypeDown, Logical: 0x22, Physical: 0x70034, Character: &quote})
-		b.KeyEventManager().HandleRawKeyMessage(message).Await()
+		b.KeyEventManager().HandleRawKeyMessage(linkedOf(message)).Await()
 		expect(len(events) == 1, "events %d", len(events))
 		expect(len(rawEvents) == 2, "raw events %d", len(rawEvents))
 	})
@@ -427,8 +427,8 @@ func TestRawKeyDataDeviceTypes(t *testing.T) {
 		manager := ensureInitialized().KeyEventManager()
 		for _, source := range []int{0x101, 0x201, 0x401, 0x01000010, 0x02000001, 0x7} {
 			for _, typ := range []string{"keydown", "keyup"} {
-				manager.HandleRawKeyMessage(map[string]any{"type": typ, "keymap": "android", "keyCode": 29,
-					"scanCode": 30, "plainCodePoint": 97, "codePoint": 97, "metaState": 0, "source": source}).Await()
+				manager.HandleRawKeyMessage(linkedOf(map[string]any{"type": typ, "keymap": "android", "keyCode": 29,
+					"scanCode": 30, "plainCodePoint": 97, "codePoint": 97, "metaState": 0, "source": source})).Await()
 			}
 		}
 		want := []ui.KeyEventDeviceType{ui.KeyEventDeviceTypeKeyboard, ui.KeyEventDeviceTypeKeyboard,

@@ -94,6 +94,9 @@ func TestJSONUTF8Encode(t *testing.T) {
 		{map[int]any{}, `{}`},
 		{[]MapEntry[any, any]{}, `{}`},
 		{[]MapEntry[any, any]{{"z", 1}, {"a", nil}}, `{"z":1,"a":null}`},
+		{NewLinkedMapOf("z", 1, "a", NewLinkedMapOf("y", []any{}, "b", 2.5), "m", nil), `{"z":1,"a":{"y":[],"b":2.5},"m":null}`},
+		{&LinkedMap{}, `{}`},
+		{(*LinkedMap)(nil), `null`},
 		{[]byte{1, 255}, `[1,255]`},
 		{[]float32{0.1}, `[0.10000000149011612]`},
 		{9223372036854775807.0, `9223372036854776000.0`}, {(*int)(nil), `null`},
@@ -107,6 +110,8 @@ func TestJSONUTF8Encode(t *testing.T) {
 	nan := math.NaN()
 	cyclic := []any{1, nil}
 	cyclic[1] = cyclic
+	cyclicMap := NewLinkedMapOf("a", 1)
+	cyclicMap.Set("self", []any{cyclicMap})
 	for _, c := range []struct {
 		v    any
 		want string
@@ -117,7 +122,10 @@ func TestJSONUTF8Encode(t *testing.T) {
 		{[]MapEntry[any, any]{{"a", 1}, {nil, 2}}, "Converting object to an encodable object failed: _Map len:2"},
 		{map[string]any{"a": []any{map[any]any{true: 1, false: 2}}}, "Converting object to an encodable object failed: _Map len:2"},
 		{struct{}{}, "Converting object to an encodable object failed: Instance of 'struct {}'"},
+		{NewLinkedMapOf("a", 1, 2, 3, "c", 4), "Converting object to an encodable object failed: _Map len:3"},
+		{[]any{NewLinkedMapOf("a", NewLinkedMapOf(nil, 1))}, "Converting object to an encodable object failed: _Map len:1"},
 		{cyclic, "Cyclic error in JSON stringify"},
+		{cyclicMap, "Cyclic error in JSON stringify"},
 	} {
 		if got := catchError(func() { JSONEncode(c.v) }); got != c.want {
 			t.Errorf("JSONEncode(%v): %q, want %q", c.v, got, c.want)
@@ -172,9 +180,10 @@ func TestJSONDecode(t *testing.T) {
 		{`"é😂\/\b\f\n\r\t\"\\"`, "é😂/\b\f\n\r\t\"\\"},
 		{`"ꯍxꯍ"`, "ꯍxꯍ"},
 		{`"\ud800"`, "�"},
-		{`{"a":1,"b":2,"a":3}`, map[string]any{"a": 3, "b": 2}},
-		{`[true,false,null,{}]`, []any{true, false, nil, map[string]any{}}},
-		{`{"a":{"b":[1,{"c":null}]}}`, map[string]any{"a": map[string]any{"b": []any{1, map[string]any{"c": nil}}}}},
+		{`{"a":1,"b":2,"a":3}`, NewLinkedMapOf("a", 3, "b", 2)},
+		{`{"b":1,"a":2,"c":3,"b":4}`, NewLinkedMapOf("b", 4, "a", 2, "c", 3)},
+		{`[true,false,null,{}]`, []any{true, false, nil, &LinkedMap{}}},
+		{`{"a":{"b":[1,{"c":null}]}}`, NewLinkedMapOf("a", NewLinkedMapOf("b", []any{1, NewLinkedMapOf("c", nil)}))},
 	} {
 		got := JSONDecode(c.in)
 		if ToString(got) != ToString(c.want) || describeKind(got) != describeKind(c.want) {
@@ -216,10 +225,10 @@ func describeKind(v any) string {
 			s += describeKind(e)
 		}
 		return s + "]"
-	case map[string]any:
+	case *LinkedMap:
 		s := "{"
-		for _, k := range []string{"a", "b", "c"} {
-			s += describeKind(x[k])
+		for k, v := range x.Entries() {
+			s += k.(string) + ":" + describeKind(v)
 		}
 		return s + "}"
 	}

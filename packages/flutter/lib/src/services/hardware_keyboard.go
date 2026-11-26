@@ -402,16 +402,8 @@ func (h *HardwareKeyboard) SyncKeyboardState() async.Future[async.Void] {
 	return async.AsyncVoid(func() {
 		keyboardState := MethodChannelInvokeMapMethod[int, int](SystemChannels.Keyboard, "getKeyboardState").Await()
 		if keyboardState != nil {
-			// Dart iterates the decoded map in the message's order; Go's
-			// decoded map has none, so the keys are recorded in increasing
-			// order.
-			keys := make([]int, 0, len(keyboardState))
-			for k := range keyboardState {
-				keys = append(keys, k)
-			}
-			slices.Sort(keys)
-			for _, key := range keys {
-				h.pressedKeys.set(PhysicalKeyboardKey{key}, LogicalKeyboardKey{keyboardState[key]})
+			for key, value := range keyboardState.Entries() {
+				h.pressedKeys.set(PhysicalKeyboardKey{key.(int)}, LogicalKeyboardKey{value.(int)})
 			}
 		}
 	})
@@ -652,7 +644,7 @@ func (m *KeyEventManager) HandleRawKeyMessage(message any) async.Future[map[stri
 			// occurs if the raw event should be dispatched.
 			m.rawKeyboard.AddListener(m.convertListener)
 		}
-		rawEvent := RawKeyEventFromMessage(message.(map[string]any))
+		rawEvent := RawKeyEventFromMessage(castElement[*dart.LinkedMap](message))
 		shouldDispatch := true
 		switch rawEvent.(type) {
 		case *RawKeyDownEvent:

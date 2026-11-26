@@ -244,22 +244,22 @@ func (e *RawKeyEventBase) debugFillProperties(properties *foundation.DiagnosticP
 	properties.Add(foundation.NewDiagnosticsProperty("physicalKey", e.PhysicalKey()))
 }
 
-func intOr(message map[string]any, key string, or int) int {
-	if v, ok := message[key].(int); ok {
+func intOr(message *dart.LinkedMap, key string, or int) int {
+	if v, ok := message.Lookup(key).(int); ok {
 		return v
 	}
 	return or
 }
 
-func stringOr(message map[string]any, key string, or string) string {
-	if v, ok := message[key].(string); ok {
+func stringOr(message *dart.LinkedMap, key string, or string) string {
+	if v, ok := message.Lookup(key).(string); ok {
 		return v
 	}
 	return or
 }
 
-func messageIntPtr(message map[string]any, key string) *int {
-	if v, ok := message[key].(int); ok {
+func messageIntPtr(message *dart.LinkedMap, key string) *int {
+	if v, ok := message.Lookup(key).(int); ok {
 		return &v
 	}
 	return nil
@@ -268,10 +268,10 @@ func messageIntPtr(message map[string]any, key string) *int {
 // RawKeyEventFromMessage is RawKeyEvent.fromMessage: the event a raw key
 // message of the flutter/keyevent channel describes. It panics with a
 // FlutterError for an unknown keymap or event type.
-func RawKeyEventFromMessage(message map[string]any) RawKeyEvent {
+func RawKeyEventFromMessage(message *dart.LinkedMap) RawKeyEvent {
 	var character *string
 	dataFromWeb := func() RawKeyEventData {
-		key, hasKey := message["key"].(string)
+		key, hasKey := message.Lookup("key").(string)
 		if hasKey && key != "" && dart.StringLength(key) == 1 {
 			c := key
 			character = &c
@@ -285,7 +285,7 @@ func RawKeyEventFromMessage(message map[string]any) RawKeyEvent {
 		})
 	}
 	var data RawKeyEventData
-	keymap := message["keymap"].(string)
+	keymap := message.Lookup("keymap").(string)
 	switch keymap {
 	case "android":
 		data = NewRawKeyEventDataAndroid(RawKeyEventDataAndroidOptions{
@@ -301,7 +301,7 @@ func RawKeyEventFromMessage(message map[string]any) RawKeyEvent {
 			DeviceId:       intOr(message, "deviceId", 0),
 			RepeatCount:    intOr(message, "repeatCount", 0),
 		})
-		if c, ok := message["character"]; ok {
+		if c, ok := message.Get("character"); ok {
 			if s, ok := c.(string); ok {
 				character = &s
 			} else {
@@ -327,7 +327,7 @@ func RawKeyEventFromMessage(message map[string]any) RawKeyEvent {
 			Modifiers:                   intOr(message, "modifiers", 0),
 			SpecifiedLogicalKey:         messageIntPtr(message, "specifiedLogicalKey"),
 		})
-		if s, ok := message["characters"].(string); ok {
+		if s, ok := message.Lookup("characters").(string); ok {
 			character = &s
 		}
 	case "ios":
@@ -337,12 +337,12 @@ func RawKeyEventFromMessage(message map[string]any) RawKeyEvent {
 			KeyCode:                     intOr(message, "keyCode", 0),
 			Modifiers:                   intOr(message, "modifiers", 0),
 		})
-		if s, ok := message["characters"].(string); ok && s != "" {
+		if s, ok := message.Lookup("characters").(string); ok && s != "" {
 			character = &s
 		}
 	case "linux":
 		unicodeScalarValues := intOr(message, "unicodeScalarValues", 0)
-		data = NewRawKeyEventDataLinux(NewKeyHelper(stringOr(message, "toolkit", "")), message["type"] == "keydown",
+		data = NewRawKeyEventDataLinux(NewKeyHelper(stringOr(message, "toolkit", "")), message.Lookup("type") == "keydown",
 			RawKeyEventDataLinuxOptions{
 				UnicodeScalarValues: unicodeScalarValues,
 				KeyCode:             intOr(message, "keyCode", 0),
@@ -372,7 +372,7 @@ func RawKeyEventFromMessage(message map[string]any) RawKeyEvent {
 		panic(foundation.NewFlutterError("Unknown keymap for key events: " + keymap))
 	}
 	repeat := slices.Contains(RawKeyboardInstance.PhysicalKeysPressed(), data.PhysicalKey())
-	typ := message["type"].(string)
+	typ := message.Lookup("type").(string)
 	switch typ {
 	case "keydown":
 		return NewRawKeyDownEvent(data, RawKeyEventOptions{Character: character, Repeat: repeat})

@@ -9,6 +9,7 @@ import (
 	"unsafe"
 
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/foundation"
+	"github.com/jonathanperis/flutter-go/src/dart"
 )
 
 // KeyboardInsertedContent is a class representing rich content (such as a
@@ -24,10 +25,10 @@ type KeyboardInsertedContent struct {
 }
 
 // NewKeyboardInsertedContentFromJSON is KeyboardInsertedContent.fromJson.
-func NewKeyboardInsertedContentFromJSON(metadata map[string]any) KeyboardInsertedContent {
-	c := KeyboardInsertedContent{MimeType: metadata["mimeType"].(string), URI: metadata["uri"].(string)}
-	if metadata["data"] != nil {
-		list := metadata["data"].([]any)
+func NewKeyboardInsertedContentFromJSON(metadata *dart.LinkedMap) KeyboardInsertedContent {
+	c := KeyboardInsertedContent{MimeType: metadata.Lookup("mimeType").(string), URI: metadata.Lookup("uri").(string)}
+	if metadata.Lookup("data") != nil {
+		list := metadata.Lookup("data").([]any)
 		c.Data = make([]byte, len(list))
 		for i, v := range list {
 			c.Data[i] = byte(v.(int)) // Uint8List.fromList truncates to 8 bits

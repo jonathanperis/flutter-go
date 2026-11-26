@@ -1160,8 +1160,8 @@ func (t *textureInternals) setSize(size ui.Size, viewID int, viewState androidVi
 		if meta == nil {
 			panic(dart.NewAssertionError(nil))
 		}
-		width, hasWidth := meta["width"]
-		height, hasHeight := meta["height"]
+		width, hasWidth := meta.Get("width")
+		height, hasHeight := meta.Get("height")
 		if !hasWidth || !hasHeight {
 			panic(dart.NewAssertionError(nil))
 		}

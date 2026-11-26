@@ -245,6 +245,18 @@ Start here when continuing flutter-go in a new session.
      document their Go form in API_MAPPING (then a divergence entry). The
      larger gap is tests: ~40% of exposed members of these libraries no Go
      test refers to (services' generated key constants account for most).
+  16. Done: decoded maps keep Dart's insertion order (approved divergence,
+     API_MAPPING "Platform channel values"): the standard and JSON codecs
+     and `dart.JSONDecode` decode Maps into `*dart.LinkedMap` and write it
+     in order; every consumer moved (text input fromJSON factories and
+     `PerformPrivateCommand`, `RawKeyEventFromMessage`, keyboard sync,
+     process text, spell check, clipboard, `MethodChannelInvokeMapMethod`
+     returning the map, flutter_test's TestTextInput fields, src/app);
+     the order workarounds are gone. Next for it: new ports that read a
+     decoded map take `*dart.LinkedMap` (widgets' restoration/platform
+     views, text input's real client); maps Flutter builds and sends are
+     still `[]dart.MapEntry` (toJSON, toMap, channel arguments) and could
+     move to `*dart.LinkedMap` where a port needs to read them back.
 
 ## Environment
 

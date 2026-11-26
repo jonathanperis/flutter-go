@@ -156,14 +156,14 @@ func newKeyboardManager(pc *ui.PlatformConfiguration) *keyboardManager {
 		pc.DispatchPlatformMessage(&ui.PlatformMessage{Channel: "flutter/keydata", Data: ui.PackKeyDataPacket(data), Response: response})
 	})
 	codec := services.JSONMessageCodec{}
-	channel := &channelKeyResponder{send: func(message map[string]any, callback func(map[string]any)) {
+	channel := &channelKeyResponder{send: func(message map[string]any, callback func(*dart.LinkedMap)) {
 		pc.DispatchPlatformMessage(&ui.PlatformMessage{Channel: "flutter/keyevent", Data: codec.EncodeMessage(message),
 			Response: platformResponse(func(reply []byte) {
 				if reply == nil {
 					callback(nil)
 					return
 				}
-				m, _ := codec.DecodeMessage(reply).(map[string]any)
+				m, _ := codec.DecodeMessage(reply).(*dart.LinkedMap)
 				callback(m)
 			})})
 	}}

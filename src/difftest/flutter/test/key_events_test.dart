@@ -291,6 +291,33 @@ void main() {
     reset();
   });
 
+  // getKeyboardState answers maps whose keys are not in increasing order:
+  // HardwareKeyboard records the pressed keys in the reply's order (the last
+  // reply adds to the keys already pressed).
+  testWidgets('sync keyboard state', (WidgetTester tester) async {
+    lines.add('scene sync keyboard state');
+    final TestDefaultBinaryMessenger messenger = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    final List<Map<int, int>> states = <Map<int, int>>[
+      <int, int>{0x7001d: 0x7a, 0x700e1: 0x200000102, 0x70004: 0x61},
+      <int, int>{0x700e0: 0x200000100, 0x7001e: 0x31, 0x7001d: 0x7a, 0x700e2: 0x200000104},
+      <int, int>{0x70039: 0x100000104, 0x7001e: 0x21, 0x70004: 0x41},
+    ];
+    for (var i = 0; i < states.length; i++) {
+      messenger.setMockMethodCallHandler(SystemChannels.keyboard, (MethodCall call) async {
+        lines.add('  call ${call.method}');
+        return states[i];
+      });
+      if (i != 2) {
+        HardwareKeyboard.instance.clearState();
+      }
+      lines.add('step sync $i');
+      await HardwareKeyboard.instance.syncKeyboardState();
+      logState();
+    }
+    messenger.setMockMethodCallHandler(SystemChannels.keyboard, (MethodCall call) async => <int, int>{});
+    reset();
+  });
+
   testWidgets('getKeyData', (WidgetTester tester) async {
     for (final String platform in platforms) {
       for (final LogicalKeyboardKey key in <LogicalKeyboardKey>[

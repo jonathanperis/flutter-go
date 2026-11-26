@@ -522,8 +522,8 @@ func simulateKeyEventByRawEvent(buildKeyData func() []dart.MapEntry[string, any]
 				result.Complete(false)
 				return
 			}
-			decoded := channel.Codec.DecodeMessage(data).(map[string]any)
-			result.Complete(decoded["handled"].(bool))
+			decoded := channel.Codec.DecodeMessage(data).(*dart.LinkedMap)
+			result.Complete(decoded.Lookup("handled").(bool))
 		}).Await()
 		return result.Future().Await()
 	})

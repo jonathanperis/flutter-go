@@ -115,7 +115,7 @@ literals of imported structs.
 | `double`, `int`, `bool`, `String` | `float64`, `int`, `bool`, `string` |
 | `double?` and other nullable values | pointer, or a documented sentinel |
 | `Duration` | `time.Duration` |
-| `List<T>`, `Map<K,V>`, `Set<T>` | `[]T`, `map[K]V`, `map[T]struct{}` |
+| `List<T>`, `Map<K,V>`, `Set<T>` | `[]T`, `map[K]V`, `map[T]struct{}`; a Map decoded from a platform message or JSON, or held where Dart's iteration order is observable, is `*dart.LinkedMap` (see "Platform channel values") |
 | `VoidCallback`, `ValueChanged<T>` | `func()`, `func(T)` |
 | `ByteData`, `Uint8List` | `[]byte` (a nil slice is null; an empty non-nil slice is a zero-length ByteData) |
 | `Int32List`, `Int64List`, `Float32List`, `Float64List` | `[]int32`, `[]int64`, `[]float32`, `[]float64` |
@@ -413,14 +413,37 @@ accepted when encoding (a `uint64` above `math.MaxInt64` throws
 is encoded as the double it widens to). Typed lists are `[]byte`,
 `[]int32`, `[]int64`, `[]float32`, `[]float64`; any other slice or array is a
 `List` (decoded: `[]any`); a nil slice or map is an empty list or map, only
-a nil interface or nil pointer is null (a non-nil pointer is its value). A
-`Map` is a Go map or a `[]dart.MapEntry[K, V]` (an ordered map, written in its
-order); a Go map is written in sorted key order (null, bools, numbers,
-strings, then the rest by their text). Decoded maps are `map[any]any`
-(standard codec) or `map[string]any` (JSON): their insertion order is lost.
-The standard codec merges keys as Dart's map does (an int and a double of the
-same value, 0.0 and -0.0; the first key is kept); a key Go can't hash (a
-list, typed data, a map) panics with `UnsupportedError`.
+a nil interface or nil pointer is null (a non-nil pointer is its value).
+
+A `Map` is `*dart.LinkedMap`, dart:core's default `LinkedHashMap<Object?,
+Object?>` (approved divergence: Go maps have no order, Dart's maps keep
+their insertion order and Flutter's code reads it). Every decoded map is one
+(StandardMessageCodec, StandardMethodCodec, JSONMessageCodec,
+JSONMethodCodec, `dart.JSONDecode`), in the order the message lists its
+entries, and a `*dart.LinkedMap` is written in its order. Its operations are
+Dart's: `Get` (value and presence), `Lookup` (`map[key]`, nil when absent),
+`Set` (`map[key] = value`: a new key goes last, an existing one keeps its
+place), `Remove`, `PutIfAbsent`, `AddAll`, `Clear`, `ContainsKey`, `Len`,
+`IsEmpty`/`IsNotEmpty`, `Keys()`/`Values()` (`iter.Seq[any]`), `Entries()`
+(`iter.Seq2[any, any]`, Dart's `entries`/`forEach`), `KeyList()`/
+`EntryList()` (copies), `String()` (Dart's `{k: v, ...}`, `{...}` for a map
+inside itself); changing a map while iterating it panics with
+`dart.ConcurrentModificationError`, as Dart's iterators throw. Keys compare
+as Dart's `==` and `hashCode` do for codec values: strings, bools and null by
+value; an int and a double match when Dart's `==` holds and their hashes
+agree (1 and 1.0, 0 and ±0.0, the largest int and 2^63 as the VM's
+saturating cast hashes it; 2^53+1 and 2^53.0 don't), the first key given
+being kept; NaN never matches; lists, typed data and maps by identity (a
+slice is the same key only with the same backing array, length and
+capacity: decoded empty lists get their own arrays). Dart's `==` on maps is
+identity, Go's `==` on the pointers; tests compare contents as
+package:matcher's `equals` does (by key, in any order). For convenience a Go
+map and a `[]dart.MapEntry[K, V]` (written in its order) are still accepted
+when encoding; a Go map's order is unspecified, so it is written in sorted
+key order (null, bools, numbers, strings, then the rest by their text).
+`dart.NewLinkedMapOf(k1, v1, k2, v2...)` is a map literal; Dart const map
+literals (keyboard tables and the like) stay Go maps plus `K<Map>Keys`
+slices.
 
 ## Known divergences
 
@@ -564,7 +587,9 @@ already cover).
   declared `MethodChannel`, does). `invokeMethod<T>` returns `Future[any]`
   (the cast is the caller's); `invokeListMethod<T>`/`invokeMapMethod<K, V>`
   are `MethodChannelInvokeListMethod[T]`/`MethodChannelInvokeMapMethod[K,
-  V]` and convert eagerly (Dart's `cast` is lazy). `SystemChannels` is a
+  V]`: the list is converted eagerly, the map is the decoded
+  `*dart.LinkedMap` itself, its entries checked against K and V at once
+  (Dart's `cast` is lazy). `SystemChannels` is a
   package variable of a struct of channels. `BinaryMessenger.
   HandlePlatformMessage` returns `Future[[]byte]` for every messenger (Dart:
   `Future<void>`, which TestDefaultBinaryMessenger overrides as
@@ -1195,8 +1220,8 @@ already cover).
   RawEvent}`; `KeyEventManager.keyMessageHandler` is the field
   `KeyMessageHandler`. Divergences: Dart hands the manager's live event
   list to the KeyMessage and clears it after dispatch, Go's message keeps
-  its events; `syncKeyboardState` records the platform's pressed keys in
-  increasing key order (the decoded map is unordered).
+  its events. `handleRawKeyMessage` takes the decoded `*dart.LinkedMap`
+  (another value panics with a TypeError, Dart's cast).
 - services (raw keyboard, deprecated): `RawKeyEventData` is an interface
   plus `RawKeyEventDataBase` (self pattern); each platform's data is a
   pointer built with `NewRawKeyEventData<Platform>(options)` (Linux:
@@ -1208,7 +1233,7 @@ already cover).
   `GLFWKeyHelperModifierShift`...). `KeyHelper` is an interface
   (`NewKeyHelper(toolkit)`). `RawKeyEvent` is an interface plus
   `*RawKeyDownEvent`/`*RawKeyUpEvent`; `RawKeyEvent.fromMessage` is
-  `RawKeyEventFromMessage(map[string]any)`; `RawKeyboard.instance` is the
+  `RawKeyEventFromMessage(*dart.LinkedMap)`; `RawKeyboard.instance` is the
   variable `RawKeyboardInstance`. Files `raw_keyboard_{android,ios,linux,
   windows}.dart` are `raw_keyboard_<p>_data.go` (Go reads the plain names
   as GOOS build constraints).
@@ -1234,8 +1259,8 @@ already cover).
   rules on UTF-16 code units (see `src/dart/regexp.go`; no look-around or
   backreferences, which RE2's parser rejects); `Pattern` is `dart.Pattern`
   (`dart.StringPattern` or `*dart.RegExp`) with `AllMatches`. Dart's
-  default Map is `dart.LinkedMap` (insertion order; int and integral double
-  keys merge). `Uri.encodeFull` is `dart.URIEncodeFull`, `Uri(path:).path`
+  default Map is `*dart.LinkedMap` (see "Platform channel values" for its
+  operations and key equality; `json.decode` returns it for objects). `Uri.encodeFull` is `dart.URIEncodeFull`, `Uri(path:).path`
   `dart.URIPath`.
 - package:characters (`src/pub/characters`, 1.4.1): `Characters` and
   `CharacterRange` are interfaces (`NewCharacters`, `NewCharacterRange`,
@@ -1273,10 +1298,13 @@ already cover).
   `AutofillHints` is a variable of a struct of strings. `Clipboard` is a
   variable of statics, `kTextPlain` `ClipboardKTextPlain`.
   `TextEditingDelta` is an interface plus `TextEditingDeltaBase`; required
-  named parameters are positional. `updateEditingStateWithTag` visits tags
-  in sorted order (decoded JSON maps lose their order). flutter_test's
-  `TestTextInput` (no TestAsyncUtils guard) is the binding's
-  `TestTextInput()`.
+  named parameters are positional. The `fromJSON`/`fromJson` factories
+  (`NewTextEditingValueFromJSON`, `NewTextEditingDeltaFromJSON`,
+  `NewKeyboardInsertedContentFromJSON`) and
+  `TextInputClient.PerformPrivateCommand`'s data take the decoded
+  `*dart.LinkedMap`. flutter_test's `TestTextInput` (no TestAsyncUtils
+  guard) is the binding's `TestTextInput()`; its `SetClientArgs` and
+  `EditingState` are `*dart.LinkedMap`.
 - services (formatters and boundaries): `TextBoundary` is an interface plus
   `TextBoundaryBase` (self pattern; a subclass overrides
   `GetTextBoundaryAt` or both of the others); positions are `*int` (nil is
@@ -1335,8 +1363,8 @@ already cover).
   `MouseCursorDefer`/`MouseCursorUncontrolled`; `SystemMouseCursors.basic`
   is `SystemMouseCursors.Basic`. `MouseTrackerAnnotation` is an interface
   with `*MouseTrackerAnnotationBase` (`NewMouseTrackerAnnotation(opts)`).
-  `DefaultProcessTextService.queryTextActions` sorts actions by id (the
-  standard codec's decoded map loses the platform's order).
+  `DefaultProcessTextService.queryTextActions` lists the actions in the
+  platform's map order, as Dart does.
   `async.CastFuture[R]` is Dart's implicit cast of a `Future<dynamic>` (no
   extra microtask).
 - widgets (interim editing bridge; see PLAN "services, part 2"): `Intent`

@@ -7,11 +7,13 @@ package services_test
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/services"
 	"github.com/jonathanperis/flutter-go/src/async"
+	"github.com/jonathanperis/flutter-go/src/dart"
 )
 
 // logMethodCalls installs a mock handler on channel that records the calls
@@ -38,27 +40,43 @@ func decodedEqual(a, b any) bool {
 	if a == nil || b == nil {
 		return a == nil && b == nil
 	}
-	va, vb := reflect.ValueOf(a), reflect.ValueOf(b)
-	if va.Kind() == reflect.Map || vb.Kind() == reflect.Map {
-		if va.Kind() != reflect.Map || vb.Kind() != reflect.Map || va.Len() != vb.Len() {
+	if ea, ok := mapEntriesOf(a); ok {
+		eb, ok := mapEntriesOf(b)
+		if !ok || len(ea) != len(eb) {
 			return false
 		}
-		for _, k := range va.MapKeys() {
-			if !k.Type().AssignableTo(vb.Type().Key()) && !(k.Kind() == reflect.Interface) {
-				return false
-			}
-			key := reflect.ValueOf(k.Interface())
-			if !key.Type().AssignableTo(vb.Type().Key()) {
-				return false
-			}
-			w := vb.MapIndex(key)
-			if !w.IsValid() || !decodedEqual(va.MapIndex(k).Interface(), w.Interface()) {
+		for _, e := range ea {
+			w, ok := services.MapLookup(b, e.Key)
+			if !ok || !decodedEqual(e.Value, w) {
 				return false
 			}
 		}
 		return true
 	}
 	return reflect.DeepEqual(a, b)
+}
+
+// mapEntriesOf lists the entries of a map value (a *dart.LinkedMap, a Go
+// map or a []dart.MapEntry): ok is false for other values.
+func mapEntriesOf(v any) (entries []dart.MapEntry[any, any], ok bool) {
+	if m, isLinked := v.(*dart.LinkedMap); isLinked {
+		return m.EntryList(), m != nil
+	}
+	rv := reflect.ValueOf(v)
+	switch {
+	case rv.Kind() == reflect.Map:
+		for it := rv.MapRange(); it.Next(); {
+			entries = append(entries, dart.MapEntry[any, any]{Key: it.Key().Interface(), Value: it.Value().Interface()})
+		}
+		return entries, true
+	case rv.Kind() == reflect.Slice && rv.Type().Elem().Kind() == reflect.Struct &&
+		strings.HasPrefix(rv.Type().Elem().Name(), "MapEntry["):
+		for i := range rv.Len() {
+			entries = append(entries, dart.MapEntry[any, any]{Key: rv.Index(i).Field(0).Interface(), Value: rv.Index(i).Field(1).Interface()})
+		}
+		return entries, true
+	}
+	return nil, false
 }
 
 // idle is tester.idle() inside a runAsync body: the event loop runs its

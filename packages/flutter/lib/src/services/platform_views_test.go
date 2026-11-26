@@ -18,6 +18,7 @@ import (
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/services"
 	flutter_test "github.com/jonathanperis/flutter-go/packages/flutter_test/lib/src"
 	"github.com/jonathanperis/flutter-go/src/async"
+	"github.com/jonathanperis/flutter-go/src/dart"
 )
 
 func sizep(w, h float64) *ui.Size { s := ui.NewSize(w, h); return &s }
@@ -515,13 +516,13 @@ func TestPlatformViewsRejectGesture(t *testing.T) {
 				controller := tc.init()
 				controller.RejectGesture().Await()
 				expect(len(*calls) == 1 && (*calls)[0].Method == "rejectGesture", "calls %v", *calls)
-				args := (*calls)[0].Arguments.(map[any]any)
-				expect(len(args) == 1 && args["id"] == controller.ViewID(), "args %v", args)
+				args := (*calls)[0].Arguments.(*dart.LinkedMap)
+				expect(args.Len() == 1 && args.Lookup("id") == controller.ViewID(), "args %v", args)
 				if tc.withID {
 					*calls = nil
 					controller.RejectGesture(services.PlatformViewControllerRejectGestureOptions{GestureID: intp(999)}).Await()
-					args := (*calls)[0].Arguments.(map[any]any)
-					expect(len(*calls) == 1 && len(args) == 2 && args["id"] == 42 && args["gestureId"] == 999, "args %v", args)
+					args := (*calls)[0].Arguments.(*dart.LinkedMap)
+					expect(len(*calls) == 1 && args.String() == "{id: 42, gestureId: 999}", "args %v", args)
 				}
 			})
 		})

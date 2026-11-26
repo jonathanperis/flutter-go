@@ -29,7 +29,7 @@ func describeDelta(d services.TextEditingDelta) []string {
 	return out
 }
 
-func runDelta(encoded map[string]any) (lines []string) {
+func runDelta(encoded *dart.LinkedMap) (lines []string) {
 	var raw []string
 	defer func() {
 		if r := recover(); r != nil {
@@ -84,10 +84,10 @@ func TestTextEditingDeltaMatchesFlutter(t *testing.T) {
 	}
 	failures := 0
 	for i, c := range ref.Cases {
-		encoded := services.JSONMessageCodec{}.DecodeMessage([]byte(c.JSON)).(map[string]any)
+		encoded := services.JSONMessageCodec{}.DecodeMessage([]byte(c.JSON)).(*dart.LinkedMap)
 		if c.OldUnits != nil {
-			encoded["oldText"] = unitsString(c.OldUnits)
-			encoded["deltaText"] = unitsString(c.DeltaUnits)
+			encoded.Set("oldText", unitsString(c.OldUnits))
+			encoded.Set("deltaText", unitsString(c.DeltaUnits))
 		}
 		got := runDelta(encoded)
 		if strings.Join(got, "\n") != strings.Join(c.Out, "\n") {

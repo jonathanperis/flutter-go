@@ -77,17 +77,17 @@ func (d *TextEditingDeltaBase) Composing() ui.TextRange  { return d.composing }
 // NewTextEditingDeltaFromJSON is TextEditingDelta.fromJSON: the insertion,
 // deletion, replacement or non-text update the platform's encoded delta
 // describes.
-func NewTextEditingDeltaFromJSON(encoded map[string]any) TextEditingDelta {
+func NewTextEditingDeltaFromJSON(encoded *dart.LinkedMap) TextEditingDelta {
 	intOr := func(key string) int {
-		if v, ok := encoded[key].(int); ok {
+		if v, ok := encoded.Lookup(key).(int); ok {
 			return v
 		}
 		return -1
 	}
-	oldText := encoded["oldText"].(string)
-	replacementDestinationStart := encoded["deltaStart"].(int)
-	replacementDestinationEnd := encoded["deltaEnd"].(int)
-	replacementSource := encoded["deltaText"].(string)
+	oldText := encoded.Lookup("oldText").(string)
+	replacementDestinationStart := encoded.Lookup("deltaStart").(int)
+	replacementDestinationEnd := encoded.Lookup("deltaEnd").(int)
+	replacementSource := encoded.Lookup("deltaText").(string)
 	const replacementSourceStart = 0
 	replacementSourceEnd := dart.StringLength(replacementSource)
 
@@ -95,12 +95,12 @@ func NewTextEditingDeltaFromJSON(encoded map[string]any) TextEditingDelta {
 	isNonTextUpdate := replacementDestinationStart == -1 && replacementDestinationStart == replacementDestinationEnd
 	newComposing := ui.NewTextRange(intOr("composingBase"), intOr("composingExtent"))
 	affinity := ui.TextAffinityDownstream
-	if s, ok := encoded["selectionAffinity"].(string); ok {
+	if s, ok := encoded.Lookup("selectionAffinity").(string); ok {
 		if a := toTextAffinity(&s); a != nil {
 			affinity = *a
 		}
 	}
-	directional, _ := encoded["selectionIsDirectional"].(bool)
+	directional, _ := encoded.Lookup("selectionIsDirectional").(bool)
 	newSelection := NewTextSelection(intOr("selectionBase"), intOr("selectionExtent"),
 		TextSelectionOptions{Affinity: &affinity, IsDirectional: directional})
 
