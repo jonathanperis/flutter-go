@@ -86,7 +86,16 @@ GestureRecognizer makeRecognizer(Map<String, Object?> spec) {
       };
       return m;
   }
+  final AllowedButtonsFilter? filter = spec['anyButtons'] == true ? (int buttons) => true : null;
   final DragGestureRecognizer r = switch (type) {
+    'vertical' when filter != null => VerticalDragGestureRecognizer(
+      supportedDevices: devices,
+      allowedButtonsFilter: filter,
+    ),
+    'horizontal' when filter != null => HorizontalDragGestureRecognizer(
+      supportedDevices: devices,
+      allowedButtonsFilter: filter,
+    ),
     'vertical' => VerticalDragGestureRecognizer(supportedDevices: devices),
     'horizontal' => HorizontalDragGestureRecognizer(supportedDevices: devices),
     _ => PanGestureRecognizer(supportedDevices: devices),

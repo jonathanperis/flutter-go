@@ -127,6 +127,9 @@ func rdMakeRecognizer(spec rdSpec) gestures.GestureRecognizer {
 	}
 	var r gestures.DragGestureRecognizer
 	var b *gestures.DragGestureRecognizerBase
+	if spec["anyButtons"] == true {
+		opts.AllowedButtonsFilter = func(int) bool { return true }
+	}
 	switch spec.str("type") {
 	case "vertical":
 		v := gestures.NewVerticalDragGestureRecognizer(opts)
