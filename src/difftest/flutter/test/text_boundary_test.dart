@@ -36,6 +36,12 @@ const List<String> samples = <String>[
   '\t\u0000​‌‍­',
   '12⃣#️⃣',
   '\u{1F469}‍❤️‍\u{1F48B}‍\u{1F468}x',
+  '\u{10FFFD}a\u{10FFFD}',
+  'ab\uDC00c\uDBFF',
+  '\u{600}aaa',
+  '\u{600}aaa\u{600}aa',
+  '\u{1F1E9}\u{1F1F0}\u{915}\u{94D}\u{915}',
+  '\u{1F1E9}\u{1F1F0}\u{1F1FE}\u{915}x\u{1F1E9}\u{1F1F0}\u{301}',
 ];
 
 // A fixed layout: lines end after each '\n' (the terminator belongs to
@@ -154,6 +160,7 @@ void main() {
           for (final String g in graphemes) cs.startsWith(g.characters),
           for (final String g in graphemes) cs.endsWith(g.characters),
           for (int i = 0; i < s.length; i++) cs.containsAll(s.substring(i, i + 1).characters),
+          for (int i = 0; i + 2 <= s.length; i++) cs.containsAll(s.substring(i, i + 2).characters),
         ]),
         'find': <Object?>[
           for (final String g in graphemes)
@@ -183,6 +190,10 @@ void main() {
             () {
               it.moveBackAll();
               return <Object?>[it.stringBeforeLength, u(it.current)];
+            },
+            () {
+              it.expandAll();
+              return <Object?>[it.dropUntil('Q'.characters), it.stringBeforeLength, u(it.current)];
             },
           ];
           for (final Object? Function() step in steps) {

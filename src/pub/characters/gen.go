@@ -6,10 +6,11 @@
 //   - lib/src/grapheme_clusters/table.dart: the string literals _data,
 //     _start, _stateMachine and _backStateMachine, decoded into their
 //     UTF-16 code units, so the Go tables are the Dart ones bit for bit;
+//
 //   - test/src/unicode_grapheme_tests.dart: splitTests, emojis,
 //     lowerChars and upperChars (the package's own test data).
 //
-//	go run gen.go [path/to/characters-1.4.1]
+//     go run gen.go [path/to/characters-1.4.1]
 //
 // (default: the pub cache's characters-1.4.1).
 package main

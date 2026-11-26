@@ -190,3 +190,32 @@ func TestTextLayoutMetricsStatics(t *testing.T) {
 		t.Error("space")
 	}
 }
+
+// rangeOnlyBoundary overrides only getTextBoundaryAt (records the
+// positions it is asked for), so the base's leading/trailing defaults run.
+type rangeOnlyBoundary struct {
+	TextBoundaryBase
+	asked []int
+}
+
+func (b *rangeOnlyBoundary) GetTextBoundaryAt(position int) ui.TextRange {
+	b.asked = append(b.asked, position)
+	if position < 0 {
+		return ui.NewTextRange(-1, -1)
+	}
+	return ui.NewTextRange(position/2*2, position/2*2+2)
+}
+
+// The base class's defaults (own test: Flutter's only built-in user of
+// them, LineBoundary, clamps the position itself).
+func TestTextBoundaryBaseDefaults(t *testing.T) {
+	b := &rangeOnlyBoundary{}
+	b.SetSelf(b)
+	expectPos(t, b.GetLeadingTextBoundaryAt(-1), nil)
+	expectPos(t, b.GetLeadingTextBoundaryAt(3), 2)
+	expectPos(t, b.GetTrailingTextBoundaryAt(-5), 2) // asks for max(0, position)
+	expectPos(t, b.GetTrailingTextBoundaryAt(3), 4)
+	if len(b.asked) != 3 || b.asked[1] != 0 {
+		t.Errorf("asked %v", b.asked)
+	}
+}

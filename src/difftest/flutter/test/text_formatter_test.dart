@@ -31,6 +31,7 @@ const List<String> texts = <String>[
   'ab&&ca@bcabc',
   'Hello World_42    end',
   'BBB',
+  'a\ra\u2028a\u2029a\na\r\na',
 ];
 
 // Formatter specs: [kind, pattern, isRegExp, replacement, regexp flags].
@@ -52,6 +53,9 @@ const List<List<Object?>> filterSpecs = <List<Object?>>[
   <Object?>['deny', r'\S+', true, '', ''],
   <Object?>['allow', r'\w+', true, '|', ''],
   <Object?>['deny', '[\uD800-\uDFFF]', true, '~', ''],
+  <Object?>['deny', 'x?', true, 'Y', 'u'],
+  <Object?>['deny', r'a$', true, r'$', ''],
+  <Object?>['deny', r'^', true, '>', 'm'],
   <Object?>['deny', 'b', true, 'X', 'i'],
   <Object?>['deny', r'^a', true, '^', 'm'],
   <Object?>['deny', r'a$', true, r'$', 'm'],

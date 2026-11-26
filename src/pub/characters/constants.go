@@ -96,13 +96,13 @@ const (
 const (
 	categorySoT = categoryEoT // Start of Text (synthetic input)
 
-	stateEoT           = stateSoT
-	stateLF            = stateCR
-	stateExtend        = statePrepend
-	stateEoTNoBreak    = stateSoTNoBreak
-	stateRegionalEven  = stateInCL
-	stateRegionalOdd   = statePictographicZWJ
-	stateLookaheadMin  = stateLookaheadZWJPictographic
+	stateEoT          = stateSoT
+	stateLF           = stateCR
+	stateExtend       = statePrepend
+	stateEoTNoBreak   = stateSoTNoBreak
+	stateRegionalEven = stateInCL
+	stateRegionalOdd  = statePictographicZWJ
+	stateLookaheadMin = stateLookaheadZWJPictographic
 
 	stateLookaheadZWJPictographic = 0x0E * automatonRowLength
 	stateLookaheadInC             = 0x0F * automatonRowLength

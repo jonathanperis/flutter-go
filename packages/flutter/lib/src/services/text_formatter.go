@@ -139,7 +139,7 @@ type FilteringTextInputFormatterOptions struct {
 }
 
 // NewFilteringTextInputFormatter is FilteringTextInputFormatter(pattern,
-// {required allow, replacementString = ''}).
+// {required allow, replacementString = ”}).
 func NewFilteringTextInputFormatter(filterPattern dart.Pattern, allow bool, opts ...FilteringTextInputFormatterOptions) *FilteringTextInputFormatter {
 	var o FilteringTextInputFormatterOptions
 	if len(opts) > 0 {

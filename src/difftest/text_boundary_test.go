@@ -45,9 +45,13 @@ func (l fakeLayout) GetLineAtOffset(position ui.TextPosition) services.TextSelec
 	return services.NewTextSelection(start, len(l.text))
 }
 
-func (fakeLayout) GetWordBoundary(ui.TextPosition) ui.TextRange           { panic(dart.UnimplementedError{}) }
-func (fakeLayout) GetTextPositionAbove(ui.TextPosition) ui.TextPosition { panic(dart.UnimplementedError{}) }
-func (fakeLayout) GetTextPositionBelow(ui.TextPosition) ui.TextPosition { panic(dart.UnimplementedError{}) }
+func (fakeLayout) GetWordBoundary(ui.TextPosition) ui.TextRange { panic(dart.UnimplementedError{}) }
+func (fakeLayout) GetTextPositionAbove(ui.TextPosition) ui.TextPosition {
+	panic(dart.UnimplementedError{})
+}
+func (fakeLayout) GetTextPositionBelow(ui.TextPosition) ui.TextPosition {
+	panic(dart.UnimplementedError{})
+}
 
 // guard is the Dart side's guard: f's value, or "error" if it panics.
 func guard(f func() any) (v any) {
@@ -202,6 +206,9 @@ func charactersCase(s string) map[string]any {
 		for i := 0; i < n; i++ {
 			l = append(l, cs.ContainsAll(characters.StringCharacters(dart.Substring(s, i, i+1))))
 		}
+		for i := 0; i+2 <= n; i++ {
+			l = append(l, cs.ContainsAll(characters.StringCharacters(dart.Substring(s, i, i+2))))
+		}
 		return l
 	})
 	find := []any{}
@@ -236,6 +243,7 @@ func charactersCase(s string) map[string]any {
 		func() any { it.ExpandAll(); return []any{it.StringBeforeLength(), units16(it.Current())} },
 		func() any { it.CollapseToEnd(); return state(it.MoveBack()) },
 		func() any { it.MoveBackAll(); return []any{it.StringBeforeLength(), units16(it.Current())} },
+		func() any { it.ExpandAll(); return state(it.DropUntil(characters.StringCharacters("Q"))) },
 	}
 	moves := []any{}
 	for _, step := range steps {

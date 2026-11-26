@@ -151,7 +151,9 @@ func (c *stringCharacters) IteratorAtEnd() CharacterRange {
 	return newRange(c.units, len(c.units), len(c.units))
 }
 
-func (c *stringCharacters) rangeAll() *stringCharacterRange { return newRange(c.units, 0, len(c.units)) }
+func (c *stringCharacters) rangeAll() *stringCharacterRange {
+	return newRange(c.units, 0, len(c.units))
+}
 
 func (c *stringCharacters) First() string {
 	if len(c.units) == 0 {
@@ -669,7 +671,9 @@ func (r *stringCharacterRange) Current() string {
 	return *r.currentCache
 }
 
-func (r *stringCharacterRange) MoveNext(count ...int) bool { return r.advanceEnd(countArg(count), r.end) }
+func (r *stringCharacterRange) MoveNext(count ...int) bool {
+	return r.advanceEnd(countArg(count), r.end)
+}
 
 func (r *stringCharacterRange) advanceEnd(count, newStart int) bool {
 	if count > 0 {
@@ -1131,7 +1135,9 @@ func (r *stringCharacterRange) CharactersBefore() Characters {
 	return newStringCharactersUnits(r.str[:r.start])
 }
 
-func (r *stringCharacterRange) CurrentCharacters() Characters { return newStringCharacters(r.Current()) }
+func (r *stringCharacterRange) CurrentCharacters() Characters {
+	return newStringCharacters(r.Current())
+}
 
 func (r *stringCharacterRange) MoveBackAll() { r.move(0, r.start) }
 func (r *stringCharacterRange) MoveNextAll() { r.move(r.end, len(r.str)) }

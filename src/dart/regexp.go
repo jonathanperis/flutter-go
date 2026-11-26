@@ -124,7 +124,7 @@ func NewRegExp(source string, opts ...RegExpOptions) *RegExp {
 }
 
 // Pattern is the source (Dart's `pattern` getter).
-func (re *RegExp) Pattern() string      { return re.source }
+func (re *RegExp) Pattern() string       { return re.source }
 func (re *RegExp) IsMultiLine() bool     { return re.isMultiLine }
 func (re *RegExp) IsCaseSensitive() bool { return re.isCaseSensitive }
 func (re *RegExp) IsUnicode() bool       { return re.isUnicode }
