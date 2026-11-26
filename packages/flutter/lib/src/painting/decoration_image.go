@@ -740,14 +740,14 @@ func generateImageTileRects(outputRect, fundamentalRect ui.Rect, repeat ImageRep
 	var out []ui.Rect
 	for i := startX; i <= stopX; i++ {
 		for j := startY; j <= stopY; j++ {
-			out = append(out, fundamentalRect.Shift(ui.NewOffset(float64(i)*strideX, float64(j)*strideY)))
+			out = append(out, fundamentalRect.Shift(ui.NewOffset(float64(float64(i)*strideX), float64(float64(j)*strideY))))
 		}
 	}
 	return out
 }
 
 func scaleRect(rect ui.Rect, scale float64) ui.Rect {
-	return ui.NewRectFromLTRB(rect.Left*scale, rect.Top*scale, rect.Right*scale, rect.Bottom*scale)
+	return ui.NewRectFromLTRB(float64(rect.Left*scale), float64(rect.Top*scale), float64(rect.Right*scale), float64(rect.Bottom*scale))
 }
 
 // blendedDecorationImage is _BlendedDecorationImage: DecorationImage.lerp's

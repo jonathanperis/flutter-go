@@ -263,7 +263,9 @@ func TestGradientFromColor(t *testing.T) {
 // testGradient is a Gradient written outside the library, on GradientBase.
 type testGradient struct{ GradientBase }
 
-func (g *testGradient) CreateShader(rect ui.Rect, textDirection *ui.TextDirection) ui.Shader { return nil }
+func (g *testGradient) CreateShader(rect ui.Rect, textDirection *ui.TextDirection) ui.Shader {
+	return nil
+}
 func (g *testGradient) Scale(factor float64) Gradient {
 	s := &testGradient{}
 	s.Init(s, scaledColors(g.colors, factor), g.stops, g.transform)
