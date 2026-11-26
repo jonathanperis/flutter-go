@@ -1,10 +1,7 @@
 package painting
 
 // Port of packages/flutter/test/painting/flutter_logo_test.dart (Flutter
-// 3.50.1). Changed: "lerpFrom and lerpTo" lerps against a stand-in
-// decoration (otherDecoration) instead of BoxDecoration (box_decoration.dart
-// is ported separately); what it checks is Decoration.lerp's handling of
-// unrelated decorations, which is the same. Skipped: "Flutter Logo golden
+// 3.50.1). Skipped: "Flutter Logo golden
 // test" (a Container golden; the painting_decorations_pixels difftest draws
 // the mark against Flutter's Impeller output).
 
@@ -13,17 +10,6 @@ import (
 
 	ui "github.com/jonathanperis/flutter-go/engine/src/flutter/lib/ui/go"
 )
-
-// otherDecoration is a Decoration that lerps with nothing.
-type otherDecoration struct{ DecorationBase }
-
-func newOtherDecoration() *otherDecoration {
-	d := &otherDecoration{}
-	d.SetSelf(d)
-	return d
-}
-
-func (d *otherDecoration) CreateBoxPainter(onChanged func()) BoxPainter { return nil }
 
 func logoStartEnd() (*FlutterLogoDecoration, *FlutterLogoDecoration) {
 	c1, c2 := ui.NewColor(0xFFD4F144), ui.NewColor(0xFF81D4FA)
@@ -63,7 +49,7 @@ func TestFlutterLogoLerpMargin(t *testing.T) {
 
 func TestFlutterLogoLerpFromAndTo(t *testing.T) {
 	start, end := logoStartEnd()
-	other := newOtherDecoration()
+	other := NewBoxDecoration()
 	if DecorationLerp(start, other, 0.0) != Decoration(start) || DecorationLerp(start, other, 1.0) != Decoration(other) ||
 		DecorationLerp(other, end, 0.0) != Decoration(other) || DecorationLerp(other, end, 1.0) != Decoration(end) {
 		t.Error("lerp with unrelated decoration")
@@ -97,7 +83,7 @@ func TestFlutterLogoMembers(t *testing.T) {
 		t.Error("isComplex")
 	}
 	if !start.Equal(NewFlutterLogoDecoration(FlutterLogoDecorationOptions{TextColor: &start.TextColor,
-		Style: FlutterLogoStyleStacked})) || start.Equal(end) || start.Equal(newOtherDecoration()) {
+		Style: FlutterLogoStyleStacked})) || start.Equal(end) || start.Equal(NewBoxDecoration()) {
 		t.Error("==")
 	}
 	if !NewFlutterLogoDecoration().GetClipPath(ui.NewRectFromLTWH(1, 2, 3, 4), ui.TextDirectionLtr).Contains(ui.NewOffset(2, 3)) {
