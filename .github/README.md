@@ -7,8 +7,7 @@ with exactly one difference: the Dart is gone, and Go does its job.
 - Every non-Dart file of the release (engine C++, Impeller, embedders,
   shaders, fonts, tools, CI, docs) is here at its upstream path, unchanged,
   except Flutter's AI-agent configuration (`.agents/`, `.claude/`,
-  `.gemini/` and similar) and its `.github/` and `.vscode/` folders, which
-  are left out.
+  `.gemini/` and similar) and its `.vscode/` folder, which are left out.
   `src/scripts/sync_upstream.sh --check` proves it blob for blob.
 - Each Go file sits beside the Dart file it replaces:
   `packages/flutter/lib/src/physics/friction_simulation.go` is the port of
@@ -16,19 +15,19 @@ with exactly one difference: the Dart is gone, and Go does its job.
   one exception is `dart:ui`: its Go files are in
   `engine/src/flutter/lib/ui/go/`, because Go can't build a package in a
   directory holding C++ sources.
-- Everything without an upstream counterpart is in [`src/`](.):
+- Everything without an upstream counterpart is in [`src/`](../src):
   the window runner, the Impeller binding, `dart:async` in Go, the
   differential tests against real Flutter, tools, and docs.
 
-The repository root's `README.md` is upstream's; this file is flutter-go's.
+The repository root's `README.md` is upstream's.
 
 ## Status
 
 Progress is measured as API parity with Flutter's Dart layer:
-[src/docs/PARITY.md](docs/PARITY.md). The goal and the
-rules every port follows are in [src/GOAL.md](GOAL.md)
-and [src/docs/API_MAPPING.md](docs/API_MAPPING.md);
-findings, including mistakes, are in [src/PLAN.md](PLAN.md).
+[src/docs/PARITY.md](../src/docs/PARITY.md). The goal and the
+rules every port follows are in [src/GOAL.md](../src/GOAL.md)
+and [src/docs/API_MAPPING.md](../src/docs/API_MAPPING.md);
+findings, including mistakes, are in [src/PLAN.md](../src/PLAN.md).
 
 ## Run (macOS)
 
@@ -56,4 +55,4 @@ import (
 ```
 
 Flutter's own license covers the upstream files and the ported code; see
-[LICENSE](../LICENSE) and [src/THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+[LICENSE](../LICENSE) and [src/THIRD_PARTY_NOTICES.md](../src/THIRD_PARTY_NOTICES.md).

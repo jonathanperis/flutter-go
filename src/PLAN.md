@@ -1010,7 +1010,10 @@ The standing goal is now full API parity with Flutter 3.50.1's Dart layer
 ### Layout: `flutter_go/` renamed `src/`; `.github/` and `.vscode/` left out
 - At the user's request, flutter-go's own directory is now `src/` (import
   paths `github.com/jonathanperis/flutter-go/src/...`), and upstream's
-  `.github/` (Flutter's workflows, issue templates, labeler) and `.vscode/`
-  are excluded from the mirror like the AI-agent configuration. The project
-  README moved from `.github/README.md` to `src/README.md`; GitHub's
-  repository page now shows upstream's root README.
+  `.vscode/` is excluded from the mirror like the AI-agent configuration.
+- `.github/` was briefly removed, then restored byte for byte: it keeps the
+  mirror faithful and lets `.github/README.md` (ours) show on GitHub. Its
+  workflows don't fire on pushes here (the push-triggered ones are guarded
+  to `flutter/flutter`); five unguarded ones (tree-analyze,
+  tool-test-general, mac-verify-binaries, revert, delete-bot-branches) would
+  run, and fail, on pull requests to master.

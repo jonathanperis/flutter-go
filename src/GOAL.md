@@ -71,8 +71,8 @@ text as "the repository root", and `scripts/`, `cmd/`, `docs/` as
 `src/scripts/`, `src/cmd/`, `src/docs/`.
 
 Further amendment: flutter-go's own directory is `src/` (was
-`flutter_go/`), and upstream's `.github/`, `.vscode/` and AI-agent
-configuration are excluded from the mirror (see PLAN.md).
+`flutter_go/`), and upstream's `.vscode/` and AI-agent configuration
+are excluded from the mirror (see PLAN.md).
 
 ## Phase status
 

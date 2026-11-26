@@ -6,6 +6,7 @@
 #   - *.go files, placed beside the Dart files they replace
 #   - src/ (tools, tests, docs, the runner: things upstream has no
 #     counterpart for)
+#   - .github/README.md (what GitHub shows on the repository page)
 #
 #   FLUTTER_SRC=~/Projetos/jonathanperis/flutter src/scripts/sync_upstream.sh          # re-sync
 #   FLUTTER_SRC=~/Projetos/jonathanperis/flutter src/scripts/sync_upstream.sh --check  # verify only
@@ -14,12 +15,11 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)" # src/
 REPO="$(cd "$ROOT/.." && pwd)"
 SRC="${FLUTTER_SRC:-$HOME/Projetos/jonathanperis/flutter}"
 TAG="$(cat "$ROOT/FLUTTER_TAG")"
-OURS='^(go\.mod|go\.sum|src/.*|.*\.go)$'
+OURS='^(go\.mod|go\.sum|src/.*|.*\.go|\.github/README\.md)$'
 # Upstream files deliberately left out: Flutter's AI-agent configuration
 # and skills (they would configure agents working on flutter-go as if it
-# were flutter/flutter), and its .github/ (workflows, templates) and
-# .vscode/ folders.
-EXCLUDED='^(\.agents/|\.claude/|\.gemini/|\.github/|\.vscode/|agent-artifacts/|CONTRIBUTING\.ai\.md$)|(^|/)(AGENTS|GEMINI|CLAUDE)\.md$'
+# were flutter/flutter), and its .vscode/ folder.
+EXCLUDED='^(\.agents/|\.claude/|\.gemini/|\.vscode/|agent-artifacts/|CONTRIBUTING\.ai\.md$)|(^|/)(AGENTS|GEMINI|CLAUDE)\.md$'
 
 PIN="$(git -C "$SRC" rev-parse -q --verify "refs/tags/$TAG^{commit}")" || {
   echo "Tag $TAG is not in $SRC; run: git -C $SRC fetch origin tag $TAG" >&2; exit 1; }
@@ -66,7 +66,7 @@ git -C "$SRC" ls-tree -r --name-only "$PIN" | grep -v '\.dart$' | while IFS= rea
 git -C "$SRC" archive --format=tar "$PIN" | tar -x -C "$REPO" --exclude='*.dart'
 # Drop the deliberately excluded files again (tracked or not, they stay out).
 git -C "$SRC" ls-tree -r --name-only "$PIN" | grep -E "$EXCLUDED" | while IFS= read -r f; do rm -f -- "$f"; done
-for d in .agents .claude .gemini .github .vscode agent-artifacts; do find "$d" -type l -delete 2>/dev/null; find "$d" -type d -empty -delete 2>/dev/null; done
+for d in .agents .claude .gemini .vscode agent-artifacts; do find "$d" -type l -delete 2>/dev/null; find "$d" -type d -empty -delete 2>/dev/null; done
 theirs | cut -f2 | tr '\n' '\0' | xargs -0 git add -f --
 
 # git add normalizes line endings under upstream's own `* text=auto`; a few
