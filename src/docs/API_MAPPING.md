@@ -835,3 +835,151 @@ Each divergence is listed here when it is introduced.
   runtime-stage bundles through `ui.EngineAssetLoader`; `ImageFilter.shader`
   is `NewImageFilterShader`. ENGINE GAPs: the SDK samples shader samplers
   linearly and the filter input nearest, whatever the FilterQuality.
+- painting (geometry values): `AlignmentGeometry`, `EdgeInsetsGeometry` and
+  `BorderRadiusGeometry` are interfaces only painting implements (sealed by
+  unexported methods); `Alignment{X, Y}`, `AlignmentDirectional{Start, Y}`,
+  `EdgeInsets{Left, Top, Right, Bottom}`, `EdgeInsetsDirectional`,
+  `BorderRadius`, `BorderRadiusDirectional` and `FractionalOffset` are
+  comparable value structs (struct literals are Dart's `.only`; the zero
+  `Alignment` is `Alignment.center`); the private mixed types are
+  unexported. Operators keep Dart's covariant results on the concrete
+  types (`Neg`, `Mul`, `Div`, `TruncDiv`, `Mod`, `Flipped`); on an
+  interface value they are `AlignmentGeometryNeg/Mul/...` (alignment) or
+  the `...Geometry` methods (`NegGeometry`, `FlippedGeometry`...). Dart's
+  `add(...)` method is `Add` on alignments (binary `+` is `Plus`) and
+  `AddGeometry` on insets (`+` is `Add`, `subtract` is `Subtract`). Dart's
+  cross-type `==` is `Equal` / `EdgeInsetsGeometryEqual(a, b)` (Go's `==`
+  also compares the dynamic type). `resolve(TextDirection?)` is
+  `Resolve(*ui.TextDirection)` (nil panics with Flutter's "No TextDirection
+  found." FlutterError: asserts are always on). Statics are package vars
+  (`AlignmentTopLeft`, `AlignmentDirectionalTopStart`,
+  `AlignmentGeometryTopStart`, `EdgeInsetsZero`, `EdgeInsetsGeometryInfinity`,
+  `BorderRadiusZero`, `FractionalOffsetCenter`, `TextAlignVerticalTop`);
+  named-argument constructors and copyWith take options structs
+  (`EdgeInsetsSymmetricOptions`, `BorderRadiusCopyWithOptions`...). Nullable
+  lerps take/return pointers (`EdgeInsetsLerp(a, b *EdgeInsets, t)`) or nil
+  interfaces (`AlignmentGeometryLerp`); equal values stand in for Dart's
+  `identical` (canonical consts). `FractionalOffset` embeds `Alignment`
+  (`Dx()`/`Dy()`); `AlignmentLike` (Alignment or FractionalOffset) stands for
+  the static type `Alignment` in `Plus`/`Sub`/`AlignmentLerp`;
+  `FractionalOffset.Resolve` returns the embedded Alignment (Dart returns
+  itself). `positionDependentBox`'s required named arguments are
+  positional (`PositionDependentBoxOptions` for the optional ones).
+  Missing: `EdgeInsets.fromViewPadding`/`fromWindowPadding` (no
+  `ui.ViewPadding` yet).
+- painting (colors, clip, matrices): `HSVColor`/`HSLColor` are comparable
+  values (`NewHSVColorFromAHSV`, `NewHSVColorFromColor`, panicking on
+  out-of-range values), `HSVColorLerp(a, b *HSVColor, t)`.
+  `ColorSwatch[T comparable]` embeds `ui.Color`, is used by pointer and is
+  built with `NewColorSwatch(primary, []dart.MapEntry[T, ui.Color])`
+  (Dart's map order); `[]` is `Get(key) *ui.Color`, `keys` is `Keys()
+  iter.Seq[T]`. `ColorProperty` is `NewColorProperty[V ui.Color |
+  *ui.Color]`. `ClipContext` is an interface plus `ClipContextBase`
+  (`SetSelf` with an object that has `Canvas()`). `MatrixUtils` is a
+  variable of statics; `createCylindricalProjectionTransform`'s required
+  named parameters are positional. vector_math: `Matrix4 * Matrix4` is
+  `Mul`; the deprecated double `translate`/`scale` are `Translate(x,
+  yz...)`/`Scale(x, yz...)`.
+- painting (borders): `ShapeBorder` is an interface plus `ShapeBorderBase`
+  (self pattern); the optional named `textDirection` is a positional
+  `*ui.TextDirection` (`GetOuterPath(rect, td)`); `+` is `Add`, the
+  protected `add(other, {reversed})` is `AddBorder(other, reversed)`;
+  `ShapeBorderLerp`, `ShapeBorderEqual(a, b)` (an `Equal` method when the
+  border has one, else `==`). `OutlinedBorder` adds `GetSide()` and
+  `CopyWithSide(*BorderSide)` (each border's `CopyWith` returns its own
+  type); `OutlinedBorderLerp`. Borders are comparable values with exported
+  fields built with `NewX(XOptions)` (a zero BorderSide is not
+  `BorderSide.none`; `RRectBorderOptions` is shared by the rounded,
+  superellipse, beveled and continuous borders); a nil `BorderRadius`
+  field reads as zero. `OvalBorder` is its own type that the other borders
+  treat as a CircleBorder (Dart's `is CircleBorder`). `BoxBorder.paint`
+  with shape/borderRadius is `PaintBox(canvas, rect,
+  BoxBorderPaintOptions)`; Border's sides are `Top()`, `Start()`...
+  (the interface needs the getters); the covariant `scale` is
+  `ScaleBorder`. `BorderSide` is `NewBorderSide(BorderSideOptions)` with
+  `BorderSideNone`, `BorderSideMerge`, `BorderSideLerp`...; `paintBorder`
+  is `PaintBorder(canvas, rect, PaintBorderOptions{Top... *BorderSide})`.
+  `NotchedShape` is an interface; `NewAutomaticNotchedShape(host,
+  guest...)`. ENGINE GAP: AutomaticNotchedShape with a guest needs
+  `Path.combine`.
+- painting (gradients, shadows, decorations): `Gradient` is an interface
+  plus `GradientBase` (`Init(self, colors, stops, transform)`);
+  `LinearGradient`/`RadialGradient`/`SweepGradient` are pointers built with
+  `NewXGradient(XGradientOptions)` (nil options take Dart's defaults);
+  `Scale` returns `Gradient` (covariant `ScaleLinear`...); `GradientLerp`,
+  `GradientsEqual`. `GradientTransform.Transform(bounds, td)`;
+  `GradientRotation` is a comparable value. `BoxShadow` is a comparable
+  value embedding `ui.Shadow` (`NewBoxShadow(BoxShadowOptions)`,
+  `BoxShadowLerp`, `BoxShadowLerpList`). `Decoration` and `BoxPainter` are
+  interfaces plus `DecorationBase`/`BoxPainterBase`; `DecorationLerp`,
+  `CreateBoxPainter(onChanged func())`, `HitTest(size, pos, td)`.
+  `DecorationImage` is an interface (lerp returns the private blended
+  type) whose fields are getters, `NewDecorationImage(DecorationImageOptions)`;
+  `paintImage` is `PaintImage(canvas, rect, image, PaintImageOptions)` and
+  reads only the implicit view's device pixel ratio. `BoxDecoration` and
+  `ShapeDecoration` are pointers built with `NewBoxDecoration(...Options)`
+  / `NewShapeDecoration(...)` (constructor asserts run), with exported
+  fields (nil is null); `ShapeDecoration.fromBoxDecoration` is
+  `NewShapeDecorationFromBoxDecoration`; `identical` in their lerps is
+  pointer identity. `ShapeDecoration.CreateBoxPainter(nil)` panics with
+  Dart's TypeError, as `onChanged!` throws. `FlutterLogoDecoration` is
+  `NewFlutterLogoDecoration(...)`; its "Flutter" label (horizontal/stacked
+  styles) waits for TextPainter.
+- painting (images): `ImageProvider` is not generic (every Flutter
+  consumer uses `ImageProvider<Object>`): an interface with `any` keys plus
+  `ImageProviderBase` (`SetSelf`); keys compare with `KeysEqual` (an
+  `Equal(any) bool` method, else `==`), and the cache's maps keep
+  insertion order. `ImageInfo` (self pattern, `DebugLabel *string`),
+  `ImageStreamCompleter` (interface plus base, `InitImageStreamCompleter`;
+  `reportError`'s required `exception` is positional) and `ImageCache`
+  (`Init`/`SetSelf`) are extensible. The top-level `imageCache` is
+  `ImageCacheInstance()`, `PaintingBinding.shaderWarmUp` is
+  `PaintingBindingShaderWarmUp`, `rootBundle` is `services.RootBundle`.
+  Decoder callbacks take the binding's options structs. `NetworkImage` is
+  concrete (the dart:io implementation; headers are sent in sorted order)
+  and `_network_image_io.dart` is `network_image_io.go` (Go ignores files
+  starting with `_`). services: `AssetBundle` is an interface plus
+  `AssetBundleBase`; the generic structured loads are
+  `AssetBundleLoadStructuredData[T]`; `AssetManifest.ListAssets` returns
+  keys not yet looked up sorted, then the rest in lookup order.
+  NetworkAssetBundle is not ported.
+- painting (text, partial): `TextScaler` is an interface plus
+  `TextScalerBase` (the default `Clamp`; `SetSelf`); `TextScaler.linear`
+  is `NewTextScalerLinear`, `noScaling` is `TextScalerNoScaling`;
+  `clamp`'s named parameters are `TextScalerClampOptions` (nil: 0 and
+  infinity). The linear and clamped scalers are comparable values, so
+  Dart's `identical(scaler.clamp(), scaler)` can't be observed for them.
+  `kDefaultFontSize` is `KDefaultFontSize`.
+- flutter_test (painting helpers): `TestRecordingCanvas` implements
+  `ui.Canvas` (`Invocations []RecordedInvocation`; a Symbol is the
+  method's Dart name; getters return Go zero values where Dart returns
+  null; `DrawParagraph(any, Offset)` until ui.Canvas has it).
+  `TestRecordingPaintingContext` waits for rendering. mock_canvas's
+  `paints` is `Paints()` returning a `*PaintPattern` whose methods chain
+  like Dart's cascade (`Path(PaintPatternPathOptions{...})`, `Rect`,
+  `RRect`, `Circle`, `Save`, `ClipRect`..., with `PaintOptions{Color,
+  StrokeWidth, HasMaskFilter, Style}` embedded); `Expect(t, actual,
+  matcher)` and `IsNot` are a minimal package:matcher. Only painter
+  functions (`func(ui.Canvas)`) are accepted as targets (RenderObjects,
+  Finders and PaintingContexts need rendering). `paints..image()` always
+  fails, as in 3.50.1 (it casts the image argument to Offset).
+  `CoversSameAreaAs`, `IsPathThat`, `PaintsNothing`, `PaintsAssertion` and
+  `PaintsExactlyCountTimes` are ported. `CreateTestImage`,
+  `Tester.PrecacheTestImage`, `Tester.RunAsync` and `AwaitFuture` drive
+  image loading on the fake loop (when only timers are left they wait
+  ~20 ms of real time for goroutine work to post before advancing the
+  fake clock).
+- flutter_test binding: PaintingBinding is mixed in Dart's `with` order;
+  the binding sets `painting.DebugDisableShadows = true` (Flutter's
+  `disableShadows`) and checks it after each test, so a test that paints
+  shadows sets it to false and restores it.
+- rendering/widgets (interim): `RenderPadding`/`widgets.Padding` take
+  `painting.EdgeInsets` and `RenderPositionedBox`/`widgets.Align` take
+  `painting.Alignment` (Flutter: the `...Geometry` types, resolved with a
+  text direction, which waits for the rendering port); `rendering.Axis` is
+  an alias of `painting.Axis` (`Horizontal`/`Vertical` kept as short names
+  for RenderFlex).
+- src/dart: `TruncDiv` is the VM's `(a / b).truncate()`: it saturates to
+  ±2^63 outside int64, throws "Infinity or NaN toInt" only for an infinite
+  or NaN quotient, and never returns -0.0. dart:ui's `clampDouble` panics
+  with a `dart.AssertionError` (Dart's assert).
