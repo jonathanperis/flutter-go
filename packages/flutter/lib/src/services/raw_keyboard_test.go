@@ -213,7 +213,9 @@ func webMessage(entries ...dart.MapEntry[string, any]) *[]dart.MapEntry[string, 
 	return &d
 }
 
-func e(k string, v any) dart.MapEntry[string, any] { return dart.MapEntry[string, any]{Key: k, Value: v} }
+func e(k string, v any) dart.MapEntry[string, any] {
+	return dart.MapEntry[string, any]{Key: k, Value: v}
+}
 
 // Regression test for flutter#114591 (browser-only in Dart).
 func TestRawKeyboardCapsLockShouldNotBeReleasedWhenRemappedOnWeb(t *testing.T) {
