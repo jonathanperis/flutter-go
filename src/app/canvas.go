@@ -59,7 +59,7 @@ func (c *uiCanvas) DrawPicture(p r.Picture, at r.Offset) {
 	c.c.Restore()
 }
 
-// DrawParagraph draws a rendering.UIParagraph with Canvas.drawParagraph.
+// DrawParagraph paints a rendering.UIParagraph with its TextPainter.
 func (c *uiCanvas) DrawParagraph(p r.Paragraph, at r.Offset) {
-	c.c.DrawParagraph(p.(*r.UIParagraph).Paragraph, at)
+	p.(*r.UIParagraph).Painter.Paint(c.c, at)
 }

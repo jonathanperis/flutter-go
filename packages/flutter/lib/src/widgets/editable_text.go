@@ -12,20 +12,18 @@ package widgets
 // (textfield.go). The EditableText widget itself, its selection overlay,
 // scrolling, formatters, undo and obscured text are not ported yet.
 //
-// painting's TextPainter.wordBoundaries (WordBoundary and _UntilTextBoundary,
-// text_painter.dart) belongs to the painting library, which is being ported
-// separately: editableTextLayout stands in for RenderEditable's text layout
-// (a dart:ui Paragraph of the text laid out on one line, as a single-line
-// EditableText lays out) and implements those two classes privately.
+// editableTextLayout stands in for RenderEditable's text layout: a
+// painting.TextPainter of the text laid out on one line (as a single-line
+// EditableText lays out), whose WordBoundaries (painting's WordBoundary)
+// give the word moves, as RenderEditable's TextPainter does.
 
 import (
-	"math"
 	"reflect"
 	"strconv"
-	"unicode"
 
 	ui "github.com/jonathanperis/flutter-go/engine/src/flutter/lib/ui/go"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/foundation"
+	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/painting"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/services"
 	"github.com/jonathanperis/flutter-go/src/async"
 	"github.com/jonathanperis/flutter-go/src/dart"
@@ -33,31 +31,33 @@ import (
 )
 
 // editableTextLayout is the text layout of a single-line field: a
-// dart:ui Paragraph of the text with unbounded width. It is the
+// TextPainter of the text with unbounded width. It is the
 // TextLayoutMetrics RenderEditable implements.
 type editableTextLayout struct {
-	text string
-	para ui.Paragraph
+	text    string
+	painter *painting.TextPainter
 }
 
 func newEditableTextLayout(text string) *editableTextLayout {
-	b := ui.NewParagraphBuilder(ui.NewParagraphStyle())
-	b.AddText(text)
-	p := b.Build()
-	p.Layout(ui.ParagraphConstraints{Width: math.Inf(1)})
-	return &editableTextLayout{text: text, para: p}
+	ltr := ui.TextDirectionLtr
+	p := painting.NewTextPainter(painting.TextPainterOptions{
+		Text:          painting.NewTextSpan(painting.TextSpanOptions{Text: &text}),
+		TextDirection: &ltr,
+	})
+	p.Layout()
+	return &editableTextLayout{text: text, painter: p}
 }
 
-// GetLineAtOffset is RenderEditable.getLineAtOffset: the paragraph's line
+// GetLineAtOffset is RenderEditable.getLineAtOffset: the painter's line
 // boundary as a selection.
 func (l *editableTextLayout) GetLineAtOffset(position ui.TextPosition) services.TextSelection {
-	line := l.para.GetLineBoundary(position)
+	line := l.painter.GetLineBoundary(position)
 	return services.NewTextSelection(line.Start, line.End)
 }
 
 // GetWordBoundary is RenderEditable.getWordBoundary.
 func (l *editableTextLayout) GetWordBoundary(position ui.TextPosition) ui.TextRange {
-	return l.para.GetWordBoundary(position)
+	return l.painter.GetWordBoundary(position)
 }
 
 // GetTextPositionAbove: a single line has no line above (the start).
@@ -68,113 +68,6 @@ func (l *editableTextLayout) GetTextPositionAbove(ui.TextPosition) ui.TextPositi
 // GetTextPositionBelow: a single line has no line below (the end).
 func (l *editableTextLayout) GetTextPositionBelow(ui.TextPosition) ui.TextPosition {
 	return ui.NewTextPosition(dart.StringLength(l.text))
-}
-
-// wordBoundary is painting's WordBoundary: the paragraph's word
-// boundaries.
-type wordBoundary struct {
-	services.TextBoundaryBase
-	layout *editableTextLayout
-}
-
-func newWordBoundary(layout *editableTextLayout) *wordBoundary {
-	b := &wordBoundary{layout: layout}
-	b.SetSelf(b)
-	return b
-}
-
-func (b *wordBoundary) GetTextBoundaryAt(position int) ui.TextRange {
-	return b.layout.para.GetWordBoundary(ui.NewTextPosition(max(position, 0)))
-}
-
-// codePointAt is WordBoundary._codePointAt (nil past the text).
-func (b *wordBoundary) codePointAt(index int) *int {
-	units := dart.StringCodeUnits(b.layout.text)
-	at := func(i int) *int {
-		if i < 0 || i >= len(units) {
-			return nil
-		}
-		v := int(units[i])
-		return &v
-	}
-	c := at(index)
-	if c == nil {
-		return nil
-	}
-	fromSurrogates := func(hi, lo int) int { return (hi << 10) + lo + (0x010000 - (0xD800 << 10) - 0xDC00) }
-	switch *c & 0xFC00 {
-	case 0xD800:
-		v := fromSurrogates(*c, *at(index + 1))
-		return &v
-	case 0xDC00:
-		v := fromSurrogates(*at(index - 1), *c)
-		return &v
-	}
-	return c
-}
-
-func isNewline(codePoint int) bool {
-	switch codePoint {
-	case 0x000A, 0x0085, 0x000B, 0x000C, 0x2028, 0x2029:
-		return true
-	}
-	return false
-}
-
-// skipSpacesAndPunctuations is WordBoundary._skipSpacesAndPunctuations
-// (its regular expression [\p{Space_Separator}\p{Punctuation}] is Go's
-// Unicode categories Zs and P).
-func (b *wordBoundary) skipSpacesAndPunctuations(offset int, forward bool) bool {
-	innerAt, outerAt := offset, offset-1
-	if forward {
-		innerAt, outerAt = offset-1, offset
-	}
-	inner := b.codePointAt(innerAt)
-	units := dart.StringCodeUnits(b.layout.text)
-	var outer *int
-	if outerAt >= 0 && outerAt < len(units) {
-		v := int(units[outerAt])
-		outer = &v
-	}
-	hardBreakRulesApply := inner == nil || outer == nil || isNewline(*inner) || isNewline(*outer)
-	return hardBreakRulesApply || !(unicode.Is(unicode.Zs, rune(*inner)) || unicode.IsPunct(rune(*inner)))
-}
-
-// moveByWordBoundary is WordBoundary.moveByWordBoundary.
-func (b *wordBoundary) moveByWordBoundary() services.TextBoundary {
-	return newUntilTextBoundary(b, b.skipSpacesAndPunctuations)
-}
-
-// untilTextBoundary is text_painter.dart's _UntilTextBoundary.
-type untilTextBoundary struct {
-	services.TextBoundaryBase
-	textBoundary services.TextBoundary
-	predicate    services.UntilPredicate
-}
-
-func newUntilTextBoundary(textBoundary services.TextBoundary, predicate services.UntilPredicate) *untilTextBoundary {
-	b := &untilTextBoundary{textBoundary: textBoundary, predicate: predicate}
-	b.SetSelf(b)
-	return b
-}
-
-func (b *untilTextBoundary) GetLeadingTextBoundaryAt(position int) *int {
-	if position < 0 {
-		return nil
-	}
-	offset := b.textBoundary.GetLeadingTextBoundaryAt(position)
-	if offset == nil || b.predicate(*offset, false) {
-		return offset
-	}
-	return b.GetLeadingTextBoundaryAt(*offset - 1)
-}
-
-func (b *untilTextBoundary) GetTrailingTextBoundaryAt(position int) *int {
-	offset := b.textBoundary.GetTrailingTextBoundaryAt(max(position, 0))
-	if offset == nil || b.predicate(*offset, true) {
-		return offset
-	}
-	return b.GetTrailingTextBoundaryAt(*offset)
 }
 
 // --- EditableTextState's boundaries.
@@ -194,7 +87,7 @@ func (s *textFieldState) characterBoundary() services.TextBoundary {
 }
 
 func (s *textFieldState) nextWordBoundary() services.TextBoundary {
-	return newWordBoundary(s.layout()).moveByWordBoundary()
+	return s.layout().painter.WordBoundaries().MoveByWordBoundary()
 }
 
 func (s *textFieldState) linebreak() services.TextBoundary {

@@ -196,12 +196,18 @@ Start here when continuing flutter-go in a new session.
      AssetImage/NetworkImage, PaintingBinding (in the test binding),
      ShaderWarmUp, debug, MatrixUtils, colors, TextScaler); flutter_test's
      TestRecordingCanvas and `paints` matcher; rendering's EdgeInsets/
-     Alignment/Axis placeholders replaced by painting's. Next for it: the
-     text item — TextPainter, TextStyle, StrutStyle, TextSpan/InlineSpan/
-     PlaceholderSpan (Accumulator, InlineSpanSemanticsInformation,
-     combineSemanticsInfo, PlaceholderDimensions, WordBoundary — then
-     drop widgets' editable_text.go stand-in — lerpFontVariations) and
-     FlutterLogoDecoration's "Flutter" label; rendering on painting
+     Alignment/Axis placeholders replaced by painting's. Done since (the
+     text item, painting 134/134): TextPainter, TextStyle, StrutStyle,
+     InlineSpan/TextSpan/PlaceholderSpan, WordBoundary,
+     lerpFontVariations, FlutterLogoDecoration's "Flutter" label; widgets'
+     editable_text.go uses painting's WordBoundary through a TextPainter,
+     rendering's UITextEngine lays out and paints with TextPainter. Next
+     for it: the rendering item — RenderParagraph/RenderEditable on
+     TextPainter (then drop rendering's interim TextStyle/TextEngine/
+     FixedTextEngine and UIParagraph; RenderEditable's TextLayoutMetrics
+     replaces editableTextLayout), widgets' WidgetSpan on
+     PlaceholderSpan (and the text_span/text_painter tests that use the
+     test stand-ins then run on it); rendering on painting
      (RenderDecoratedBox with BoxPainter, RenderImage, the `...Geometry`
      types resolved with a text direction in RenderPadding/
      RenderPositionedBox, TestRecordingPaintingContext and `paints` on

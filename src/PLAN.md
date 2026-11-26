@@ -2265,3 +2265,94 @@ measures every public member and parameter, by API_MAPPING's rules:
   foundation 461/474, 469/482; physics 58/59, 70/70; scheduler 81/82, 40/41;
   semantics 517/517, 213/213; animation 303/303, 181/181; services
   1965/1968, 728/737; gestures 628/630, 761/771.
+
+### painting, finished (P4): the text item
+
+- **Scope.** text_painter.dart in full (TextPainter with layout and its
+  relayout cache, paint, caret offsets/heights, selection boxes,
+  positions, closest glyphs, word/line boundaries, line metrics,
+  placeholder boxes, strut and ellipsis behaviour, width bases, the
+  static computeWidth/computeMaxIntrinsicWidth; PlaceholderDimensions,
+  WordBoundary with moveByWordBoundary), text_style.dart (TextStyle,
+  lerpFontVariations), strut_style.dart, inline_span.dart, text_span.dart,
+  placeholder_span.dart, and FlutterLogoDecoration's "Flutter" label.
+  painting 121 -> 134 of 134 (total 1062 -> 1075 of 2888, tested 788 ->
+  800).
+- **Moved onto it:** widgets' editable_text.go drops its private
+  WordBoundary/_UntilTextBoundary stand-in: editableTextLayout is a
+  TextPainter and the word moves are painting's
+  `WordBoundaries().MoveByWordBoundary()`; rendering's UITextEngine lays
+  out and paints with TextPainter (CaretX is getOffsetForCaret, OffsetAtX
+  getPositionForOffset; src/app paints with `Painter.Paint`). Every
+  editing, text-field and layout difftest is unchanged.
+- **Tests:** text_painter_test (64 of 66: 2 skipped upstream), the 3
+  text_painter_rtl tests that run upstream (9 skipped upstream),
+  text_style_test (19; hashCode halves dropped), strut_style_test (+ Go
+  checks of merge/inherit/fromTextStyle), text_span_test (13 of 15: mouse
+  cursor/onEnter tests pump RichText with a mouse TestGesture), plus
+  inline/placeholder span tests, recorded-call tests of the logo label,
+  and services' "wordBoundary.moveByWordBoundary" (in a services_test
+  package file: it imports painting). WidgetSpan is stood in for by test
+  placeholder spans built as WidgetSpan builds.
+- **Difftests (exact):** painting_text_painter — 51 scenes of
+  `difftest/painting_text_painter_scenes.json` (shared with Dart), 96
+  layouts of one painter per scene at successive widths (so
+  `_resizeToFit` and the adjusted-max-width relayout are exercised):
+  size, intrinsics, baselines, preferredLineHeight, line metrics,
+  placeholder boxes, caret offset and full height at every position with
+  both affinities, boxes of every range (all 12 height/width styles on two
+  ranges), positions and closest glyphs on a 9x7 grid, word/line
+  boundaries, moveByWordBoundary, getOffsetAfter/Before, the paint offset;
+  FlutterTest, Ahem and Roboto, RTL and bidi, surrogates, combining
+  marks, every alignment with finite/infinite widths, justify, ellipsis
+  (incl. RTL), maxLines, scalers (linear, clamped, the deprecated
+  factor), struts (forced, small, disabled, Ahem, Roboto, zero-scaled),
+  longestLine, height behaviours, placeholders of every alignment incl.
+  zero-size ones, trailing spaces/tab/nbsp/figure space; plus state
+  changes (setters, paint-only changes, the template's reset, errors) —
+  15,000 lines. painting_text_style — TextStyle toString/toStringDeep/
+  prefixed properties, getTextStyle/getParagraphStyle (their toString and
+  a paragraph laid out with them), copyWith/apply variants, merge/==/
+  compareTo/lerp over 14x14 pairs x 5 t's (incl. the inherit-mismatch
+  FlutterError), single-field compareTo, lerpFontVariations over 9x9 lists
+  (Dart's HashSet<String> order reproduced), StrutStyle (toString,
+  inherit, merge, fromTextStyle, ==, compareTo), span trees (toPlainText,
+  codeUnitAt, getSpanForPosition, visits, semantics info,
+  combineSemanticsInfo, ==, compareTo, toStringDeep), malformed UTF-16 —
+  2,600 lines. Both matched after one fix each (below).
+- **Difftest (pixels):** painting_text_pixels, 14 scenes on Impeller: the
+  9 TextPainter scenes (alignment, RTL, ellipsis, styled spans with
+  background/decoration, strut, Roboto scaled, placeholders, a recolored
+  paragraph) are bit-exact, and so is the logo's label; the logo scenes
+  differ only on the mark's anti-aliased beam edges (one MSAA sample, as
+  in painting_pixels), every such pixel checked to be on an edge.
+- **Found by the difftests:** dart:ui's bridge read uninitialized memory
+  for a zero-size placeholder's GlyphInfo (SkParagraph finds it but
+  leaves the info unset; the engine's default-constructed GlyphInfo is
+  Rect.zero, (0, 0), rtl — what TextPainter's "placeholders with a size of
+  (0, 0)" workaround relies on): `SkGlyphInfo glyph_info{}` in
+  typography_bridge.cc, with a ui test. Dart's `Paint()..color = c!` on a
+  null color is a TypeError (null check), now `dart.TypeError` too.
+- **Flutter quirks kept:** TextStyle.lerp(a, null) lerps the background
+  color from null; a style with only decorationThickness asserts in
+  debugFillProperties (so its toString throws); the overflow property is
+  never shown; StrutStyle.fromTextStyle with a family and a package
+  prefixes the package twice; a malformed TextSpan text becomes one
+  U+FFFD (the whole addText fails).
+- **Mutations:** 112: 108 caught, 4 equivalent — skipping line breaking at
+  an unchanged max width (relaying out at the same width gives the same
+  layout), adjusting an infinite max width for left-aligned text too (a
+  left-aligned paragraph's width is never observable: paint offset 0 and
+  contentWidth from the intrinsics), treating a trailing nbsp as a
+  trailing space (SkParagraph counts nbsp in the line width, so the glyph
+  edge and the line edge coincide), and the y shift of text boxes (the
+  paint offset's dy is always 0). Ten were first missed and caught after
+  adding cases (relayout at the intrinsic width then a paint-only change,
+  an empty centered paragraph with a min width, paint-only changes in
+  pixels, the template reset after a style change, the degenerate strut
+  height fallback, foreground/background compareTo, package equality,
+  strut leading inheritance, empty localized spans, U+FFFD in Roboto).
+- **Process:** the forks that ported the Flutter tests ran concurrently in
+  the same worktree on disjoint files (test files only, bugs reported
+  rather than fixed); mutations need the difftest package rebuilt each
+  time (~3 min each), so long batches run as one background job.

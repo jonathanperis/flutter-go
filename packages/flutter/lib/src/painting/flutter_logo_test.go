@@ -3,7 +3,8 @@ package painting
 // Port of packages/flutter/test/painting/flutter_logo_test.dart (Flutter
 // 3.50.1). Skipped: "Flutter Logo golden
 // test" (a Container golden; the painting_decorations_pixels difftest draws
-// the mark against Flutter's Impeller output).
+// the logo against Flutter's Impeller output). The label it shows is
+// tested through recorded canvas calls in flutter_logo_label_test.go.
 
 import (
 	"testing"

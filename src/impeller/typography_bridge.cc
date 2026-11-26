@@ -787,7 +787,7 @@ extern "C" void fgo_paragraph_get_position_for_offset(FgoParagraph* p,
 extern "C" bool fgo_paragraph_get_glyph_info_at(FgoParagraph* p,
                                                 uint32_t offset,
                                                 FgoGlyphInfo* out) {
-  SkGlyphInfo glyph_info;
+  SkGlyphInfo glyph_info{};  // Skia leaves a zero-size placeholder's info unset: zero (Rect.zero, (0, 0), rtl), as the engine's default-constructed GlyphInfo
   const bool found = p->paragraph->GetGlyphInfoAt(offset, &glyph_info);
   if (found) {
     GlyphInfoFrom(glyph_info, out);
@@ -799,7 +799,7 @@ extern "C" bool fgo_paragraph_get_closest_glyph_info(FgoParagraph* p,
                                                      double dx,
                                                      double dy,
                                                      FgoGlyphInfo* out) {
-  SkGlyphInfo glyph_info;
+  SkGlyphInfo glyph_info{};  // Skia leaves a zero-size placeholder's info unset: zero (Rect.zero, (0, 0), rtl), as the engine's default-constructed GlyphInfo
   const bool found =
       p->paragraph->GetClosestGlyphInfoAtCoordinate(dx, dy, &glyph_info);
   if (found) {
