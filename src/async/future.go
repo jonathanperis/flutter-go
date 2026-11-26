@@ -515,6 +515,10 @@ func castFuture[R any](f Future[any]) Future[R] {
 }
 
 func castValue[R any](v any) R {
+	var zero R
+	if _, isVoid := any(zero).(Void); isVoid {
+		return zero // Future<void> accepts (and ignores) any value
+	}
 	if v == nil {
 		var zero R
 		return zero
