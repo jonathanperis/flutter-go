@@ -2,8 +2,10 @@ package rendering
 
 import (
 	"fmt"
-	ui "github.com/jonathanperis/flutter-go/engine/src/flutter/lib/ui/go"
 	"math"
+	"time"
+
+	ui "github.com/jonathanperis/flutter-go/engine/src/flutter/lib/ui/go"
 )
 
 // DefaultCacheExtent is how far beyond the visible area items are kept built
@@ -36,16 +38,23 @@ type RenderFixedExtentList struct {
 	first      int         // index of kids[0]
 	// OnScroll is called when the scroll offset changes.
 	OnScroll func(offset float64)
-	// Input hooks, set by the widgets layer (Flutter's ScrollPosition):
-	// Hold stops any scroll animation (a pointer landed) and reports whether
-	// one was running; drags report finger deltas and timestamps (seconds);
-	// DragEnd gets the raw release velocity and the distance its samples
-	// covered; PointerScroll is a mouse wheel delta.
-	Hold          func() bool
-	DragStart     func(ts float64)
-	DragUpdate    func(delta, ts float64)
-	DragEnd       func(velocity, distance float64)
-	PointerScroll func(delta float64)
+	// Input hooks, set by the widgets layer (Flutter's ScrollableState and
+	// ScrollPosition), called by its vertical drag recognizer:
+	// IgnoringPointer reports whether a scroll activity ignores pointers
+	// (the list's items are then not hit-tested); Hold stops any scroll
+	// animation (onDown); drags report the primary delta and the event's
+	// time stamp; DragEnd gets the drag's primary velocity (0 when it is
+	// not a fling); DragCancel ends a drag or hold without a fling;
+	// FlingLimits are the physics' minFlingDistance, minFlingVelocity and
+	// maxFlingVelocity; PointerScroll is a mouse wheel delta.
+	IgnoringPointer func() bool
+	Hold            func()
+	DragStart       func(ts time.Duration)
+	DragUpdate      func(delta float64, ts time.Duration)
+	DragEnd         func(velocity float64)
+	DragCancel      func()
+	FlingLimits     func() (minDistance, minVelocity, maxVelocity float64)
+	PointerScroll   func(delta float64)
 }
 
 func NewFixedExtentList(itemExtent float64, itemCount int, m ChildManager) *RenderFixedExtentList {

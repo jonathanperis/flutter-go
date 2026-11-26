@@ -110,6 +110,15 @@ func (b *AutomatedTestWidgetsFlutterBinding) CreateBinaryMessenger() services.Bi
 	return b.TestDefaultBinaryMessengerBindingMixin.CreateBinaryMessenger()
 }
 
+// HitTestInView is RendererBinding's: the test's tree (its gesture
+// targets, see widgets.BuildOwner.HitTestGestures), then GestureBinding's.
+func (b *AutomatedTestWidgetsFlutterBinding) HitTestInView(result *gestures.HitTestResult, position ui.Offset, viewID int) {
+	if b.tester != nil {
+		b.tester.Owner.HitTestGestures(result, position)
+	}
+	b.GestureBindingMixin.HitTestInView(result, position, viewID)
+}
+
 // PerformSemanticsAction is RendererBinding's (not ported): actions are
 // ignored.
 func (b *AutomatedTestWidgetsFlutterBinding) PerformSemanticsAction(action ui.SemanticsActionEvent) {}
@@ -212,6 +221,7 @@ func (b *AutomatedTestWidgetsFlutterBinding) startTest(t *Tester) {
 func (b *AutomatedTestWidgetsFlutterBinding) postTest(t *Tester) {
 	defer func() {
 		b.tester = nil
+		b.ResetGestureBinding()
 		t.restoreLoop()
 		foundation.FlutterErrorOnError = t.previousOnError
 		b.ResetInternalState()

@@ -10,6 +10,7 @@ import (
 
 	ui "github.com/jonathanperis/flutter-go/engine/src/flutter/lib/ui/go"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/foundation"
+	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/gestures"
 	r "github.com/jonathanperis/flutter-go/packages/flutter/lib/src/rendering"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/scheduler"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/services"
@@ -61,27 +62,39 @@ type Options struct {
 }
 
 // appBinding is the app's binding (partial WidgetsFlutterBinding:
-// BindingBase and SchedulerBinding); its persistent frame callback draws
-// the tree into the frame being produced, as WidgetsBinding.drawFrame
-// does.
+// BindingBase with GestureBinding, SchedulerBinding); its persistent frame
+// callback draws the tree into the frame being produced, as
+// WidgetsBinding.drawFrame does, and its hit test finds the tree's gesture
+// targets, as RendererBinding.hitTestInView does.
 type appBinding struct {
 	foundation.BindingBaseBase
+	gestures.GestureBindingMixin
 	scheduler.SchedulerBindingMixin
 	// drawFrame is the rendering pipeline for the frame in progress.
 	drawFrame func()
+	// owner is the tree being shown.
+	owner *widgets.BuildOwner
 }
 
 func (b *appBinding) InitInstances()         { b.SchedulerBindingMixin.InitInstances() }
 func (b *appBinding) InitServiceExtensions() { b.SchedulerBindingMixin.InitServiceExtensions() }
 func (b *appBinding) Unlocked()              { b.SchedulerBindingMixin.Unlocked() }
 
+func (b *appBinding) HitTestInView(result *gestures.HitTestResult, position ui.Offset, viewID int) {
+	if b.owner != nil {
+		b.owner.HitTestGestures(result, position)
+	}
+	b.GestureBindingMixin.HitTestInView(result, position, viewID)
+}
+
 var binding *appBinding
 
 func ensureBinding() *appBinding {
 	if binding == nil {
 		b := &appBinding{}
+		b.GestureBindingMixin.SetSelf(b)
 		b.SchedulerBindingMixin.SetSelf(b)
-		b.Construct(b, &b.SchedulerBindingMixin)
+		b.Construct(b, &b.GestureBindingMixin, &b.SchedulerBindingMixin)
 		b.AddPersistentFrameCallback(func(time.Duration) {
 			if b.drawFrame != nil {
 				b.drawFrame()
@@ -158,7 +171,9 @@ func Run(root widgets.Widget, o Options) error {
 				Alt: m&glfw.ModAlt != 0, Meta: m&glfw.ModSuper != 0})
 		}
 	})
-	router.Now = func() float64 { return time.Since(epoch).Seconds() }
+	b.owner = owner
+	router.TimeStamp = func() time.Duration { return time.Since(epoch) }
+	router.AfterEvent = func() { loop.FlushMicrotasks() }
 	owner.DevicePixelRatio = float64(layer.Scale())
 	ww, wh := win.GetSize()
 	owner.SetViewSize(ui.Size{Width: float64(ww), Height: float64(wh)})
