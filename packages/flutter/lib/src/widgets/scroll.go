@@ -6,10 +6,10 @@ import (
 	"time"
 
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/animation"
+	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/foundation"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/physics"
 	r "github.com/jonathanperis/flutter-go/packages/flutter/lib/src/rendering"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/scheduler"
-	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/foundation"
 )
 
 // ScrollPhysics selects how a list responds at its edges and after a drag.

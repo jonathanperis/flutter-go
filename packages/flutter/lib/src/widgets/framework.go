@@ -15,10 +15,10 @@ import (
 	"reflect"
 	"sort"
 
+	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/foundation"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/gestures"
 	r "github.com/jonathanperis/flutter-go/packages/flutter/lib/src/rendering"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/scheduler"
-	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/foundation"
 )
 
 type Widget any
@@ -527,9 +527,9 @@ type BuildOwner struct {
 	DevicePixelRatio float64
 	// Platform selects keyboard shortcuts (flutter_test's default is Android).
 	Platform foundation.TargetPlatform
-	focus     KeyTarget
-	app       Widget
-	viewSize  r.Size
+	focus    KeyTarget
+	app      Widget
+	viewSize r.Size
 	// pendingRoot is a RunApp widget waiting for the next build phase.
 	pendingRoot *rootWidget
 	// gestureTargets are the gesture recognizers of the tree's render

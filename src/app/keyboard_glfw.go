@@ -22,13 +22,12 @@ package app
 //     ASCII control character of a letter.
 
 import (
-
 	"github.com/go-gl/glfw/v3.3/glfw"
 
 	ui "github.com/jonathanperis/flutter-go/engine/src/flutter/lib/ui/go"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/services"
-	"github.com/jonathanperis/flutter-go/src/dart"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/widgets"
+	"github.com/jonathanperis/flutter-go/src/dart"
 )
 
 // glfwModifierKeys are GLFW's modifier keys with the macOS key code and

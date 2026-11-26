@@ -22,7 +22,7 @@ type TestTextInputKeyHandler interface {
 // down with the modifiers held sends its selectors.
 type MacOSTestTextInputKeyHandler struct {
 	// Client is the text input client id the selectors are sent to.
-	Client                     int
+	Client                    int
 	shift, alt, meta, control bool
 }
 

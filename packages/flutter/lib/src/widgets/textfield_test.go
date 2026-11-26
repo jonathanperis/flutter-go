@@ -5,12 +5,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/foundation"
 	r "github.com/jonathanperis/flutter-go/packages/flutter/lib/src/rendering"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/services"
-	"github.com/jonathanperis/flutter-go/src/async"
-	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/foundation"
 	. "github.com/jonathanperis/flutter-go/packages/flutter/lib/src/widgets"
 	"github.com/jonathanperis/flutter-go/packages/flutter_test/lib/src"
+	"github.com/jonathanperis/flutter-go/src/async"
 )
 
 func caretDrawn(t *flutter_test.Tester) bool {

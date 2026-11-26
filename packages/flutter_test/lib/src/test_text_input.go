@@ -34,7 +34,7 @@ type TestTextInput struct {
 	// keyHandler is the platform-specific key handler that can process
 	// unhandled keyboard events (nil: none).
 	keyHandler TestTextInputKeyHandler
-	handler   func(services.MethodCall) async.Future[any]
+	handler    func(services.MethodCall) async.Future[any]
 }
 
 // TestTextInputOptions are TestTextInput's named parameters.

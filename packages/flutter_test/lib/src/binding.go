@@ -42,7 +42,7 @@ type AutomatedTestWidgetsFlutterBinding struct {
 	tester *Tester // the test in progress (flutter_test: inTest)
 
 	testRestorationManager *TestRestorationManager
-	testTextInput *TestTextInput
+	testTextInput          *TestTextInput
 }
 
 var automatedTestBinding *AutomatedTestWidgetsFlutterBinding
@@ -295,6 +295,7 @@ func (b *AutomatedTestWidgetsFlutterBinding) RestorationManager() *services.Rest
 func (b *AutomatedTestWidgetsFlutterBinding) CreateRestorationManager() *services.RestorationManager {
 	return &NewTestRestorationManager().RestorationManager
 }
+
 // TestTextInput is the binding's mock of the platform's text input
 // (testTextInput): reset and registered for every test.
 func (b *AutomatedTestWidgetsFlutterBinding) TestTextInput() *TestTextInput { return b.testTextInput }

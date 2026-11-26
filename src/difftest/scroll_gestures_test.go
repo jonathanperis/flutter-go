@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	r "github.com/jonathanperis/flutter-go/packages/flutter/lib/src/rendering"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/foundation"
+	r "github.com/jonathanperis/flutter-go/packages/flutter/lib/src/rendering"
 	. "github.com/jonathanperis/flutter-go/packages/flutter/lib/src/widgets"
 	flutter_test "github.com/jonathanperis/flutter-go/packages/flutter_test/lib/src"
 	"github.com/jonathanperis/flutter-go/src/dart"

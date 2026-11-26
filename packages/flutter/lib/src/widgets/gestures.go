@@ -13,9 +13,9 @@ import (
 	"time"
 
 	ui "github.com/jonathanperis/flutter-go/engine/src/flutter/lib/ui/go"
+	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/foundation"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/gestures"
 	r "github.com/jonathanperis/flutter-go/packages/flutter/lib/src/rendering"
-	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/foundation"
 )
 
 // Fling velocity limits and the touch slop (gestures' kMinFlingVelocity,

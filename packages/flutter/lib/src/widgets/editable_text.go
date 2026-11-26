@@ -20,8 +20,8 @@ package widgets
 
 import (
 	"math"
-	"strconv"
 	"reflect"
+	"strconv"
 	"unicode"
 
 	ui "github.com/jonathanperis/flutter-go/engine/src/flutter/lib/ui/go"
@@ -197,7 +197,9 @@ func (s *textFieldState) nextWordBoundary() services.TextBoundary {
 	return newWordBoundary(s.layout()).moveByWordBoundary()
 }
 
-func (s *textFieldState) linebreak() services.TextBoundary { return services.NewLineBoundary(s.layout()) }
+func (s *textFieldState) linebreak() services.TextBoundary {
+	return services.NewLineBoundary(s.layout())
+}
 
 func (s *textFieldState) paragraphBoundary() services.TextBoundary {
 	return services.NewParagraphBoundary(s.value().Text)
@@ -555,7 +557,7 @@ func (s *textFieldState) buildActions() map[reflect.Type]Action {
 	vertical := s.updateTextSelectionVerticallyAction()
 	return map[reflect.Type]Action{
 		IntentTypeOf[DoNothingAndStopPropagationTextIntent](): NewDoNothingAction(DoNothingActionOptions{ConsumesKey: &f}),
-		IntentTypeOf[ReplaceTextIntent](): NewCallbackAction(func(i ReplaceTextIntent) any { s.replaceText(i); return nil }),
+		IntentTypeOf[ReplaceTextIntent]():                     NewCallbackAction(func(i ReplaceTextIntent) any { s.replaceText(i); return nil }),
 		IntentTypeOf[UpdateSelectionIntent](): NewCallbackAction(func(i UpdateSelectionIntent) any {
 			s.updateSelection(i)
 			return nil

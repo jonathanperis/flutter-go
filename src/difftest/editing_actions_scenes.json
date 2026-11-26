@@ -1,0 +1,1182 @@
+{
+ "docs": [
+  {
+   "type": "foo, bar... baz! qux"
+  },
+  {
+   "key": "home",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "key": "end",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "key": "arrowLeft",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "key": "arrowLeft",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "key": "backspace",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "key": "home",
+   "mods": [
+    "shift",
+    "control"
+   ]
+  },
+  {
+   "key": "delete"
+  },
+  {
+   "key": "end",
+   "mods": [
+    "shift",
+    "control"
+   ]
+  },
+  {
+   "key": "arrowLeft"
+  },
+  {
+   "key": "delete",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "key": "delete",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "key": "arrowRight",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "key": "backspace",
+   "mods": [
+    "alt"
+   ]
+  },
+  {
+   "type": "start "
+  },
+  {
+   "key": "delete",
+   "mods": [
+    "alt"
+   ]
+  },
+  {
+   "key": "arrowLeft",
+   "mods": [
+    "alt"
+   ]
+  },
+  {
+   "key": "arrowRight",
+   "mods": [
+    "shift",
+    "alt"
+   ]
+  },
+  {
+   "key": "arrowLeft",
+   "mods": [
+    "shift",
+    "alt"
+   ]
+  },
+  {
+   "key": "arrowUp",
+   "mods": [
+    "alt"
+   ]
+  },
+  {
+   "key": "arrowDown",
+   "mods": [
+    "alt"
+   ]
+  }
+ ],
+ "paragraph": [
+  {
+   "type": "alpha beta gamma"
+  },
+  {
+   "key": "arrowLeft",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "key": "arrowUp",
+   "mods": [
+    "shift",
+    "control"
+   ]
+  },
+  {
+   "key": "arrowDown",
+   "mods": [
+    "shift",
+    "control"
+   ]
+  },
+  {
+   "key": "arrowDown",
+   "mods": [
+    "shift",
+    "control"
+   ]
+  },
+  {
+   "key": "arrowUp",
+   "mods": [
+    "shift",
+    "alt"
+   ]
+  },
+  {
+   "key": "arrowDown",
+   "mods": [
+    "shift",
+    "alt"
+   ]
+  },
+  {
+   "key": "arrowLeft"
+  },
+  {
+   "key": "pageUp"
+  },
+  {
+   "key": "pageDown"
+  },
+  {
+   "key": "pageUp",
+   "mods": [
+    "shift"
+   ]
+  },
+  {
+   "key": "pageDown",
+   "mods": [
+    "shift"
+   ]
+  },
+  {
+   "key": "arrowDown",
+   "mods": [
+    "shift"
+   ]
+  }
+ ],
+ "clipboard": [
+  {
+   "type": "hello world"
+  },
+  {
+   "key": "arrowLeft",
+   "mods": [
+    "shift",
+    "control"
+   ]
+  },
+  {
+   "key": "keyC",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "key": "home"
+  },
+  {
+   "key": "keyV",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "key": "keyA",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "key": "keyX",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "key": "keyV",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "key": "keyV",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "key": "arrowLeft",
+   "mods": [
+    "shift"
+   ]
+  },
+  {
+   "key": "arrowLeft",
+   "mods": [
+    "shift"
+   ]
+  },
+  {
+   "key": "delete",
+   "mods": [
+    "shift"
+   ]
+  },
+  {
+   "key": "insert",
+   "mods": [
+    "shift"
+   ]
+  },
+  {
+   "key": "arrowLeft",
+   "mods": [
+    "shift",
+    "control"
+   ]
+  },
+  {
+   "key": "insert",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "key": "end"
+  },
+  {
+   "key": "insert",
+   "mods": [
+    "shift"
+   ]
+  },
+  {
+   "key": "keyX",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "key": "keyC",
+   "mods": [
+    "control"
+   ]
+  }
+ ],
+ "space_enter": [
+  {
+   "type": "ab"
+  },
+  {
+   "key": "space"
+  },
+  {
+   "key": "enter"
+  },
+  {
+   "key": "arrowLeft"
+  },
+  {
+   "key": "space"
+  },
+  {
+   "key": "tab"
+  },
+  {
+   "key": "escape"
+  },
+  {
+   "type": " "
+  },
+  {
+   "key": "arrowLeft",
+   "mods": [
+    "shift"
+   ]
+  },
+  {
+   "key": "enter"
+  }
+ ],
+ "empty": [
+  {
+   "key": "backspace"
+  },
+  {
+   "key": "delete"
+  },
+  {
+   "key": "arrowLeft"
+  },
+  {
+   "key": "arrowRight",
+   "mods": [
+    "shift"
+   ]
+  },
+  {
+   "key": "keyA",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "key": "backspace",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "key": "home",
+   "mods": [
+    "shift"
+   ]
+  },
+  {
+   "type": "x"
+  },
+  {
+   "key": "keyA",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "key": "backspace"
+  },
+  {
+   "key": "arrowUp"
+  },
+  {
+   "key": "arrowDown",
+   "mods": [
+    "shift"
+   ]
+  }
+ ],
+ "graphemes_more": [
+  {
+   "type": "go \ud83d\udc68\u200d\ud83d\udc69\u200d\ud83d\udc67 now"
+  },
+  {
+   "key": "arrowLeft",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "key": "arrowLeft",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "key": "backspace"
+  },
+  {
+   "key": "arrowRight",
+   "mods": [
+    "shift"
+   ]
+  },
+  {
+   "key": "arrowRight",
+   "mods": [
+    "shift"
+   ]
+  },
+  {
+   "key": "delete"
+  },
+  {
+   "type": "\u0915\u094d\u0937\u093f"
+  },
+  {
+   "key": "arrowLeft"
+  },
+  {
+   "key": "arrowLeft",
+   "mods": [
+    "shift"
+   ]
+  },
+  {
+   "key": "backspace"
+  },
+  {
+   "key": "backspace",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "type": "\ud83c\uddfa\ud83c\uddf8\ud83c\uddef\ud83c\uddf5"
+  },
+  {
+   "key": "arrowLeft"
+  },
+  {
+   "key": "delete"
+  },
+  {
+   "key": "home"
+  },
+  {
+   "key": "delete",
+   "mods": [
+    "control"
+   ]
+  }
+ ],
+ "punctuation_words": [
+  {
+   "type": "a.b c--d (e) 'f' g_h i\u00a0j"
+  },
+  {
+   "key": "home"
+  },
+  {
+   "key": "arrowRight",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "key": "arrowRight",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "key": "arrowRight",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "key": "arrowRight",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "key": "arrowRight",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "key": "arrowRight",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "key": "arrowRight",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "key": "arrowLeft",
+   "mods": [
+    "shift",
+    "control"
+   ]
+  },
+  {
+   "key": "arrowLeft",
+   "mods": [
+    "shift",
+    "control"
+   ]
+  },
+  {
+   "key": "backspace",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "key": "end"
+  },
+  {
+   "key": "backspace",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "key": "backspace",
+   "mods": [
+    "control"
+   ]
+  }
+ ],
+ "mac_editing": [
+  {
+   "type": "one two three"
+  },
+  {
+   "key": "backspace",
+   "mods": [
+    "meta"
+   ]
+  },
+  {
+   "type": "one two three"
+  },
+  {
+   "key": "arrowLeft",
+   "mods": [
+    "alt"
+   ]
+  },
+  {
+   "key": "delete",
+   "mods": [
+    "alt"
+   ]
+  },
+  {
+   "key": "keyT",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "key": "keyA",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "key": "keyF",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "key": "keyF",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "key": "keyE",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "key": "keyB",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "key": "keyN",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "key": "keyP",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "key": "arrowLeft",
+   "mods": [
+    "alt"
+   ]
+  },
+  {
+   "key": "arrowLeft",
+   "mods": [
+    "shift",
+    "meta"
+   ]
+  },
+  {
+   "key": "arrowRight",
+   "mods": [
+    "shift",
+    "meta"
+   ]
+  },
+  {
+   "key": "arrowLeft",
+   "mods": [
+    "alt"
+   ]
+  },
+  {
+   "key": "home",
+   "mods": [
+    "shift"
+   ]
+  },
+  {
+   "key": "end",
+   "mods": [
+    "shift"
+   ]
+  },
+  {
+   "key": "arrowRight"
+  },
+  {
+   "key": "arrowLeft",
+   "mods": [
+    "alt"
+   ]
+  },
+  {
+   "key": "arrowRight",
+   "mods": [
+    "shift",
+    "alt"
+   ]
+  },
+  {
+   "key": "arrowLeft",
+   "mods": [
+    "shift",
+    "alt"
+   ]
+  },
+  {
+   "key": "arrowLeft",
+   "mods": [
+    "shift",
+    "alt"
+   ]
+  },
+  {
+   "key": "arrowDown",
+   "mods": [
+    "shift",
+    "alt"
+   ]
+  },
+  {
+   "key": "arrowUp",
+   "mods": [
+    "shift",
+    "alt"
+   ]
+  },
+  {
+   "key": "arrowUp",
+   "mods": [
+    "shift",
+    "meta"
+   ]
+  },
+  {
+   "key": "arrowDown",
+   "mods": [
+    "shift",
+    "meta"
+   ]
+  },
+  {
+   "key": "delete",
+   "mods": [
+    "meta"
+   ]
+  },
+  {
+   "key": "arrowUp",
+   "mods": [
+    "meta"
+   ]
+  },
+  {
+   "key": "delete",
+   "mods": [
+    "meta"
+   ]
+  },
+  {
+   "key": "enter"
+  },
+  {
+   "key": "arrowDown",
+   "mods": [
+    "alt"
+   ]
+  },
+  {
+   "key": "arrowUp",
+   "mods": [
+    "alt"
+   ]
+  },
+  {
+   "key": "pageUp"
+  },
+  {
+   "key": "pageDown",
+   "mods": [
+    "shift"
+   ]
+  },
+  {
+   "key": "pageUp",
+   "mods": [
+    "shift"
+   ]
+  }
+ ],
+ "mac_clipboard": [
+  {
+   "type": "copy this"
+  },
+  {
+   "key": "arrowLeft",
+   "mods": [
+    "shift",
+    "alt"
+   ]
+  },
+  {
+   "key": "keyC",
+   "mods": [
+    "meta"
+   ]
+  },
+  {
+   "key": "arrowRight"
+  },
+  {
+   "key": "keyV",
+   "mods": [
+    "meta"
+   ]
+  },
+  {
+   "key": "keyA",
+   "mods": [
+    "meta"
+   ]
+  },
+  {
+   "key": "keyX",
+   "mods": [
+    "meta"
+   ]
+  },
+  {
+   "key": "keyV",
+   "mods": [
+    "meta"
+   ]
+  },
+  {
+   "key": "keyV",
+   "mods": [
+    "meta"
+   ]
+  },
+  {
+   "key": "keyV",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "key": "keyA",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "key": "keyE",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "key": "keyA",
+   "mods": [
+    "meta"
+   ]
+  },
+  {
+   "type": "z"
+  }
+ ],
+ "mac_transpose": [
+  {
+   "type": "abc"
+  },
+  {
+   "key": "keyT",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "key": "arrowLeft"
+  },
+  {
+   "key": "keyT",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "key": "home"
+  },
+  {
+   "key": "keyT",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "key": "arrowRight"
+  },
+  {
+   "key": "keyT",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "type": "\ud83d\ude00x"
+  },
+  {
+   "key": "arrowLeft"
+  },
+  {
+   "key": "keyT",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "key": "end"
+  },
+  {
+   "key": "keyT",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "key": "keyA",
+   "mods": [
+    "meta"
+   ]
+  },
+  {
+   "key": "keyT",
+   "mods": [
+    "control"
+   ]
+  }
+ ],
+ "mac_deletes": [
+  {
+   "type": "hello wide world"
+  },
+  {
+   "key": "backspace",
+   "mods": [
+    "alt"
+   ]
+  },
+  {
+   "key": "backspace",
+   "mods": [
+    "alt",
+    "shift"
+   ]
+  },
+  {
+   "key": "backspace",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "key": "arrowLeft",
+   "mods": [
+    "alt"
+   ]
+  },
+  {
+   "key": "arrowLeft",
+   "mods": [
+    "alt"
+   ]
+  },
+  {
+   "key": "delete",
+   "mods": [
+    "alt",
+    "shift"
+   ]
+  },
+  {
+   "key": "delete",
+   "mods": [
+    "shift"
+   ]
+  },
+  {
+   "key": "backspace",
+   "mods": [
+    "meta",
+    "shift"
+   ]
+  },
+  {
+   "key": "end"
+  },
+  {
+   "key": "arrowLeft",
+   "mods": [
+    "shift"
+   ]
+  },
+  {
+   "key": "backspace",
+   "mods": [
+    "meta"
+   ]
+  },
+  {
+   "key": "delete",
+   "mods": [
+    "meta",
+    "shift"
+   ]
+  }
+ ],
+ "linux_keys": [
+  {
+   "type": "linux text here"
+  },
+  {
+   "key": "home"
+  },
+  {
+   "key": "end",
+   "mods": [
+    "shift"
+   ]
+  },
+  {
+   "key": "home",
+   "mods": [
+    "shift"
+   ]
+  },
+  {
+   "key": "arrowRight"
+  },
+  {
+   "key": "home",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "key": "end",
+   "mods": [
+    "shift",
+    "control"
+   ]
+  },
+  {
+   "key": "arrowLeft",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "key": "backspace",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "key": "keyA",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "key": "delete"
+  },
+  {
+   "type": "x y"
+  },
+  {
+   "key": "pageUp"
+  },
+  {
+   "key": "pageDown",
+   "mods": [
+    "shift"
+   ]
+  }
+ ],
+ "windows_keys": [
+  {
+   "type": "windows text"
+  },
+  {
+   "key": "home"
+  },
+  {
+   "key": "end",
+   "mods": [
+    "shift"
+   ]
+  },
+  {
+   "key": "pageUp"
+  },
+  {
+   "key": "pageDown"
+  },
+  {
+   "key": "pageUp",
+   "mods": [
+    "shift"
+   ]
+  },
+  {
+   "key": "arrowLeft",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "key": "delete",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "key": "home",
+   "mods": [
+    "control"
+   ]
+  },
+  {
+   "key": "end",
+   "mods": [
+    "shift",
+    "control"
+   ]
+  },
+  {
+   "key": "backspace",
+   "mods": [
+    "alt"
+   ]
+  }
+ ],
+ "ios_keys": [
+  {
+   "type": "ios text"
+  },
+  {
+   "key": "backspace"
+  },
+  {
+   "key": "delete"
+  },
+  {
+   "key": "arrowLeft"
+  },
+  {
+   "key": "backspace",
+   "mods": [
+    "alt"
+   ]
+  },
+  {
+   "key": "arrowLeft",
+   "mods": [
+    "alt"
+   ]
+  },
+  {
+   "key": "arrowLeft",
+   "mods": [
+    "meta"
+   ]
+  },
+  {
+   "key": "arrowRight",
+   "mods": [
+    "shift",
+    "meta"
+   ]
+  },
+  {
+   "key": "keyA",
+   "mods": [
+    "meta"
+   ]
+  },
+  {
+   "key": "backspace",
+   "mods": [
+    "meta"
+   ]
+  },
+  {
+   "key": "keyT",
+   "mods": [
+    "control"
+   ]
+  }
+ ]
+}

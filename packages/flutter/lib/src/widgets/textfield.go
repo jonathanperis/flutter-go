@@ -119,9 +119,9 @@ type textFieldState struct {
 	actions    map[reflect.Type]Action
 	textLayout *editableTextLayout
 
-	connection                     *services.TextInputConnection
+	connection                      *services.TextInputConnection
 	lastKnownRemoteTextEditingValue *services.TextEditingValue
-	batchEditDepth                 int
+	batchEditDepth                  int
 }
 
 func (s *textFieldState) controller() *TextEditingController {
@@ -314,10 +314,10 @@ func (s *textFieldState) PerformAction(action services.TextInputAction) {
 	}
 }
 
-func (s *textFieldState) PerformPrivateCommand(string, map[string]any)             {}
-func (s *textFieldState) UpdateFloatingCursor(services.RawFloatingCursorPoint)    {}
-func (s *textFieldState) ShowAutocorrectionPromptRect(int, int)                   {}
-func (s *textFieldState) InsertContent(services.KeyboardInsertedContent)          {}
+func (s *textFieldState) PerformPrivateCommand(string, map[string]any)         {}
+func (s *textFieldState) UpdateFloatingCursor(services.RawFloatingCursorPoint) {}
+func (s *textFieldState) ShowAutocorrectionPromptRect(int, int)                {}
+func (s *textFieldState) InsertContent(services.KeyboardInsertedContent)       {}
 func (s *textFieldState) DidChangeInputControl(_, _ services.TextInputControl) {}
 
 // ConnectionClosed is connectionClosed: the platform closed the input
@@ -396,4 +396,3 @@ func (w editable) CreateRenderObject() r.RenderBox {
 func (w editable) UpdateRenderObject(ro r.RenderBox) {
 	ro.(*r.RenderEditable).Set(w.value, w.style, w.focused, w.caretVisible)
 }
-

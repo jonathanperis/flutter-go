@@ -30,9 +30,9 @@ func NewEditable(style TextStyle) *RenderEditable {
 	return &RenderEditable{style: style, CaretColor: RGB(0x1d1b20), SelectionColor: ui.Color{R: 0.4, G: 0.31, B: 0.64, A: 0.3}}
 }
 
-func (r *RenderEditable) Children() []RenderBox   { return nil }
-func (r *RenderEditable) HitTestSelf(Offset) bool { return true }
-func (r *RenderEditable) Value() services.TextEditingValue   { return r.value }
+func (r *RenderEditable) Children() []RenderBox            { return nil }
+func (r *RenderEditable) HitTestSelf(Offset) bool          { return true }
+func (r *RenderEditable) Value() services.TextEditingValue { return r.value }
 
 func (r *RenderEditable) Set(v services.TextEditingValue, style TextStyle, focused, caretVisible bool) {
 	if v.Text != r.value.Text || style != r.style {
