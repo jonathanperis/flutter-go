@@ -109,7 +109,11 @@ String info(InlineSpanSemanticsInformation i) =>
     '${i.requiresOwnNode}|${i.stringAttributes}}';
 
 void main() {
-  test('painting_text_style', () {
+  test('painting_text_style', () async {
+    await ui.loadFontFromList(
+      File('../../../engine/src/flutter/txt/third_party/fonts/Roboto-Regular.ttf').readAsBytesSync(),
+      fontFamily: 'Roboto',
+    );
     final List<String> out = <String>[];
     final Paint fg = Paint()..color = const Color(0xFF112233);
     final Paint bg = Paint()..color = const Color(0xFF445566);
@@ -298,6 +302,12 @@ void main() {
     )..layout();
     out.add('malformed ${bad.size} ${bad.plainText.length}');
     bad.dispose();
+    final TextPainter badRoboto = TextPainter(
+      text: TextSpan(text: String.fromCharCodes(<int>[0x61, 0xDC00]), style: const TextStyle(fontSize: 10, fontFamily: 'Roboto')),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    out.add('malformed roboto ${badRoboto.size}');
+    badRoboto.dispose();
 
     // lerpFontVariations.
     final List<List<FontVariation>?> variations = <List<FontVariation>?>[

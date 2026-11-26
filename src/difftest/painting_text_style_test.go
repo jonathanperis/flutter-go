@@ -295,6 +295,12 @@ func paintingTextStyleLines(t *testing.T) []string {
 	bad.Layout()
 	add(fmt.Sprintf("malformed %s %d", bad.Size(), dart.StringLength(bad.PlainText())))
 	bad.Dispose()
+	badText2 := dart.StringFromCharCodes([]uint16{0x61, 0xDC00})
+	badRoboto := NewTextPainter(TextPainterOptions{Text: NewTextSpan(TextSpanOptions{Text: &badText2,
+		Style: NewTextStyle(TextStyleOptions{FontSize: f(10), FontFamily: s("Roboto")})}), TextDirection: &ltrDir})
+	badRoboto.Layout()
+	add("malformed roboto " + badRoboto.Size().String())
+	badRoboto.Dispose()
 
 	fv := ui.NewFontVariation
 	variations := [][]ui.FontVariation{
