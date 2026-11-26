@@ -131,40 +131,20 @@ func (s *spyBuilder) Build() ui.SemanticsUpdate { return s.builder.Build() }
 // semBinding is the Dart test's SemanticsDiffBinding (BindingBase with
 // SchedulerBinding and SemanticsBinding, its builder the spy).
 type semBinding struct {
+	foundation.BindingBaseBase
 	scheduler.SchedulerBindingMixin
-	sem semantics.SemanticsBindingMixin
+	semantics.SemanticsBindingMixin
 }
 
-func (b *semBinding) InitInstances()         { b.sem.InitInstances() }
-func (b *semBinding) SemanticsEnabled() bool { return b.sem.SemanticsEnabled() }
-func (b *semBinding) AddSemanticsEnabledListener(l func()) {
-	b.sem.AddSemanticsEnabledListener(l)
+func (b *semBinding) InitInstances() { b.SemanticsBindingMixin.InitInstances() }
+func (b *semBinding) InitServiceExtensions() {
+	b.SchedulerBindingMixin.InitServiceExtensions()
 }
-func (b *semBinding) RemoveSemanticsEnabledListener(l func()) {
-	b.sem.RemoveSemanticsEnabledListener(l)
-}
-func (b *semBinding) AddSemanticsActionListener(l func(ui.SemanticsActionEvent)) {
-	b.sem.AddSemanticsActionListener(l)
-}
-func (b *semBinding) RemoveSemanticsActionListener(l func(ui.SemanticsActionEvent)) {
-	b.sem.RemoveSemanticsActionListener(l)
-}
-func (b *semBinding) GetRectOfSemanticsNodeInViewCoordinates(v, n int) *ui.Rect {
-	return b.sem.GetRectOfSemanticsNodeInViewCoordinates(v, n)
-}
-func (b *semBinding) DebugOutstandingSemanticsHandles() int {
-	return b.sem.DebugOutstandingSemanticsHandles()
-}
-func (b *semBinding) EnsureSemantics() *semantics.SemanticsHandle    { return b.sem.EnsureSemantics() }
+func (b *semBinding) Unlocked()                                      { b.SchedulerBindingMixin.Unlocked() }
 func (b *semBinding) PerformSemanticsAction(ui.SemanticsActionEvent) {}
-func (b *semBinding) AccessibilityFeatures() ui.AccessibilityFeatures {
-	return b.sem.AccessibilityFeatures()
-}
-func (b *semBinding) HandleAccessibilityFeaturesChanged() { b.sem.HandleAccessibilityFeaturesChanged() }
 func (b *semBinding) CreateSemanticsUpdateBuilder() ui.SemanticsUpdateBuilder {
 	return &spyBuilder{builder: ui.NewSemanticsUpdateBuilder()}
 }
-func (b *semBinding) DisableAnimations() bool { return b.sem.DisableAnimations() }
 
 func nodeAt(r ui.Rect) *semantics.SemanticsNode {
 	n := semantics.NewSemanticsNode()
@@ -1143,12 +1123,9 @@ func TestSemanticsMatchesFlutter(t *testing.T) {
 	}
 	defer async.SetCurrent(async.NewLoop())()
 	b := &semBinding{}
-	base := &foundation.BindingBaseBase{}
-	b.SchedulerBindingMixin.BindingBase = base
-	b.sem.BindingBase = &b.SchedulerBindingMixin
 	b.SchedulerBindingMixin.SetSelf(b)
-	b.sem.SetSelf(b)
-	base.Construct(b)
+	b.SemanticsBindingMixin.SetSelf(b)
+	b.Construct(b, &b.SchedulerBindingMixin, &b.SemanticsBindingMixin)
 
 	semLog = nil
 	sceneValuesS()

@@ -1507,3 +1507,146 @@ The standing goal is now full API parity with Flutter 3.50.1's Dart layer
   forks' reports).
 - Parity: 371 → 400 of 2889 exposed (tested 284 → 309); services 11 → 31,
   dart:ui 51 → 60.
+
+### Bindings: one composition pattern for binding mixins
+- Problem: each binding mixin struct embedded `foundation.BindingBase` as
+  its "super", so a binding could embed only the topmost mixin; the
+  semantics port forwarded SemanticsBinding's methods to a field, and
+  ServicesBinding's super was typed `scheduler.SchedulerBinding` (fixed
+  order). Go can't embed a type parameter, so a static mixin chain over an
+  arbitrary composition is impossible.
+- Pattern (`foundation/binding_mixins.go`, API_MAPPING "Bindings"): a
+  binding embeds `foundation.BindingBaseBase` and the mixin structs (which
+  embed nothing) in Dart's `with` order, calls each mixin's `SetSelf(b)`,
+  then `b.Construct(b, &b.M1, &b.M2, ...)`. Methods defined by several
+  mixins (`InitInstances`, `InitServiceExtensions`, `Unlocked`, a mixin's
+  method a later mixin overrides) are ambiguous in Go, so the binding
+  defines them as calls to the last mixin in `with` order that defines
+  them; the compiler lists the missing ones. Dart's `super.m()` inside a
+  mixin is `foundation.BindingSuper[I](self, mixin)` (the closest mixin
+  before it implementing I, else BindingBase) or
+  `foundation.BindingBaseSuper(self, mixin)` for BindingBase's methods: a
+  dynamic walk of the binding's mixin list, i.e. Dart's linearization,
+  whatever the composition. Mixin-on-mixin overrides
+  (TestDefaultBinaryMessengerBinding.createBinaryMessenger over
+  ServicesBinding's) work the same way.
+- Moved onto it: SchedulerBinding, ServicesBinding, SemanticsBinding,
+  flutter_test's TestDefaultBinaryMessengerBinding and
+  AutomatedTestWidgetsFlutterBinding (now BindingBase with Scheduler,
+  Services, Gesture, Semantics, TestDefaultBinaryMessenger, as
+  TestWidgetsFlutterBinding orders them; the loop is flushed after
+  construction for the channel buffers' microtask and the engine's posted
+  reply), src/app's binding, and every test/difftest binding (the
+  semantics forwarding wrappers are gone).
+- Verified by `foundation/binding_mixins_test.go` (three toy mixins:
+  init order, super of a mixin's own method, unlocked order, errors) and
+  the `binding_composition` difftest: BindingBase with L0, Gesture, L1,
+  Scheduler, L2, Services, L3 (on Services), Semantics, L4 (on
+  Scheduler), logging mixins interleaved, compared line by line with Dart:
+  initInstances/initServiceExtensions/unlocked nesting, the X.instance
+  statics set at each step, createBinaryMessenger and
+  handleAppLifecycleStateChanged chains (incl. through the lifecycle
+  channel), and the 10 service extensions in registration order.
+
+### gestures (P4), with dart:ui's pointer.dart and key.dart
+- `packages/flutter/lib/src/gestures` ports the whole library (3.50.1),
+  one Go file per Dart file (hit_test.dart is `hittest.go`): events (all
+  PointerEvent classes and their transformed variants), converter,
+  hit test, pointer router, signal resolver, arena, team, recognizer
+  (GestureRecognizer/OneSequence/PrimaryPointer), eager, tap, multitap
+  (DoubleTap/MultiTap/SerialTap), long press, force press, monodrag
+  (Vertical/Horizontal/Pan), drag, drag details, multidrag, scale,
+  tap_and_drag, velocity tracker (+ iOS/macOS trackers), lsq solver,
+  resampler, gesture settings/details, constants, debug, and GestureBinding
+  (packet handling, hit tests kept per pointer, dispatch with each entry's
+  transform, close/sweep, cancelPointer, locking, signal resolution,
+  onHitTest, the touch resampler on the sampling clock,
+  FlutterErrorDetailsForPointerEventDispatcher). dart:ui: pointer.dart and
+  key.dart in full, PlatformDispatcher.onPointerDataPacket/onKeyData/
+  onHitTest, the engine's packet layout (`DispatchPointerDataPacket`,
+  `PackPointerDataPacket`), window.dart's GestureSettings and the view's
+  devicePixelRatio/gestureSettings (ENGINE GAP: no window metrics; an
+  embedder sets them with `UpdateViewGestureMetrics`). `src/dart`
+  Stopwatch; vector_math additions (perspectiveTransform, rows/columns).
+- Done with five forks in parallel worktrees (base layer; tap family;
+  drag family; scale; tap-and-drag + cross-family tests), each with an
+  exact difftest, then merged here; the binding, the recognizer bases and
+  the test helpers were ported first so the families could build on them.
+- flutter_test: `TestPointer` (test_pointer.dart), gesture_tester.dart's
+  `testGesture`/`GestureTester` (`RunTestGesture`), and the test binding's
+  `DebugSamplingClock` on the test's fake clock (the tester's loop, not an
+  inner FakeAsync's, as testWidgets' clock is).
+- **Migration:** widgets' ad-hoc `PointerRouter` arena and its
+  VelocityTracker/least-squares copy (`velocity.go`) are gone. The test
+  binding and src/app's binding (now BindingBase with GestureBinding,
+  SchedulerBinding) hit-test the tree through
+  `BuildOwner.HitTestGestures`, which adds the gesture targets a
+  RenderPointerListener would: a TapGestureRecognizer per tap region and a
+  VerticalDragGestureRecognizer per list, configured as ScrollableState
+  does (fling limits from the physics, the platform's velocity tracker,
+  hold on down, cancel → goBallistic(0), Scrollable's IgnorePointer while
+  a scroll activity runs, wheel events through the PointerSignalResolver).
+  `widgets.PointerRouter` is now a thin event source (TestPointer-like
+  events to `GestureBinding.handlePointerEvent`, microtasks flushed after
+  each event as flutter_test's awaits do). The tester's `Fling` ports
+  flingFrom's positions exactly (`Offset.lerp`, `offset.distance`).
+- **Result:** the drag-fling difftest, which differed by up to 2.6e-11,
+  is now **exact** and compares exactly (the real tracker's arithmetic
+  plus flingFrom's lerped positions); a new `scroll_gestures` difftest
+  drives real gestures on lists on Android, iOS and macOS (each
+  platform's tracker and fling limits, the bouncing motion-start
+  threshold with event time stamps, holds and cancels under a competing
+  outer tap, item taps) and matched on the first run.
+- **Found:** Dart dispatches `event.transformed(entry.transform)` to every
+  target, and the root entry's transform is the identity, not null, so
+  even untransformed targets receive `_TransformedPointerXEvent`s (they
+  still pass `is PointerDownEvent`); `_CombiningGestureArenaMember`
+  prints as `Instance of '_CombiningGestureArenaMember'` in arena
+  diagnostics; scale.dart in 3.50.1 has no pointer-scroll/scale signal
+  handling (trackpad scale only through pan/zoom events).
+- Difftests, all exact: `binding_composition` (58 lines), `gesture_binding`
+  (≈300 lines: dispatch/transforms/arena/cancel/locking/errors/signals/
+  resampling/base recognizers/teams/invokeCallback), `pointer_events`
+  (4,170 lines: every event class and transform, converter at several
+  DPRs, resampler, arena, router, resolver, hit test), `velocity_tracker`
+  (2,512 lines: all three trackers, lsq solver degrees 0–3),
+  `recognizers_tap` (1,051 lines, 37 scenes), `recognizers_drag` (10,132
+  lines, 319 scenes), `recognizers_scale` (607 lines, 27 scenes),
+  `recognizers_tap_and_drag`, `scroll_gestures`, and `drag_fling`
+  tightened to exact.
+  (`recognizers_tap_and_drag`: ≈14,000 lines, 455 scenes.) Every one
+  matched Flutter on its first run once its scenes were written; the
+  scenes added for mutations matched too.
+- Flutter's tests (packages/flutter/test/gestures): arena 11/11,
+  debug 5/5, events 25/25, hit_test 3/3, lsq_solver 5/5, pointer_router
+  9/9, pointer_signal_resolver 5/5, resampler 10/10, velocity_tracker
+  11/11, recognizer 7/7, gesture_binding 20/20, locking 1/1,
+  gesture_binding_resample_event 1/1, team 2/2, tap 34/34, double_tap
+  23/23, multitap 2/2, serial_tap 16/16, long_press 27/27, force_press
+  9/9, drag 43/43, monodrag 5/6, multidrag 5/5, scale 15/15,
+  tap_and_drag 30/30, transformed_scale 1/1 (adapted: the hit test's
+  transform is put on the event). Skipped because they pump widgets
+  (GestureDetector/Listener/Scrollable not ported): monodrag's
+  "CustomScrollView" test, transformed_tap 0/3, transformed_double_tap
+  0/2, transformed_long_press 0/3, transformed_monodrag 0/8 (a
+  non-widget slop-under-scale test stands in), gesture_config_regression
+  0/2, gesture_binding_resample_event_on_widget 0/1. Plus
+  `foundation/binding_mixins_test.go` and own tests (arena default win,
+  stopped boundary, perspective assert, pack/unpack, KeyData,
+  GestureSettings, router up-elsewhere).
+- Mutations: 334 valid, 309 caught, 25 equivalent (the binding pattern
+  and GestureBinding/recognizer bases 47/46/1, the widgets bridge 11/9/2,
+  base layer 66/63/3, tap family 45/44/1, drag family 68/63/5, scale
+  42/36/6, tap-and-drag 55/48/7; each fork's equivalents are argued in
+  its report: e.g. a second resolve of an already-resolved arena entry is
+  a no-op, a NaN-free `max`'s -0.0 rule, the iOS bouncing drag start
+  always resetting the motion-stop state so its time stamp never
+  matters, the bridge adding no transforms so tap local = global).
+  Caught only after adding scenes: arena close/sweep through hit-test
+  targets, cancelPointer's microtask, a pointer held down across
+  resampling, the velocity trackers on the binding's clock, filters on
+  device kind vs buttons separately, the deadline at exactly its
+  duration, an up beyond the slop, a team's captain winning, the bouncing
+  min fling velocity, holds under a competing outer tap.
+- Parity: 400 → 603 of 2889 exposed (tested 309 → 432); gestures 0 →
+  188/188, dart:ui 60 → 75.

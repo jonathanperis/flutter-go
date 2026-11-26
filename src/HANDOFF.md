@@ -96,8 +96,26 @@ Start here when continuing flutter-go in a new session.
      src/app's platform messages to a host (ENGINE GAP), then the rest of
      services (keyboard, text input, restoration, asset bundle, system
      chrome...).
-  7. Split `widgets` (gestures code) and `services` (text-editing model
-     under non-Flutter names) by library.
+  7. Done: bindings compose as Dart's mixins do (`foundation/
+     binding_mixins.go`, API_MAPPING "Bindings": BindingBaseBase + mixin
+     structs in `with` order, `BindingSuper` for the linearized `super`);
+     scheduler, services, semantics and flutter_test's bindings use it, and
+     flutter_test's AutomatedTestWidgetsFlutterBinding is BindingBase with
+     Scheduler, Services, Gesture, Semantics, TestDefaultBinaryMessenger.
+  8. Done (P4): gestures in full, with dart:ui's pointer.dart/key.dart,
+     flutter_test's TestPointer and the gesture tests' helper; widgets'
+     ad-hoc pointer router/velocity tracker replaced by the real
+     recognizers (drag-fling difftest now exact). Next for it: port
+     rendering's hit testing (RenderPointerListener, BoxHitTestResult) and
+     widgets' GestureDetector/RawGestureDetector/Listener/Scrollable, then
+     drop `BuildOwner.HitTestGestures` and `widgets.PointerRouter` (the
+     thin bridge) and port the widget-based gesture tests skipped so far
+     (transformed_*, resample_event_on_widget); flutter_test's TestGesture
+     and WidgetController (tester.fling/drag on real TestGestures);
+     src/app's mouse as a mouse pointer kind (it sends touch events today).
+  9. Split `services` (text-editing model under non-Flutter names) by
+     library; RendererBinding/PaintingBinding/WidgetsBinding into the
+     bindings as their libraries are ported.
 
 ## Environment
 

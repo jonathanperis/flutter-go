@@ -14,7 +14,7 @@ import (
 )
 
 type testServiceExtensionsBinding struct {
-	SchedulerBindingMixin
+	schedulerOnlyBinding
 	extensions       map[string]foundation.ServiceExtensionCallback
 	eventsDispatched map[string][]map[string]any
 	frameScheduled   bool
@@ -57,7 +57,7 @@ func TestServiceExtensionsTimeDilation(t *testing.T) {
 	loop := fakeAsync(t)
 	binding := &testServiceExtensionsBinding{extensions: map[string]foundation.ServiceExtensionCallback{},
 		eventsDispatched: map[string][]map[string]any{}}
-	construct(binding, &binding.SchedulerBindingMixin)
+	construct(binding, &binding.schedulerOnlyBinding)
 	name := SchedulerServiceExtensionsTimeDilation.Name()
 	events := func() []map[string]any {
 		return binding.getServiceExtensionStateChangedEvents("ext.flutter." + name)

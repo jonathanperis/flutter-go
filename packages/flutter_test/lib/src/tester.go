@@ -24,8 +24,9 @@ type Tester struct {
 	Size   r.Size
 	// Canvas holds the last frame's paint commands.
 	Canvas *r.Recorder
-	// eventTime overrides pointer event timestamps (seconds) when >= 0.
-	eventTime float64
+	// eventTime, if not nil, is the time stamp of the next pointer events
+	// (otherwise the fake clock's time).
+	eventTime *time.Duration
 
 	binding     *AutomatedTestWidgetsFlutterBinding
 	loop        *async.Loop // the test's fake event loop (FakeAsync)
@@ -60,14 +61,15 @@ func New(t testing.TB) *Tester {
 	tt := &Tester{t: t, Owner: o, router: widgets.NewPointerRouter(o), Size: ui.Size{Width: 800, Height: 600},
 		binding: binding, loop: async.NewLoop()}
 	o.SetViewSize(tt.Size)
-	tt.router.Now = func() float64 {
-		if tt.eventTime >= 0 {
-			return tt.eventTime
+	tt.router.TimeStamp = func() time.Duration {
+		if tt.eventTime != nil {
+			return *tt.eventTime
 		}
-		return tt.Now().Seconds()
+		return tt.Now()
 	}
-	tt.router.Clock = func() float64 { return tt.Now().Seconds() }
-	tt.eventTime = -1
+	// flutter_test awaits each event it sends, running its microtasks (the
+	// gesture arena resolves a lone member in one).
+	tt.router.AfterEvent = func() { tt.loop.FlushMicrotasks() }
 	o.Clipboard = &MemoryClipboard{}
 	o.OnNeedsFrame = binding.EnsureVisualUpdate
 	binding.startTest(tt)
@@ -243,15 +245,17 @@ func (t *Tester) Fling(f Finder, dy, speed float64) {
 	start := ui.Offset{Dx: rc.Left + rc.Width()/2, Dy: rc.Top + rc.Height()/2}
 	const moveCount = 50
 	const frameIntervalUs = 16000.0
-	delta := 1e6 * math.Abs(dy) / (moveCount * speed) // µs between moves
+	delta := 1e6 * ui.Offset{Dx: 0, Dy: dy}.Distance() / (moveCount * speed) // µs between moves
 	ts, last := 0.0, 0.0
-	at := func(us float64) { t.eventTime = math.Round(us) / 1e6 }
-	defer func() { t.eventTime = -1 }()
+	at := func(us float64) { d := time.Duration(math.Round(us)) * time.Microsecond; t.eventTime = &d }
+	defer func() { t.eventTime = nil }()
 	at(ts)
 	t.router.PointerDown(start)
+	offset := ui.Offset{Dx: 0, Dy: dy}
 	for i := 0; i <= moveCount; i++ {
 		at(ts)
-		t.router.PointerMove(ui.Offset{Dx: start.Dx, Dy: start.Dy + dy*float64(i)/moveCount})
+		// startLocation + Offset.lerp(Offset.zero, offset, i / kMoveCount)
+		t.router.PointerMove(start.Add(*ui.OffsetLerp(&ui.Offset{}, &offset, float64(i)/moveCount)))
 		ts += delta
 		if ts-last > frameIntervalUs {
 			t.Pump(time.Duration(math.Trunc(ts-last)) * time.Microsecond)
@@ -275,12 +279,14 @@ func (t *Tester) DragTimed(f Finder, moves []TimedMove) {
 	t.t.Helper()
 	rc := t.Rect(f)
 	start := ui.Offset{Dx: rc.Left + rc.Width()/2, Dy: rc.Top + rc.Height()/2}
-	defer func() { t.eventTime = -1 }()
-	t.eventTime = 0
+	defer func() { t.eventTime = nil }()
+	zero := time.Duration(0)
+	t.eventTime = &zero
 	t.router.PointerDown(start)
 	pos := start
 	for _, m := range moves {
-		t.eventTime = m.T.Seconds()
+		at := m.T
+		t.eventTime = &at
 		pos = ui.Offset{Dx: start.Dx, Dy: start.Dy + m.DY}
 		t.router.PointerMove(pos)
 	}
@@ -301,23 +307,24 @@ func (t *Tester) StartGesture(f Finder) *Gesture {
 	rc := t.Rect(f)
 	g := &Gesture{t: t, start: ui.Offset{Dx: rc.Left + rc.Width()/2, Dy: rc.Top + rc.Height()/2}}
 	g.pos = g.start
-	t.eventTime = 0
+	zero := time.Duration(0)
+	t.eventTime = &zero
 	t.router.PointerDown(g.pos)
-	t.eventTime = -1
+	t.eventTime = nil
 	return g
 }
 
 // MoveTo moves the pointer to start + (0, dy) at event time at.
 func (g *Gesture) MoveTo(dy float64, at time.Duration) {
-	g.t.eventTime = at.Seconds()
+	g.t.eventTime = &at
 	g.pos = ui.Offset{Dx: g.start.Dx, Dy: g.start.Dy + dy}
 	g.t.router.PointerMove(g.pos)
-	g.t.eventTime = -1
+	g.t.eventTime = nil
 }
 
 // Up releases the pointer at event time at.
 func (g *Gesture) Up(at time.Duration) {
-	g.t.eventTime = at.Seconds()
+	g.t.eventTime = &at
 	g.t.router.PointerUp(g.pos)
-	g.t.eventTime = -1
+	g.t.eventTime = nil
 }

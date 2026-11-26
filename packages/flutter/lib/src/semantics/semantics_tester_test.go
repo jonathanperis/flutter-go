@@ -20,14 +20,11 @@ import (
 	"github.com/jonathanperis/flutter-go/src/async"
 )
 
-// testBinding is BindingBase with SchedulerBinding, SemanticsBinding. Go
-// can't embed both mixins (their promoted BindingBase methods would be
-// ambiguous), so it embeds the scheduler mixin and forwards the
-// SemanticsBinding methods to a SemanticsBindingMixin whose super
-// (BindingBase) is the scheduler mixin.
+// testBinding is BindingBase with SchedulerBinding, SemanticsBinding.
 type testBinding struct {
+	foundation.BindingBaseBase
 	scheduler.SchedulerBindingMixin
-	sem semantics.SemanticsBindingMixin
+	semantics.SemanticsBindingMixin
 
 	performedActions []ui.SemanticsActionEvent
 	builderFactory   func() ui.SemanticsUpdateBuilder
@@ -35,53 +32,27 @@ type testBinding struct {
 
 func newTestBinding() *testBinding {
 	b := &testBinding{}
-	base := &foundation.BindingBaseBase{}
-	b.SchedulerBindingMixin.BindingBase = base
-	b.sem.BindingBase = &b.SchedulerBindingMixin
 	b.SchedulerBindingMixin.SetSelf(b)
-	b.sem.SetSelf(b)
-	base.Construct(b)
+	b.SemanticsBindingMixin.SetSelf(b)
+	b.Construct(b, &b.SchedulerBindingMixin, &b.SemanticsBindingMixin)
 	return b
 }
 
-func (b *testBinding) InitInstances() { b.sem.InitInstances() }
+func (b *testBinding) InitInstances() { b.SemanticsBindingMixin.InitInstances() }
+func (b *testBinding) InitServiceExtensions() {
+	b.SchedulerBindingMixin.InitServiceExtensions()
+}
+func (b *testBinding) Unlocked() { b.SchedulerBindingMixin.Unlocked() }
 
-func (b *testBinding) SemanticsEnabled() bool { return b.sem.SemanticsEnabled() }
-func (b *testBinding) AddSemanticsEnabledListener(l func()) {
-	b.sem.AddSemanticsEnabledListener(l)
-}
-func (b *testBinding) RemoveSemanticsEnabledListener(l func()) {
-	b.sem.RemoveSemanticsEnabledListener(l)
-}
-func (b *testBinding) AddSemanticsActionListener(l func(ui.SemanticsActionEvent)) {
-	b.sem.AddSemanticsActionListener(l)
-}
-func (b *testBinding) RemoveSemanticsActionListener(l func(ui.SemanticsActionEvent)) {
-	b.sem.RemoveSemanticsActionListener(l)
-}
-func (b *testBinding) GetRectOfSemanticsNodeInViewCoordinates(viewID, nodeID int) *ui.Rect {
-	return b.sem.GetRectOfSemanticsNodeInViewCoordinates(viewID, nodeID)
-}
-func (b *testBinding) DebugOutstandingSemanticsHandles() int {
-	return b.sem.DebugOutstandingSemanticsHandles()
-}
-func (b *testBinding) EnsureSemantics() *semantics.SemanticsHandle { return b.sem.EnsureSemantics() }
 func (b *testBinding) PerformSemanticsAction(action ui.SemanticsActionEvent) {
 	b.performedActions = append(b.performedActions, action)
-}
-func (b *testBinding) AccessibilityFeatures() ui.AccessibilityFeatures {
-	return b.sem.AccessibilityFeatures()
-}
-func (b *testBinding) HandleAccessibilityFeaturesChanged() {
-	b.sem.HandleAccessibilityFeaturesChanged()
 }
 func (b *testBinding) CreateSemanticsUpdateBuilder() ui.SemanticsUpdateBuilder {
 	if b.builderFactory != nil {
 		return b.builderFactory()
 	}
-	return b.sem.CreateSemanticsUpdateBuilder()
+	return b.SemanticsBindingMixin.CreateSemanticsUpdateBuilder()
 }
-func (b *testBinding) DisableAnimations() bool { return b.sem.DisableAnimations() }
 
 var (
 	sharedBinding     *testBinding

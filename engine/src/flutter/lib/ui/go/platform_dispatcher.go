@@ -55,6 +55,7 @@ type PlatformDispatcher struct {
 	initialLifecycleState         string
 	initialLifecycleStateAccessed bool
 	semantics                     platformDispatcherSemantics // platform_dispatcher_semantics.go
+	input                         platformDispatcherInput     // pointer_dispatch.go
 }
 
 // platformConfiguration is _PlatformConfiguration (the fields ported so far)

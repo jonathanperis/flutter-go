@@ -15,6 +15,7 @@ import (
 	"reflect"
 	"sort"
 
+	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/gestures"
 	r "github.com/jonathanperis/flutter-go/packages/flutter/lib/src/rendering"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/scheduler"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/services"
@@ -533,6 +534,9 @@ type BuildOwner struct {
 	viewSize  r.Size
 	// pendingRoot is a RunApp widget waiting for the next build phase.
 	pendingRoot *rootWidget
+	// gestureTargets are the gesture recognizers of the tree's render
+	// objects (see HitTestGestures).
+	gestureTargets map[r.RenderBox]gestures.HitTestTarget
 }
 
 // Vsync is the TickerProvider for animations of e's subtree (Flutter's

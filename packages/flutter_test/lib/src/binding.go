@@ -1,9 +1,11 @@
 package flutter_test
 
-// A partial port of flutter_test's binding.dart (Flutter 3.50.1): the
-// scheduler side of AutomatedTestWidgetsFlutterBinding, the binding
-// `testWidgets` runs in. The rest of WidgetsFlutterBinding (gestures,
-// services, rendering, widgets bindings) is not ported: the persistent
+// A partial port of flutter_test's binding.dart (Flutter 3.50.1):
+// AutomatedTestWidgetsFlutterBinding, the binding `testWidgets` runs in,
+// composed as TestWidgetsFlutterBinding is (BindingBase with
+// SchedulerBinding, ServicesBinding, GestureBinding, SemanticsBinding,
+// TestDefaultBinaryMessengerBinding; RendererBinding, PaintingBinding and
+// WidgetsBinding are not in it yet). The persistent
 // frame callback draws the current Tester's BuildOwner, as
 // RendererBinding/WidgetsBinding's drawFrame would.
 //
@@ -14,19 +16,29 @@ package flutter_test
 import (
 	"time"
 
+	ui "github.com/jonathanperis/flutter-go/engine/src/flutter/lib/ui/go"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/foundation"
+	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/gestures"
 	r "github.com/jonathanperis/flutter-go/packages/flutter/lib/src/rendering"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/scheduler"
+	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/semantics"
+	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/services"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/widgets"
 	"github.com/jonathanperis/flutter-go/src/async"
 	"github.com/jonathanperis/flutter-go/src/dart"
 )
 
 // AutomatedTestWidgetsFlutterBinding is the binding headless widget tests
-// run in (partial: BindingBase and SchedulerBinding). It controls time:
-// frames are produced only by Tester.Pump, from the test's fake clock.
+// run in (partial, see the file comment). It controls time: frames are
+// produced only by Tester.Pump, from the test's fake clock.
 type AutomatedTestWidgetsFlutterBinding struct {
+	foundation.BindingBaseBase
 	scheduler.SchedulerBindingMixin
+	services.ServicesBindingMixin
+	gestures.GestureBindingMixin
+	semantics.SemanticsBindingMixin
+	TestDefaultBinaryMessengerBindingMixin
+
 	tester *Tester // the test in progress (flutter_test: inTest)
 }
 
@@ -38,10 +50,20 @@ var automatedTestBinding *AutomatedTestWidgetsFlutterBinding
 func AutomatedTestWidgetsFlutterBindingEnsureInitialized() *AutomatedTestWidgetsFlutterBinding {
 	if automatedTestBinding == nil {
 		b := &AutomatedTestWidgetsFlutterBinding{}
-		base := &foundation.BindingBaseBase{}
-		b.SchedulerBindingMixin.BindingBase = base
-		b.SetSelf(b)
-		base.Construct(b)
+		b.SchedulerBindingMixin.SetSelf(b)
+		b.ServicesBindingMixin.SetSelf(b)
+		b.GestureBindingMixin.SetSelf(b)
+		b.SemanticsBindingMixin.SetSelf(b)
+		b.TestDefaultBinaryMessengerBindingMixin.SetSelf(b)
+		loop := async.Current()
+		b.Construct(b, &b.SchedulerBindingMixin, &b.ServicesBindingMixin, &b.GestureBindingMixin, &b.SemanticsBindingMixin,
+			&b.TestDefaultBinaryMessengerBindingMixin)
+		// ServicesBinding's channel buffers drain in a microtask, and the
+		// engine answers initializationComplete with a posted event: run
+		// them, as Dart's event loop would before the first test.
+		loop.FlushMicrotasks()
+		loop.RunPosted()
+		loop.FlushMicrotasks()
 		automatedTestBinding = b
 	}
 	return automatedTestBinding
@@ -51,10 +73,55 @@ func AutomatedTestWidgetsFlutterBindingEnsureInitialized() *AutomatedTestWidgets
 // adds the persistent frame callback that draws the tree
 // (RendererBinding's _handlePersistentFrameCallback).
 func (b *AutomatedTestWidgetsFlutterBinding) InitInstances() {
-	b.SchedulerBindingMixin.InitInstances()
+	b.TestDefaultBinaryMessengerBindingMixin.InitInstances()
 	scheduler.SetTimeDilation(1.0) // just in case the developer has artificially changed it for development
 	b.AddPersistentFrameCallback(b.handlePersistentFrameCallback)
 }
+
+// The methods several mixins define (Go can't promote them) are the last
+// mixin's in `with` order, as in Dart.
+
+func (b *AutomatedTestWidgetsFlutterBinding) InitServiceExtensions() {
+	b.ServicesBindingMixin.InitServiceExtensions()
+}
+func (b *AutomatedTestWidgetsFlutterBinding) Unlocked() { b.GestureBindingMixin.Unlocked() }
+
+// DebugSamplingClock is the test clock (_TestSamplingClock): fake time on
+// the test's own event loop (testWidgets' FakeAsync clock, even inside a
+// nested FakeAsync such as testGesture's), from 2015-01-01 as
+// flutter_test's clock; outside a test, the current loop's.
+func (b *AutomatedTestWidgetsFlutterBinding) DebugSamplingClock() gestures.SamplingClock {
+	if b.tester != nil {
+		return testSamplingClock{loop: b.tester.loop}
+	}
+	return testSamplingClock{loop: async.Current()}
+}
+
+type testSamplingClock struct{ loop *async.Loop }
+
+func (c testSamplingClock) Now() time.Time {
+	return time.Unix(0, 0).UTC().Add(testClockEpoch + c.loop.Elapsed())
+}
+
+func (c testSamplingClock) Stopwatch() *dart.Stopwatch {
+	return dart.NewStopwatchWithClock(c.loop.Elapsed)
+}
+func (b *AutomatedTestWidgetsFlutterBinding) CreateBinaryMessenger() services.BinaryMessenger {
+	return b.TestDefaultBinaryMessengerBindingMixin.CreateBinaryMessenger()
+}
+
+// HitTestInView is RendererBinding's: the test's tree (its gesture
+// targets, see widgets.BuildOwner.HitTestGestures), then GestureBinding's.
+func (b *AutomatedTestWidgetsFlutterBinding) HitTestInView(result *gestures.HitTestResult, position ui.Offset, viewID int) {
+	if b.tester != nil {
+		b.tester.Owner.HitTestGestures(result, position)
+	}
+	b.GestureBindingMixin.HitTestInView(result, position, viewID)
+}
+
+// PerformSemanticsAction is RendererBinding's (not ported): actions are
+// ignored.
+func (b *AutomatedTestWidgetsFlutterBinding) PerformSemanticsAction(action ui.SemanticsActionEvent) {}
 
 func (b *AutomatedTestWidgetsFlutterBinding) handlePersistentFrameCallback(time.Duration) {
 	t := b.tester
@@ -154,6 +221,7 @@ func (b *AutomatedTestWidgetsFlutterBinding) startTest(t *Tester) {
 func (b *AutomatedTestWidgetsFlutterBinding) postTest(t *Tester) {
 	defer func() {
 		b.tester = nil
+		b.ResetGestureBinding()
 		t.restoreLoop()
 		foundation.FlutterErrorOnError = t.previousOnError
 		b.ResetInternalState()

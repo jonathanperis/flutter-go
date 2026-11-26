@@ -590,7 +590,7 @@ func lifecycleTransitions(binding *testBinding, previous *ui.AppLifecycleState, 
 var lifecycleListener func(ui.AppLifecycleState)
 
 func (b *testBinding) HandleAppLifecycleStateChanged(state ui.AppLifecycleState) {
-	b.TestDefaultBinaryMessengerBindingMixin.HandleAppLifecycleStateChanged(state)
+	b.SchedulerBindingMixin.HandleAppLifecycleStateChanged(state)
 	if lifecycleListener != nil {
 		lifecycleListener(state)
 	}

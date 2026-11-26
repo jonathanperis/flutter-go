@@ -261,34 +261,103 @@ through it. One pattern, everywhere:
   column, className, method and source only). `PartialStackFrame.package`
   is a `dart.Pattern` (`dart.StringPattern("...")` or a `*regexp.Regexp`).
 
-## Bindings, zones and statics
+## Bindings
 
-- A binding mixin (`mixin SchedulerBinding on BindingBase`) is an
-  interface (`scheduler.SchedulerBinding`) plus an embeddable struct
-  (`SchedulerBindingMixin`) whose embedded `foundation.BindingBase` is the
-  binding it is mixed onto, Dart's `super` (a `*BindingBaseBase`, or the
-  mixin below it, so mixins stack in Dart's order). A binding embeds the
-  topmost mixin, sets the chain, calls the mixin's `SetSelf`, then
-  `Construct` on the base:
+Flutter composes its bindings as mixins on `BindingBase`
+(`WidgetsFlutterBinding extends BindingBase with GestureBinding,
+SchedulerBinding, ServicesBinding, PaintingBinding, SemanticsBinding,
+RendererBinding, WidgetsBinding`), and Dart's mixin linearization decides
+which override runs and where each `super` call goes. Go has no mixins, so
+one pattern (`foundation/binding_mixins.go`) stands for it, for every
+binding and every combination of mixins:
+
+- `BindingBase` is an interface plus the embeddable `BindingBaseBase`. A
+  binding mixin (`mixin SchedulerBinding on BindingBase`) is an interface
+  (`scheduler.SchedulerBinding`, embedding `foundation.BindingBase` and the
+  interfaces of its other `on` types) plus an embeddable struct
+  (`scheduler.SchedulerBindingMixin`) with the mixin's state and methods.
+  The struct embeds nothing: it keeps `self`, the binding it is mixed into,
+  set by `SetSelf`, and calls every overridable method through it.
+- A binding class embeds `foundation.BindingBaseBase`, then the mixin
+  structs in Dart's `with` order; its constructor points each mixin at the
+  binding (`SetSelf`) and calls `Construct(self, mixins...)` with pointers
+  to the embedded mixins in `with` order. `Construct` is Dart's
+  `BindingBase()` constructor: it records the mixins and runs
+  `InitInstances` and `InitServiceExtensions` through `self`.
+- A method that several mixins define (or a mixin and `BindingBase`:
+  `InitInstances`, `InitServiceExtensions`, `Unlocked`, a mixin's method a
+  later mixin overrides) is ambiguous in Go and isn't promoted; the binding
+  class defines it, calling the last mixin in `with` order that defines it
+  (Dart's most-derived override). The compiler lists them: the binding
+  doesn't implement the mixins' interfaces until they are all defined.
+- Dart's `super.m()` inside a mixin is `foundation.BindingSuper[I](m.self,
+  m).M()`: the closest mixin before `m` in `with` order implementing `I`
+  (an interface with `M`), else `BindingBaseBase`. For `BindingBase`'s own
+  methods, `foundation.BindingBaseSuper(m.self, m)` is a `BindingBase`
+  whose every method goes to `super`. So the chain follows the binding's
+  actual composition, as Dart's linearization does: `initInstances` runs
+  `BindingBase`'s first, then each mixin's in `with` order (each calls
+  super first), and so do `initServiceExtensions` and `unlocked`. A binding
+  class overriding a method calls the most-derived mixin's method as its
+  super (or `BindingSuper` with a nil mixin).
+- `X.instance` is `XInstance()` (`scheduler.SchedulerBindingInstance()`),
+  set in the mixin's `InitInstances` to `self`, and checked with
+  `foundation.BindingBaseCheckInstance`.
+- A Go binding with a fixed composition that other bindings extend (Dart:
+  `class TestBinding extends WidgetsFlutterBinding`) is a struct embedding
+  the base and the mixins, with the forwarding methods; the extending
+  binding embeds it, overrides at depth 0, and calls `SetSelf`/`Construct`
+  with itself.
 
   ```go
-  type MyBinding struct{ scheduler.SchedulerBindingMixin }
+  type MyBinding struct {
+  	foundation.BindingBaseBase
+  	gestures.GestureBindingMixin
+  	scheduler.SchedulerBindingMixin
+  	services.ServicesBindingMixin
+  	semantics.SemanticsBindingMixin
+  }
 
-  b := &MyBinding{}
-  base := &foundation.BindingBaseBase{}
-  b.SchedulerBindingMixin.BindingBase = base
-  b.SetSelf(b)
-  base.Construct(b)
+  func NewMyBinding() *MyBinding {
+  	b := &MyBinding{}
+  	b.GestureBindingMixin.SetSelf(b)
+  	b.SchedulerBindingMixin.SetSelf(b)
+  	b.ServicesBindingMixin.SetSelf(b)
+  	b.SemanticsBindingMixin.SetSelf(b)
+  	b.Construct(b, &b.GestureBindingMixin, &b.SchedulerBindingMixin,
+  		&b.ServicesBindingMixin, &b.SemanticsBindingMixin)
+  	return b
+  }
+
+  // Defined by several mixins: the last one in `with` order.
+  func (b *MyBinding) InitInstances()         { b.SemanticsBindingMixin.InitInstances() }
+  func (b *MyBinding) InitServiceExtensions() { b.ServicesBindingMixin.InitServiceExtensions() }
+  func (b *MyBinding) Unlocked()              { b.SchedulerBindingMixin.Unlocked() }
+
+  // Abstract in SemanticsBinding (RendererBinding implements it).
+  func (b *MyBinding) PerformSemanticsAction(action ui.SemanticsActionEvent) {}
   ```
+
+  and inside a mixin:
+
+  ```go
+  func (m *ServicesBindingMixin) InitInstances() {
+  	foundation.BindingBaseSuper(m.outer(), m).InitInstances() // super.initInstances()
+  	servicesBindingInstance = m.outer()                       // _instance = this
+  	...
+  }
+  ```
+- ServicesBinding registers its channel handlers in `InitInstances`, and
+  `ChannelBuffers` drains what was buffered meanwhile in a microtask: flush
+  the event loop after constructing a binding with it.
+
+## Zones and statics
+
 - A binding can be constructed once per process, as in Dart. Go runs a
   package's tests in one process, so tests that need a binding of their
   own (each Dart test file has its own isolate) re-run themselves in a
   child process (`isolated(t)` in the scheduler tests and difftests).
-- `BindingBase` is an interface plus the embeddable `BindingBaseBase`. A
-  binding embeds it (and its mixins) and its constructor calls
-  `b.Construct(b)`, which is Dart's `BindingBase()` constructor: it sets
-  `self` and runs `InitInstances` and `InitServiceExtensions` through it.
-  Protected members are exported methods (Go has no `@protected`); named
+- Protected members are exported methods (Go has no `@protected`); named
   required parameters (`registerServiceExtension(name:, callback:)`) are
   positional.
 - Go has no zones: where Flutter records `Zone.current` (the binding's
@@ -567,15 +636,6 @@ Each divergence is listed here when it is introduced.
   foundation's `EnumProperty`/`describeEnum` use `Name()` and `dartToString`
   uses `String()` as is. Enums without `Name()` (foundation's own) keep
   returning the bare name from `String()`.
-- Stacking two binding mixins that each need the binding as `self`
-  (`BindingBase with SchedulerBinding, SemanticsBinding`): Go can't embed
-  both (their promoted `BindingBase` methods, including the unexported
-  `bindingBase()`, would be ambiguous), so the binding embeds the lower
-  mixin and keeps the upper one as a field whose `BindingBase` is the lower
-  mixin, forwards the upper mixin's interface methods to it, and calls the
-  upper mixin's `InitInstances` from its own (see the semantics tests'
-  `testBinding`). `semantics.SemanticsBinding` has no unexported method so
-  forwarding types implement it.
 - semantics: `Set`s and `Map`s whose iteration order is observable keep
   Dart's insertion order: `SemanticsNode.Tags`, `controlsNodes` and
   `tagsForChildren` are slices without duplicates (nil is null); a custom
@@ -631,3 +691,100 @@ Each divergence is listed here when it is introduced.
   `double.compareTo`, `String.compareTo` (UTF-16 code units) and
   `double.tryParse` are `dart.CompareDoubles`, `dart.CompareStrings`,
   `dart.DoubleTryParse`.
+- gestures: `PointerEvent` is an interface; each event class is a struct
+  used by pointer (`*PointerDownEvent`), so `event is PointerDownEvent` is
+  a type switch. Dart's `_TransformedPointerXEvent` wrappers are values of
+  the same struct with `Original()` set (so the switch matches them too);
+  only `ToStringShort`/`toString` show the `_Transformed...` name.
+  `copyWith` is `CopyWith(PointerEventCopyWithOptions)` and `transformed`
+  is `Transformed(*Matrix4)`, both returning `PointerEvent` (no covariant
+  returns). Constructors take per-class options whose non-zero Dart
+  defaults are pointers (`Buttons`, `Pressure`, `PressureMin/Max`, signal
+  events' `Kind`, `Scale`). `PointerSignalEvent` is an interface.
+  PointerEvent's statics are functions (`PointerEventTransformPosition`,
+  `PointerEventTransformDeltaViaPositions`, `ComputeHitSlop`...).
+- gestures: hit_test.dart is `hittest.go` and dart:ui's onHitTest is
+  `platform_dispatcher_hittest.go` (a `_test.go` name would make them test
+  files). `HitTestEntry` is an interface plus `HitTestEntryBase`
+  (`NewHitTestEntry`, `InitHitTestEntry` for subclasses); `HitTestEntry(t)`
+  prints `HitTestEntry<HitTestTarget>` as Flutter's does; `Path()` is an
+  `iter.Seq`. `PointerEventConverter.expand` is
+  `PointerEventConverter.Expand(iter.Seq[ui.PointerData], getter)` (a variable of statics), lazy as
+  Dart's Iterable; `DevicePixelRatioGetter` returns `*float64` (nil: the
+  view is gone). `PointerRouter.addRoute`'s optional transform is
+  variadic; routes compare with `dart.FunctionsEqual`.
+- gestures: `GestureArenaEntry` is an interface (team.dart implements it);
+  `GestureArenaMember` is an interface.
+- gestures: the recognizer classes are interfaces plus embeddable bases
+  (`GestureRecognizer` + `GestureRecognizerBase`,
+  `OneSequenceGestureRecognizer` + `...Base`,
+  `PrimaryPointerGestureRecognizer` + `...Base`); a recognizer embeds the
+  base of its Dart superclass (or the concrete recognizer it extends) and
+  calls `Construct(self, options)` once (Dart's super constructor); every
+  overridable method goes through `self`, and overrides call "super"
+  through the embedded field. Public mutable fields (`GestureSettings`,
+  `SupportedDevices`, callbacks such as `OnTap`, `OnStart`) are struct
+  fields; @protected methods are exported. The generic
+  `invokeCallback<T>` is `InvokeCallback[T](recognizer, name, callback,
+  debugReport...)` (T's zero value is Dart's null result) and
+  `InvokeVoidCallback`. `PrimaryPointerGestureRecognizer`'s slop
+  tolerances are `*float64` options whose nil is Dart's default (the touch
+  slop); `NoPreAcceptSlopTolerance`/`NoPostAcceptSlopTolerance` pass
+  Dart's explicit null.
+- gestures: `GestureBinding` is a binding mixin (see "Bindings"); its
+  public fields `pointerRouter`, `gestureArena`, `pointerSignalResolver`
+  are methods, `resamplingEnabled`/`samplingOffset` are getter/setter
+  pairs. `SamplingClock` is an interface (`Now`, `Stopwatch()
+  *dart.Stopwatch`); the velocity trackers read
+  `GestureBinding.instance.samplingClock` through a hook GestureBinding
+  sets in InitInstances (the wall clock without a binding).
+  `FlutterError.reportError` takes `*foundation.FlutterErrorDetails`, so
+  `details is FlutterErrorDetailsForPointerEventDispatcher` is
+  `gestures.AsFlutterErrorDetailsForPointerEventDispatcher(details)`.
+  Only the implicit view exists: the device pixel ratio of any other view
+  id is unknown (null).
+- gestures: `VelocityTracker` is a struct the iOS/macOS trackers embed
+  (self pattern); `getVelocityEstimate` returns `*VelocityEstimate` (nil:
+  null). `Velocity`, `VelocityEstimate`, `DeviceGestureSettings` and
+  `OffsetPair` are comparable values. Drag/scale details are used by
+  pointer and built with `NewXDetails(XDetailsOptions{...})` (nil options:
+  Dart's defaults; `ScaleEndDetails`'s `Velocity` defaults to the zero
+  value, which is `VelocityZero`). `pointerCount` is `PointerCount()`.
+- dart:ui (pointer.dart, key.dart): enums with `Name()`/`String()` and
+  `...Values`; `PointerData` is a struct literal (`SignalKind` is a
+  pointer; nil is null); `PlatformDispatcher.onPointerDataPacket`/
+  `onKeyData`/`onHitTest` are getter/setter pairs; the engine side is
+  `PlatformConfiguration.DispatchPointerDataPacket(bytes)` and
+  `PlatformConfiguration.HitTest(viewID, x, y)`. ENGINE GAP: views have no
+  metrics: the device pixel ratio is 1.0 and the gesture settings empty
+  unless an embedder sets them with
+  `PlatformConfiguration.UpdateViewGestureMetrics` (a stand-in for
+  `_updateWindowMetrics`).
+- flutter_test: `TestPointer` is ported (`NewTestPointer(opts)`, events'
+  named parameters as options); `TestGesture` is not. The gesture tests'
+  helper `testGesture`/`GestureTester` (test/gestures/gesture_tester.dart)
+  is `flutter_test.RunTestGesture`/`GestureTester`.
+- gestures (recognizers): tap, long press and tap-and-drag details are
+  Diagnosticable pointers built with `NewXDetails(XDetailsOptions)`;
+  positions are methods, other fields struct fields, nullable values
+  pointers (`*ui.PointerDeviceKind`, `*time.Duration`, `*float64`).
+  `BaseTapGestureRecognizer`'s handlers take positional parameters
+  (`HandleTapUp(down, up)`). `DragGestureRecognizer` and
+  `BaseTapAndDragGestureRecognizer` (sealed in Dart) are interfaces plus
+  `...Base` structs whose private abstract members are unexported
+  interface methods; the `_TapStatusTrackerMixin` members belong to the
+  tap-and-drag Base. Fling limits, `maxConsecutiveTap`,
+  `dragUpdateThrottleFrequency` and `DelayedMultiDragGestureRecognizer`'s
+  `Delay` are pointer fields/options (nil: null). `GestureVelocityTrackerBuilder`
+  returns `*VelocityTracker` (an iOS/macOS tracker's embedded pointer).
+  `Drag` is an interface plus `DragBase`; a nil `Drag` from
+  `GestureMultiDragStartCallback` is null. `MultiDragPointerState` is an
+  interface plus a Base (`Construct(self, initialPosition, kind, settings)`).
+  LongPress's nil post-accept slop is its Dart default (null).
+- widgets (until GestureDetector/Scrollable are ported): the test binding
+  and src/app hit-test through `BuildOwner.HitTestGestures`, which adds a
+  TapGestureRecognizer per tap region and a VerticalDragGestureRecognizer
+  per list; `widgets.PointerRouter` only builds pointer events for
+  `GestureBinding.HandlePointerEvent` (it moves the pointer to where it is
+  lifted first, as the engine synthesizes that move). src/app sends touch
+  events for the mouse.

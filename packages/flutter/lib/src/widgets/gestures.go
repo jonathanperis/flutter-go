@@ -1,187 +1,275 @@
 package widgets
 
+// The bridge from the flutter-go render tree to the gestures library, until
+// widgets' GestureDetector/RawGestureDetector/Listener and rendering's
+// hit testing are ported: BuildOwner.HitTestGestures is the part of
+// RendererBinding.hitTestInView that finds the gesture targets (each
+// GestureDetector's TapGestureRecognizer, each list's
+// VerticalDragGestureRecognizer, as ScrollableState configures it), and
+// PointerRouter turns pointer positions into the PointerEvents a test or
+// an embedder sends to GestureBinding.handlePointerEvent.
+
 import (
-	"math"
+	"time"
 
+	ui "github.com/jonathanperis/flutter-go/engine/src/flutter/lib/ui/go"
+	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/gestures"
 	r "github.com/jonathanperis/flutter-go/packages/flutter/lib/src/rendering"
+	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/services"
 )
 
-// Fling velocity limits (Flutter's kMinFlingVelocity and kMaxFlingVelocity).
+// Fling velocity limits and the touch slop (gestures' kMinFlingVelocity,
+// kMaxFlingVelocity and kTouchSlop).
 const (
-	MinFlingVelocity = 50.0
-	MaxFlingVelocity = 8000.0
+	MinFlingVelocity = gestures.KMinFlingVelocity
+	MaxFlingVelocity = gestures.KMaxFlingVelocity
+	TouchSlop        = gestures.KTouchSlop
 )
 
-// TouchSlop is how far a pointer must move before a drag starts
-// (Flutter's kTouchSlop).
-const TouchSlop = 18.0
+// tapTarget is a GestureDetector's RawGestureDetector: a TapGestureRecognizer
+// for a RenderTapRegion.
+type tapTarget struct {
+	region *r.RenderTapRegion
+	tap    *gestures.TapGestureRecognizer
+}
 
-// PointerRouter turns raw pointer events into taps, drags and scrolls.
-//
-// Taps: like Flutter's gesture arena for nested tap recognizers, the deepest
-// GestureDetector under both the down and the up position wins.
-// Drags: the deepest list under the down position scrolls. If a tap
-// recognizer competes, the drag is accepted only after moving beyond
-// TouchSlop (cancelling the tap) and, as with DragStartBehavior.start,
-// begins where it was accepted; otherwise it is accepted on down. Release velocity comes from a port of
-// Flutter's VelocityTracker.
-type PointerRouter struct {
-	owner    *BuildOwner
-	down     []*r.RenderTapRegion
-	isDown   bool
+func newTapTarget(region *r.RenderTapRegion) *tapTarget {
+	t := &tapTarget{region: region, tap: gestures.NewTapGestureRecognizer()}
+	t.tap.OnTapUp = func(details *gestures.TapUpDetails) {
+		if t.region.OnTapAt != nil {
+			t.region.OnTapAt(details.GlobalPosition())
+		}
+	}
+	t.tap.OnTap = func() {
+		if t.region.OnTap != nil {
+			t.region.OnTap()
+		}
+	}
+	return t
+}
+
+// HandleEvent is RenderPointerListener's: a down adds the pointer to the
+// recognizer.
+func (t *tapTarget) HandleEvent(event gestures.PointerEvent, entry gestures.HitTestEntry) {
+	if down, ok := event.(*gestures.PointerDownEvent); ok {
+		t.tap.AddPointer(down)
+	}
+}
+
+// scrollTarget is a Scrollable's RawGestureDetector: a
+// VerticalDragGestureRecognizer configured from the list's physics, and
+// the pointer signal handler (Scrollable's Listener) for wheel scrolls.
+type scrollTarget struct {
 	list     *r.RenderFixedExtentList
-	start    r.Offset
-	last     r.Offset
-	dragging bool
-	tracker  VelocityTracker
-	// Now returns the current pointer event's timestamp in seconds.
-	Now func() float64
-	// Clock returns the sampling clock in seconds (defaults to Now). Flutter
-	// separates the two: event timestamps for the fit, a clock to detect a
-	// pointer that stopped before lifting.
-	Clock func() float64
+	drag     *gestures.VerticalDragGestureRecognizer
+	platform services.Platform
 }
 
-func NewPointerRouter(o *BuildOwner) *PointerRouter { return &PointerRouter{owner: o} }
-
-func (p *PointerRouter) hit(pos r.Offset) (taps []*r.RenderTapRegion, list *r.RenderFixedExtentList) {
-	for _, ro := range r.HitTest(p.owner.RenderRoot(), pos) {
-		switch t := ro.(type) {
-		case *r.RenderTapRegion:
-			taps = append(taps, t)
-		case *r.RenderFixedExtentList:
-			if list == nil {
-				list = t
+func newScrollTarget(list *r.RenderFixedExtentList) *scrollTarget {
+	t := &scrollTarget{list: list, drag: gestures.NewVerticalDragGestureRecognizer()}
+	t.drag.OnDown = func(*gestures.DragDownDetails) {
+		if t.list.Hold != nil {
+			t.list.Hold()
+		}
+	}
+	t.drag.OnStart = func(details *gestures.DragStartDetails) {
+		if t.list.DragStart != nil {
+			t.list.DragStart(timeStampOf(details.SourceTimeStamp))
+		}
+	}
+	t.drag.OnUpdate = func(details *gestures.DragUpdateDetails) {
+		if t.list.DragUpdate != nil && details.PrimaryDelta != nil {
+			t.list.DragUpdate(*details.PrimaryDelta, timeStampOf(details.SourceTimeStamp))
+		}
+	}
+	t.drag.OnEnd = func(details *gestures.DragEndDetails) {
+		if t.list.DragEnd != nil {
+			v := 0.0
+			if details.PrimaryVelocity != nil {
+				v = *details.PrimaryVelocity
 			}
+			t.list.DragEnd(v)
 		}
 	}
-	return taps, list
-}
-
-func (p *PointerRouter) PointerDown(pos r.Offset) {
-	p.down, p.list = p.hit(pos)
-	p.isDown, p.dragging = true, false
-	p.start, p.last = pos, pos
-	p.tracker = VelocityTracker{}
-	p.record(pos)
-	// Gesture arena: with no tap recognizer competing, the drag is the only
-	// member and wins at once (Flutter resolves single-member arenas by
-	// default), so the whole movement scrolls. With a competitor, the drag
-	// must first move beyond TouchSlop.
-	if p.list != nil && len(p.down) == 0 {
-		p.dragging = true
-		p.startDrag()
-	}
-	if p.list != nil && p.list.Hold != nil && p.list.Hold() {
-		// Touching a scrolling list only stops it: like Flutter's
-		// IgnorePointer during scroll activities, items don't get the tap.
-		p.down = nil
-	}
-}
-
-func (p *PointerRouter) record(pos r.Offset) {
-	if p.Now == nil {
-		return
-	}
-	clock := p.Now
-	if p.Clock != nil {
-		clock = p.Clock
-	}
-	p.tracker.AddPosition(p.Now(), clock(), pos.Dy)
-}
-
-// releaseEstimate returns the finger's release velocity (px/s, positive =
-// moving down) and the distance its samples covered; the scroll physics
-// decide whether that is a fling.
-func (p *PointerRouter) releaseEstimate() (velocity, distance float64) {
-	if p.Now == nil {
-		return 0, 0
-	}
-	clock := p.Now
-	if p.Clock != nil {
-		clock = p.Clock
-	}
-	vy, dy, ok := p.tracker.Estimate(clock())
-	if !ok {
-		return 0, 0
-	}
-	return vy, dy
-}
-
-func (p *PointerRouter) PointerMove(pos r.Offset) {
-	if !p.isDown || p.list == nil {
-		return
-	}
-	p.record(pos)
-	if !p.dragging {
-		if math.Abs(pos.Dy-p.start.Dy) <= TouchSlop {
-			return
+	t.drag.OnCancel = func() {
+		if t.list.DragCancel != nil {
+			t.list.DragCancel()
 		}
-		p.dragging = true
-		// DragStartBehavior.start: the drag begins at the pointer position
-		// where it was accepted, so this move itself scrolls nothing.
-		p.last = pos
-		p.startDrag()
-		return
 	}
-	if p.list.DragUpdate != nil {
-		p.list.DragUpdate(pos.Dy-p.last.Dy, p.eventTime())
-	} else {
-		p.list.ScrollBy(p.last.Dy - pos.Dy)
+	t.drag.VelocityTrackerBuilder = func(event gestures.PointerEvent) *gestures.VelocityTracker {
+		switch t.platform { // ScrollBehavior.velocityTrackerBuilder
+		case services.IOS:
+			return &gestures.NewIOSScrollViewFlingVelocityTracker(event.Kind()).VelocityTracker
+		case services.MacOS:
+			return &gestures.NewMacOSScrollViewFlingVelocityTracker(event.Kind()).VelocityTracker
+		}
+		return gestures.NewVelocityTrackerWithKind(event.Kind())
 	}
-	p.last = pos
+	return t
 }
 
-func (p *PointerRouter) eventTime() float64 {
-	if p.Now == nil {
+func timeStampOf(ts *time.Duration) time.Duration {
+	if ts == nil {
 		return 0
 	}
-	return p.Now()
+	return *ts
 }
 
-func (p *PointerRouter) startDrag() {
-	if p.list.DragStart != nil {
-		p.list.DragStart(p.eventTime())
+// configure is ScrollableState's recognizer setup from the physics.
+func (t *scrollTarget) configure(platform services.Platform) {
+	t.platform = platform
+	if t.list.FlingLimits != nil {
+		minDistance, minVelocity, maxVelocity := t.list.FlingLimits()
+		t.drag.MinFlingDistance, t.drag.MinFlingVelocity, t.drag.MaxFlingVelocity = &minDistance, &minVelocity, &maxVelocity
 	}
 }
 
-func (p *PointerRouter) PointerUp(pos r.Offset) {
-	if pos != p.last && p.isDown {
+func (t *scrollTarget) HandleEvent(event gestures.PointerEvent, entry gestures.HitTestEntry) {
+	switch e := event.(type) {
+	case *gestures.PointerDownEvent:
+		t.drag.AddPointer(e)
+	case *gestures.PointerScrollEvent:
+		// Scrollable._receivedPointerSignal: one scrollable handles a wheel
+		// event (the deepest, registered first).
+		gestures.GestureBindingInstance().PointerSignalResolver().Register(e, func(gestures.PointerSignalEvent) {
+			if t.list.PointerScroll != nil {
+				t.list.PointerScroll(e.ScrollDelta().Dy)
+			} else {
+				t.list.ScrollBy(e.ScrollDelta().Dy)
+			}
+		})
+	}
+}
+
+// HitTestGestures adds the gesture targets under position (logical pixels,
+// in the root's coordinates) to result, deepest first: a TapGestureRecognizer
+// per tap region and a VerticalDragGestureRecognizer for the deepest list.
+// A list whose scroll activity ignores pointers (a fling or animation is
+// running) hides its items, as Scrollable's IgnorePointer does.
+func (o *BuildOwner) HitTestGestures(result *gestures.HitTestResult, position ui.Offset) {
+	if o.rootRender == nil {
+		return
+	}
+	if o.gestureTargets == nil {
+		o.gestureTargets = map[r.RenderBox]gestures.HitTestTarget{}
+	}
+	path := r.HitTest(o.rootRender, position)
+	listAt := -1
+	for i, ro := range path {
+		if _, ok := ro.(*r.RenderFixedExtentList); ok {
+			listAt = i
+			break
+		}
+	}
+	ignoreItems := false
+	if listAt >= 0 {
+		list := path[listAt].(*r.RenderFixedExtentList)
+		ignoreItems = list.IgnoringPointer != nil && list.IgnoringPointer()
+	}
+	for i, ro := range path {
+		switch ro := ro.(type) {
+		case *r.RenderTapRegion:
+			if ignoreItems && i < listAt {
+				continue
+			}
+			t, ok := o.gestureTargets[ro].(*tapTarget)
+			if !ok {
+				t = newTapTarget(ro)
+				o.gestureTargets[ro] = t
+			}
+			result.Add(gestures.NewHitTestEntry(t))
+		case *r.RenderFixedExtentList:
+			if i != listAt {
+				continue
+			}
+			t, ok := o.gestureTargets[ro].(*scrollTarget)
+			if !ok {
+				t = newScrollTarget(ro)
+				o.gestureTargets[ro] = t
+			}
+			t.configure(o.Platform)
+			result.Add(gestures.NewHitTestEntry(t))
+		}
+	}
+}
+
+// PointerRouter sends one pointer's events (as flutter_test's TestPointer
+// builds them) to GestureBinding.handlePointerEvent.
+type PointerRouter struct {
+	owner       *BuildOwner
+	pointer     int
+	isDown      bool
+	last        ui.Offset
+	mouseAdded  bool
+	nextPointer int
+	// TimeStamp returns the time stamp of the next event (zero if nil).
+	TimeStamp func() time.Duration
+	// AfterEvent, if set, runs after each event is handled (flutter_test
+	// awaits each event, which runs the microtasks it scheduled).
+	AfterEvent func()
+}
+
+// NewPointerRouter creates a router for o's tree.
+func NewPointerRouter(o *BuildOwner) *PointerRouter { return &PointerRouter{owner: o} }
+
+func (p *PointerRouter) now() time.Duration {
+	if p.TimeStamp == nil {
+		return 0
+	}
+	return p.TimeStamp()
+}
+
+func (p *PointerRouter) send(event gestures.PointerEvent) {
+	gestures.GestureBindingInstance().HandlePointerEvent(event)
+	if p.AfterEvent != nil {
+		p.AfterEvent()
+	}
+}
+
+// PointerDown puts a new touch pointer down at pos.
+func (p *PointerRouter) PointerDown(pos ui.Offset) {
+	p.nextPointer++
+	p.pointer = p.nextPointer
+	p.isDown = true
+	p.last = pos
+	p.send(gestures.NewPointerDownEvent(gestures.PointerDownEventOptions{
+		TimeStamp: p.now(), Pointer: p.pointer, Position: pos}))
+}
+
+// PointerMove moves the pointer to pos.
+func (p *PointerRouter) PointerMove(pos ui.Offset) {
+	if !p.isDown {
+		return
+	}
+	delta := pos.Sub(p.last)
+	p.last = pos
+	p.send(gestures.NewPointerMoveEvent(gestures.PointerMoveEventOptions{
+		TimeStamp: p.now(), Pointer: p.pointer, Position: pos, Delta: delta}))
+}
+
+// PointerUp lifts the pointer at pos (moving it there first if needed).
+func (p *PointerRouter) PointerUp(pos ui.Offset) {
+	if !p.isDown {
+		return
+	}
+	if pos != p.last {
 		p.PointerMove(pos)
 	}
-	down, dragging, list := p.down, p.dragging, p.list
-	p.down, p.isDown, p.list, p.dragging = nil, false, nil, false
-	if dragging {
-		if list.DragEnd != nil {
-			vy, dy := p.releaseEstimate()
-			list.DragEnd(vy, dy)
-		}
-		return // a drag is not a tap
-	}
-	up, _ := p.hit(pos)
-	for _, d := range down { // deepest first
-		for _, u := range up {
-			if d == u {
-				if d.OnTapAt != nil {
-					d.OnTapAt(pos)
-				}
-				if d.OnTap != nil {
-					d.OnTap()
-				}
-				return
-			}
-		}
-	}
+	p.isDown = false
+	p.send(gestures.NewPointerUpEvent(gestures.PointerUpEventOptions{
+		TimeStamp: p.now(), Pointer: p.pointer, Position: pos}))
 }
 
-// Scroll applies a scroll-wheel delta (positive scrolls content up) to the
-// deepest list under pos.
-func (p *PointerRouter) Scroll(pos r.Offset, dy float64) {
-	if _, list := p.hit(pos); list != nil {
-		if list.PointerScroll != nil {
-			list.PointerScroll(dy)
-		} else {
-			list.ScrollBy(dy)
-		}
+// Scroll sends a mouse-wheel scroll of dy (positive scrolls content up) at
+// pos.
+func (p *PointerRouter) Scroll(pos ui.Offset, dy float64) {
+	mouse := ui.PointerDeviceKindMouse
+	if !p.mouseAdded {
+		p.mouseAdded = true
+		p.send(gestures.NewPointerAddedEvent(gestures.PointerAddedEventOptions{
+			TimeStamp: p.now(), Kind: mouse, Device: 1, Position: pos}))
 	}
+	p.send(gestures.NewPointerScrollEvent(gestures.PointerScrollEventOptions{
+		PointerSignalEventOptions: gestures.PointerSignalEventOptions{TimeStamp: p.now(), Kind: &mouse, Device: 1, Position: pos},
+		ScrollDelta:               ui.NewOffset(0, dy)}))
 }

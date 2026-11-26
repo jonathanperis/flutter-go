@@ -429,11 +429,10 @@ type TestDefaultBinaryMessengerBinding interface {
 	testDefaultBinaryMessengerBinding() *TestDefaultBinaryMessengerBindingMixin
 }
 
-// TestDefaultBinaryMessengerBindingMixin is the mixin's state and methods;
-// its embedded services.ServicesBinding is the binding it is mixed onto
-// (see services.ServicesBindingMixin for the construction).
+// TestDefaultBinaryMessengerBindingMixin is the mixin's state and methods,
+// to embed after services.ServicesBindingMixin (see
+// foundation/binding_mixins.go for the construction).
 type TestDefaultBinaryMessengerBindingMixin struct {
-	services.ServicesBinding
 	self TestDefaultBinaryMessengerBinding
 }
 
@@ -455,7 +454,7 @@ func TestDefaultBinaryMessengerBindingInstance() TestDefaultBinaryMessengerBindi
 }
 
 func (m *TestDefaultBinaryMessengerBindingMixin) InitInstances() {
-	m.ServicesBinding.InitInstances()
+	foundation.BindingBaseSuper(m.self, m).InitInstances()
 	testDefaultBinaryMessengerBindingInstance = m.self
 }
 
@@ -468,7 +467,10 @@ func (m *TestDefaultBinaryMessengerBindingMixin) CreateBinaryMessenger() service
 			return services.StandardMethodCodec{}.EncodeSuccessEnvelope(map[int]int{})
 		})
 	}
-	return NewTestDefaultBinaryMessenger(m.ServicesBinding.CreateBinaryMessenger(), TestDefaultBinaryMessengerOptions{
+	super := foundation.BindingSuper[interface {
+		CreateBinaryMessenger() services.BinaryMessenger
+	}](m.self, m)
+	return NewTestDefaultBinaryMessenger(super.CreateBinaryMessenger(), TestDefaultBinaryMessengerOptions{
 		OutboundHandlers: map[string]services.MessageHandler{"flutter/keyboard": keyboardHandler},
 	})
 }

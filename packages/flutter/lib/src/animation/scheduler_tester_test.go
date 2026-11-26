@@ -24,8 +24,13 @@ const ms = time.Millisecond
 
 // testBinding is the scheduler part of WidgetsFlutterBinding.
 type testBinding struct {
+	foundation.BindingBaseBase
 	scheduler.SchedulerBindingMixin
 }
+
+func (b *testBinding) InitInstances()         { b.SchedulerBindingMixin.InitInstances() }
+func (b *testBinding) InitServiceExtensions() { b.SchedulerBindingMixin.InitServiceExtensions() }
+func (b *testBinding) Unlocked()              { b.SchedulerBindingMixin.Unlocked() }
 
 var binding *testBinding
 
@@ -33,10 +38,8 @@ var binding *testBinding
 func ensureBinding() *testBinding {
 	if binding == nil {
 		b := &testBinding{}
-		base := &foundation.BindingBaseBase{}
-		b.SchedulerBindingMixin.BindingBase = base
-		b.SetSelf(b)
-		base.Construct(b)
+		b.SchedulerBindingMixin.SetSelf(b)
+		b.Construct(b, &b.SchedulerBindingMixin)
 		binding = b
 	}
 	return binding

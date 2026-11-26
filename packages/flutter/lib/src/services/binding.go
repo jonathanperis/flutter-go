@@ -89,25 +89,32 @@ type SystemContextMenuClient interface {
 }
 
 // ServicesBindingMixin is ServicesBinding's state and methods, to embed in
-// a binding. Its embedded scheduler.SchedulerBinding is the binding it is
-// mixed onto (Dart's "super", a *scheduler.SchedulerBindingMixin over a
-// *foundation.BindingBaseBase):
+// a binding after foundation.BindingBaseBase and scheduler's
+// SchedulerBindingMixin (Dart: `on BindingBase, SchedulerBinding`; see
+// foundation/binding_mixins.go):
 //
-//	type MyBinding struct{ services.ServicesBindingMixin }
+//	type MyBinding struct {
+//		foundation.BindingBaseBase
+//		scheduler.SchedulerBindingMixin
+//		services.ServicesBindingMixin
+//	}
 //
 //	func NewMyBinding() *MyBinding {
 //		b := &MyBinding{}
-//		base := &foundation.BindingBaseBase{}
-//		sched := &scheduler.SchedulerBindingMixin{BindingBase: base}
-//		b.ServicesBindingMixin.SchedulerBinding = sched
-//		sched.SetSelf(b)
+//		b.SchedulerBindingMixin.SetSelf(b)
 //		b.ServicesBindingMixin.SetSelf(b)
-//		base.Construct(b)
+//		b.Construct(b, &b.SchedulerBindingMixin, &b.ServicesBindingMixin)
 //		return b
 //	}
+//
+//	func (b *MyBinding) InitInstances()         { b.ServicesBindingMixin.InitInstances() }
+//	func (b *MyBinding) InitServiceExtensions() { b.ServicesBindingMixin.InitServiceExtensions() }
+//	func (b *MyBinding) Unlocked()              { b.SchedulerBindingMixin.Unlocked() }
+//
+// ServicesBinding's channel handlers are registered in InitInstances, and
+// ChannelBuffers drains the messages buffered meanwhile in a microtask:
+// flush the event loop after constructing the binding.
 type ServicesBindingMixin struct {
-	scheduler.SchedulerBinding
-
 	self ServicesBinding
 
 	defaultBinaryMessenger  BinaryMessenger
@@ -141,7 +148,7 @@ func ServicesBindingInstance() ServicesBinding {
 }
 
 func (m *ServicesBindingMixin) InitInstances() {
-	m.SchedulerBinding.InitInstances()
+	foundation.BindingBaseSuper(m.outer(), m).InitInstances()
 	self := m.outer()
 	servicesBindingInstance = self
 	m.defaultBinaryMessenger = self.CreateBinaryMessenger()
@@ -200,7 +207,7 @@ func (m *ServicesBindingMixin) HandleSystemMessage(systemMessage any) async.Futu
 }
 
 func (m *ServicesBindingMixin) InitServiceExtensions() {
-	m.SchedulerBinding.InitServiceExtensions()
+	foundation.BindingBaseSuper(m.outer(), m).InitServiceExtensions()
 	self := m.outer()
 	if foundation.KDebugMode {
 		self.RegisterStringServiceExtension(ServicesServiceExtensionsEvict.Name(),

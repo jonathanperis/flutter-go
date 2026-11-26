@@ -31,9 +31,9 @@ var (
 	fastSpring            = physics.NewSpringDescriptionWithDampingRatio(0.3, 75.0, 1.3) // BouncingScrollPhysics.spring, fast deceleration
 	rubberBandLambda      = dart.Log(2) / 0.07
 	rubberBandSpring      = physics.SpringDescription{Mass: 1.0, Stiffness: 1e5 * rubberBandLambda * rubberBandLambda, Damping: (1e5 + 1) * rubberBandLambda}
-	motionStartThreshold  = 3.5   // BouncingScrollPhysics.dragStartDistanceMotionThreshold
-	motionStoppedDuration = 0.050 // ScrollDragController.motionStoppedDurationThreshold (s)
-	bigThresholdBreak     = 24.0  // ScrollDragController._bigThresholdBreakDistance
+	motionStartThreshold  = 3.5                   // BouncingScrollPhysics.dragStartDistanceMotionThreshold
+	motionStoppedDuration = 50 * time.Millisecond // ScrollDragController.motionStoppedDurationThreshold
+	bigThresholdBreak     = 24.0                  // ScrollDragController._bigThresholdBreakDistance
 )
 
 // ScrollController owns a list's scroll position and its physics (Flutter's
@@ -52,7 +52,7 @@ type ScrollController struct {
 
 	// drag state (ScrollDragController)
 	offsetSinceLastStop *float64
-	lastNonStationary   float64
+	lastNonStationary   time.Duration
 }
 
 // NewScrollController starts at initialOffset.
@@ -202,12 +202,8 @@ func (c *ScrollController) goIdle() {
 	}
 }
 
-// Hold stops any scroll animation and reports whether one was running.
-func (c *ScrollController) Hold() bool {
-	running := c.anim != nil && c.anim.IsAnimating()
-	c.goIdle()
-	return running
-}
+// Hold stops any scroll animation (a pointer went down: ScrollPosition.hold).
+func (c *ScrollController) Hold() { c.goIdle() }
 
 // IsAnimating reports whether a scroll animation is running.
 func (c *ScrollController) IsAnimating() bool { return c.anim != nil && c.anim.IsAnimating() }
@@ -317,7 +313,7 @@ func (c *ScrollController) AnimateTo(offset float64, d time.Duration, curve anim
 // ---------------------------------------------------------------------------
 // Drag (ScrollDragController) and pointer scroll
 
-func (c *ScrollController) dragStart(ts float64) {
+func (c *ScrollController) dragStart(ts time.Duration) {
 	c.goIdle()
 	c.lastNonStationary = ts
 	c.offsetSinceLastStop = nil
@@ -329,7 +325,7 @@ func (c *ScrollController) dragStart(ts float64) {
 
 // adjustForScrollStartThreshold is ScrollDragController's: on bouncing
 // physics, the first 3.5 px after a stop are swallowed, then motion eases in.
-func (c *ScrollController) adjustForScrollStartThreshold(offset, ts float64) float64 {
+func (c *ScrollController) adjustForScrollStartThreshold(offset float64, ts time.Duration) float64 {
 	if offset == 0 {
 		if c.bouncing() && c.offsetSinceLastStop == nil && ts-c.lastNonStationary > motionStoppedDuration {
 			zero := 0.0
@@ -352,7 +348,7 @@ func (c *ScrollController) adjustForScrollStartThreshold(offset, ts float64) flo
 }
 
 // dragUpdate applies a finger delta (positive = finger moved down).
-func (c *ScrollController) dragUpdate(delta, ts float64) {
+func (c *ScrollController) dragUpdate(delta float64, ts time.Duration) {
 	if delta != 0 {
 		c.lastNonStationary = ts
 	}
@@ -363,22 +359,25 @@ func (c *ScrollController) dragUpdate(delta, ts float64) {
 	c.setPixels(c.list.ScrollOffset() - c.applyPhysicsToUserOffset(delta))
 }
 
-// dragEnd is the vertical recognizer's fling decision with this physics'
-// limits, then ScrollDragController.end (negate, go ballistic).
-func (c *ScrollController) dragEnd(velocity, distance float64) {
-	minV, maxV := MinFlingVelocity, MaxFlingVelocity
+// flingLimits are the physics' minFlingDistance, minFlingVelocity and
+// maxFlingVelocity, which ScrollableState gives its drag recognizer.
+func (c *ScrollController) flingLimits() (minDistance, minVelocity, maxVelocity float64) {
+	minVelocity, maxVelocity = MinFlingVelocity, MaxFlingVelocity
 	if c.bouncing() {
-		minV = MinFlingVelocity * 2
+		minVelocity = MinFlingVelocity * 2
 	}
 	if c.physics() == BouncingFastPhysics {
-		maxV = MaxFlingVelocity * 8
+		maxVelocity = MaxFlingVelocity * 8
 	}
-	v := 0.0
-	if math.Abs(velocity) > minV && math.Abs(distance) > TouchSlop {
-		v = math.Max(-maxV, math.Min(maxV, velocity))
-	}
-	c.goBallistic(-v)
+	return TouchSlop, minVelocity, maxVelocity
 }
+
+// dragEnd is ScrollDragController.end: the drag recognizer's primary
+// velocity (already the fling decision), negated, goes ballistic.
+func (c *ScrollController) dragEnd(velocity float64) { c.goBallistic(-velocity) }
+
+// dragCancel is ScrollHoldController/ScrollDragController.cancel.
+func (c *ScrollController) dragCancel() { c.goBallistic(0) }
 
 // pointerScroll is ScrollPosition.pointerScroll: a wheel delta, clamped to
 // the scroll range on every platform.

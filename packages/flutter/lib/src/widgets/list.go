@@ -73,10 +73,13 @@ func (e *Element) attachController(c *ScrollController) {
 	}
 	c.attach(list)
 	c.platform = e.owner.Platform
+	list.IgnoringPointer = c.IsAnimating
 	list.Hold = c.Hold
 	list.DragStart = c.dragStart
 	list.DragUpdate = c.dragUpdate
 	list.DragEnd = c.dragEnd
+	list.DragCancel = c.dragCancel
+	list.FlingLimits = c.flingLimits
 	list.PointerScroll = c.pointerScroll
 }
 

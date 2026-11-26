@@ -48,9 +48,12 @@ func TestAcceleratingDragMatchesFlutter(t *testing.T) {
 		got = append(got, c.Offset())
 	}
 	ref := want["accelerating_drag"]
+	if len(ref) != len(got) {
+		t.Fatalf("%d frames, flutter %d", len(got), len(ref))
+	}
 	for i := range ref {
-		if math.Abs(ref[i]-got[i]) > 1e-6 {
-			t.Fatalf("frame %d: flutter %.6f go %.6f", i, ref[i], got[i])
+		if ref[i] != got[i] { // exact: the real VelocityTracker/LeastSquaresSolver
+			t.Fatalf("frame %d: flutter %v go %v", i, ref[i], got[i])
 		}
 	}
 	t.Logf("release %.3f → end %.3f (flutter %.3f)", got[0], got[len(got)-1], ref[len(ref)-1])
@@ -84,12 +87,15 @@ func TestDragFlingMatchesFlutter(t *testing.T) {
 				got = append(got, c.Offset())
 			}
 			ref := want[name]
+			if len(ref) != len(got) {
+				t.Fatalf("%d frames, flutter %d", len(got), len(ref))
+			}
 			maxErr := 0.0
 			for i := range ref {
 				e := math.Abs(ref[i] - got[i])
 				maxErr = math.Max(maxErr, e)
-				if e > 1e-6 {
-					t.Errorf("frame %d: flutter %.6f go %.6f", i, ref[i], got[i])
+				if ref[i] != got[i] { // exact
+					t.Errorf("frame %d: flutter %v go %v", i, ref[i], got[i])
 					if i > 3 {
 						break
 					}

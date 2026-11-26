@@ -34,10 +34,11 @@ type ServiceExtensionCallback func(parameters map[string]string) async.Future[ma
 // framework to the engine (SchedulerBinding, WidgetsBinding...).
 //
 // A binding is a struct embedding BindingBaseBase (Dart: extends
-// BindingBase) and the mixins of the bindings it combines; its constructor
-// calls Construct(self) on the embedded base, which runs Dart's BindingBase()
-// constructor: InitInstances and InitServiceExtensions, called through self
-// so overrides run. Overrides call the embedded base's method as "super".
+// BindingBase) and the mixins of the bindings it combines, in Dart's `with`
+// order; its constructor calls Construct(self, mixins...) on the embedded
+// base, which runs Dart's BindingBase() constructor: InitInstances and
+// InitServiceExtensions, called through self so overrides run. See
+// binding_mixins.go for how mixins are composed and reach "super".
 type BindingBase interface {
 	// Window is the deprecated main window (Deprecated: use View.of or
 	// PlatformDispatcher; deprecated after v3.7.0-32.0.pre).
@@ -97,6 +98,11 @@ type BindingBaseBase struct {
 	debugConstructed bool
 	debugBindingZone *async.Loop
 	lockCount        int
+
+	// mixins are the binding's mixins in Dart's `with` order (Dart's
+	// linearization: each one's super is the one before it, the first's is
+	// this base); see BindingSuper.
+	mixins []any
 }
 
 var (
@@ -110,10 +116,16 @@ var (
 var BindingBaseDebugZoneErrorsAreFatal = false
 
 // Construct is Dart's BindingBase() constructor: it points the base at
-// self (the binding embedding it) and initializes the binding through
+// self (the binding embedding it), records the binding's mixins (pointers
+// to the embedded mixin structs, in Dart's `with` order, each already
+// pointed at self with its SetSelf) and initializes the binding through
 // self.InitInstances and self.InitServiceExtensions.
-func (b *BindingBaseBase) Construct(self BindingBase) {
+func (b *BindingBaseBase) Construct(self BindingBase, mixins ...any) {
+	if self.bindingBase() != b {
+		panic("foundation: Construct must be called on the BindingBaseBase embedded in self")
+	}
 	b.self = self
+	b.setMixins(mixins)
 	if !KReleaseMode {
 		FlutterTimeline.StartSync("Framework initialization")
 	}
