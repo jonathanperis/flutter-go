@@ -8,9 +8,9 @@ package services
 // system context menu client), exitApplication, initializationComplete and
 // the service extensions.
 //
-// Not ported yet (they come with their libraries): the keyboard
-// (HardwareKeyboard, KeyEventManager, the key event channel), the
-// restoration manager, TextInput.ensureInitialized, the licenses read from
+// The keyboard (HardwareKeyboard, KeyEventManager, the key event channel)
+// comes with hardware_keyboard.go. Not ported yet (they come with their
+// libraries): the restoration manager, TextInput.ensureInitialized, the licenses read from
 // the asset bundle (initLicenses), the root bundle's clear/evict
 // (handleMemoryPressure and evict do nothing else), SystemChrome's
 // lifecycle hook, and PlatformDispatcher.onViewFocusChange /
@@ -71,6 +71,11 @@ type ServicesBinding interface {
 	// initialized (it may then remove the splash screen).
 	InitializationComplete() async.Future[async.Void]
 
+	// Keyboard is the global HardwareKeyboard (HardwareKeyboard.instance).
+	Keyboard() *HardwareKeyboard
+	// KeyEventManager dispatches key messages (deprecated).
+	KeyEventManager() *KeyEventManager
+
 	servicesBinding() *ServicesBindingMixin
 }
 
@@ -121,6 +126,8 @@ type ServicesBindingMixin struct {
 	accessibilityFocus      *foundation.ValueNotifier[*int]
 	systemUiChangeCallback  SystemUiChangeCallback
 	systemContextMenuClient SystemContextMenuClient
+	keyboard                *HardwareKeyboard
+	keyEventManager         *KeyEventManager
 }
 
 // SetSelf points the mixin at the binding embedding it, whose methods it
@@ -152,6 +159,7 @@ func (m *ServicesBindingMixin) InitInstances() {
 	self := m.outer()
 	servicesBindingInstance = self
 	m.defaultBinaryMessenger = self.CreateBinaryMessenger()
+	m.initKeyboard()
 	// The handlers' Future<void> results are encoded as null.
 	SystemChannels.System.SetMessageHandler(func(message any) async.Future[any] {
 		return voidToNull(self.HandleSystemMessage(message))
@@ -172,6 +180,23 @@ func voidToNull(f async.Future[async.Void]) async.Future[any] {
 		f.Await()
 		return nil
 	})
+}
+
+func (m *ServicesBindingMixin) Keyboard() *HardwareKeyboard { return m.keyboard }
+
+func (m *ServicesBindingMixin) KeyEventManager() *KeyEventManager { return m.keyEventManager }
+
+// initKeyboard is _initKeyboard: the key handlers are installed once the
+// platform has answered getKeyboardState.
+func (m *ServicesBindingMixin) initKeyboard() {
+	m.keyboard = NewHardwareKeyboard()
+	m.keyEventManager = NewKeyEventManager(m.keyboard, RawKeyboardInstance)
+	async.OnComplete(m.keyboard.SyncKeyboardState(), func(async.Void) {
+		m.outer().PlatformDispatcher().SetOnKeyData(m.keyEventManager.HandleKeyData)
+		SystemChannels.KeyEvent.SetMessageHandler(func(message any) async.Future[any] {
+			return async.Then(m.keyEventManager.HandleRawKeyMessage(message), func(r map[string]any) any { return r })
+		})
+	}, nil)
 }
 
 func (m *ServicesBindingMixin) DefaultBinaryMessenger() BinaryMessenger {

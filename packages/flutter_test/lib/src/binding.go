@@ -222,6 +222,11 @@ func (b *AutomatedTestWidgetsFlutterBinding) postTest(t *Tester) {
 	defer func() {
 		b.tester = nil
 		b.ResetGestureBinding()
+		// TestWidgetsFlutterBinding's per-test keyboard reset.
+		b.KeyEventManager().KeyMessageHandler = nil
+		services.RawKeyboardInstance.ClearKeysPressed()
+		services.HardwareKeyboardInstance().ClearState()
+		b.KeyEventManager().ClearState()
 		t.restoreLoop()
 		foundation.FlutterErrorOnError = t.previousOnError
 		b.ResetInternalState()
