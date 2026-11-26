@@ -40,6 +40,8 @@ type AutomatedTestWidgetsFlutterBinding struct {
 	TestDefaultBinaryMessengerBindingMixin
 
 	tester *Tester // the test in progress (flutter_test: inTest)
+
+	testRestorationManager *TestRestorationManager
 }
 
 var automatedTestBinding *AutomatedTestWidgetsFlutterBinding
@@ -205,6 +207,11 @@ func (b *AutomatedTestWidgetsFlutterBinding) startTest(t *Tester) {
 	}
 	b.tester = t
 	t.restoreLoop = async.SetCurrent(t.loop)
+	// TestWidgetsFlutterBinding.reset().
+	if b.testRestorationManager != nil {
+		b.testRestorationManager.Dispose()
+		b.testRestorationManager = nil
+	}
 	t.lastSize = t.Size
 	t.previousOnError = foundation.FlutterErrorOnError
 	foundation.FlutterErrorOnError = func(details *foundation.FlutterErrorDetails) {
@@ -225,6 +232,10 @@ func (b *AutomatedTestWidgetsFlutterBinding) postTest(t *Tester) {
 		t.restoreLoop()
 		foundation.FlutterErrorOnError = t.previousOnError
 		b.ResetInternalState()
+		if b.testRestorationManager != nil {
+			b.testRestorationManager.Dispose()
+			b.testRestorationManager = nil
+		}
 	}()
 	if e := t.TakeException(); e != nil {
 		t.t.Errorf("An exception was reported and not taken: %v", e)
@@ -250,4 +261,25 @@ func (b *AutomatedTestWidgetsFlutterBinding) postTest(t *Tester) {
 	if scheduler.TimeDilation() != 1.0 {
 		t.t.Errorf("The timeDilation was changed and not reset by the test.")
 	}
+}
+
+// TestRestorationManager is TestWidgetsFlutterBinding's covariant
+// restorationManager: the test's TestRestorationManager, created on first
+// use and disposed at the end of each test.
+func (b *AutomatedTestWidgetsFlutterBinding) TestRestorationManager() *TestRestorationManager {
+	if b.testRestorationManager == nil {
+		b.testRestorationManager = NewTestRestorationManager()
+	}
+	return b.testRestorationManager
+}
+
+// RestorationManager is the test's TestRestorationManager (its embedded
+// RestorationManager; TestRestorationManager returns the whole).
+func (b *AutomatedTestWidgetsFlutterBinding) RestorationManager() *services.RestorationManager {
+	return &b.TestRestorationManager().RestorationManager
+}
+
+// CreateRestorationManager creates a TestRestorationManager.
+func (b *AutomatedTestWidgetsFlutterBinding) CreateRestorationManager() *services.RestorationManager {
+	return &NewTestRestorationManager().RestorationManager
 }
