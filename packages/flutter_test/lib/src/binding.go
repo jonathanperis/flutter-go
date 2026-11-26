@@ -3,9 +3,9 @@ package flutter_test
 // A partial port of flutter_test's binding.dart (Flutter 3.50.1):
 // AutomatedTestWidgetsFlutterBinding, the binding `testWidgets` runs in,
 // composed as TestWidgetsFlutterBinding is (BindingBase with
-// SchedulerBinding, ServicesBinding, SemanticsBinding,
-// TestDefaultBinaryMessengerBinding; GestureBinding, RendererBinding,
-// PaintingBinding and WidgetsBinding are not in it yet). The persistent
+// SchedulerBinding, ServicesBinding, GestureBinding, SemanticsBinding,
+// TestDefaultBinaryMessengerBinding; RendererBinding, PaintingBinding and
+// WidgetsBinding are not in it yet). The persistent
 // frame callback draws the current Tester's BuildOwner, as
 // RendererBinding/WidgetsBinding's drawFrame would.
 //
@@ -18,6 +18,7 @@ import (
 
 	ui "github.com/jonathanperis/flutter-go/engine/src/flutter/lib/ui/go"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/foundation"
+	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/gestures"
 	r "github.com/jonathanperis/flutter-go/packages/flutter/lib/src/rendering"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/scheduler"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/semantics"
@@ -34,6 +35,7 @@ type AutomatedTestWidgetsFlutterBinding struct {
 	foundation.BindingBaseBase
 	scheduler.SchedulerBindingMixin
 	services.ServicesBindingMixin
+	gestures.GestureBindingMixin
 	semantics.SemanticsBindingMixin
 	TestDefaultBinaryMessengerBindingMixin
 
@@ -50,10 +52,11 @@ func AutomatedTestWidgetsFlutterBindingEnsureInitialized() *AutomatedTestWidgets
 		b := &AutomatedTestWidgetsFlutterBinding{}
 		b.SchedulerBindingMixin.SetSelf(b)
 		b.ServicesBindingMixin.SetSelf(b)
+		b.GestureBindingMixin.SetSelf(b)
 		b.SemanticsBindingMixin.SetSelf(b)
 		b.TestDefaultBinaryMessengerBindingMixin.SetSelf(b)
 		loop := async.Current()
-		b.Construct(b, &b.SchedulerBindingMixin, &b.ServicesBindingMixin, &b.SemanticsBindingMixin,
+		b.Construct(b, &b.SchedulerBindingMixin, &b.ServicesBindingMixin, &b.GestureBindingMixin, &b.SemanticsBindingMixin,
 			&b.TestDefaultBinaryMessengerBindingMixin)
 		// ServicesBinding's channel buffers drain in a microtask, and the
 		// engine answers initializationComplete with a posted event: run
@@ -81,7 +84,23 @@ func (b *AutomatedTestWidgetsFlutterBinding) InitInstances() {
 func (b *AutomatedTestWidgetsFlutterBinding) InitServiceExtensions() {
 	b.ServicesBindingMixin.InitServiceExtensions()
 }
-func (b *AutomatedTestWidgetsFlutterBinding) Unlocked() { b.SchedulerBindingMixin.Unlocked() }
+func (b *AutomatedTestWidgetsFlutterBinding) Unlocked() { b.GestureBindingMixin.Unlocked() }
+
+// DebugSamplingClock is the test clock (_TestSamplingClock): fake time on
+// the current test's event loop, from 2015-01-01 as flutter_test's clock.
+func (b *AutomatedTestWidgetsFlutterBinding) DebugSamplingClock() gestures.SamplingClock {
+	return testSamplingClock{loop: async.Current()}
+}
+
+type testSamplingClock struct{ loop *async.Loop }
+
+func (c testSamplingClock) Now() time.Time {
+	return time.Unix(0, 0).UTC().Add(testClockEpoch + c.loop.Elapsed())
+}
+
+func (c testSamplingClock) Stopwatch() *dart.Stopwatch {
+	return dart.NewStopwatchWithClock(c.loop.Elapsed)
+}
 func (b *AutomatedTestWidgetsFlutterBinding) CreateBinaryMessenger() services.BinaryMessenger {
 	return b.TestDefaultBinaryMessengerBindingMixin.CreateBinaryMessenger()
 }
