@@ -169,9 +169,9 @@ func (b *WordBoundary) codePointAt(index int) *int {
 	var v int
 	switch *codeUnitAtIndex & 0xFC00 {
 	case 0xD800:
-		v = codePointFromSurrogates(*codeUnitAtIndex, *nonNull(b.text.CodeUnitAt(index+1)))
+		v = codePointFromSurrogates(*codeUnitAtIndex, *nonNull(b.text.CodeUnitAt(index + 1)))
 	case 0xDC00:
-		v = codePointFromSurrogates(*nonNull(b.text.CodeUnitAt(index-1)), *codeUnitAtIndex)
+		v = codePointFromSurrogates(*nonNull(b.text.CodeUnitAt(index - 1)), *codeUnitAtIndex)
 	default:
 		v = *codeUnitAtIndex
 	}

@@ -3,8 +3,9 @@ package services
 // Port of packages/flutter/test/services/text_boundary_test.dart (Flutter
 // 3.50.1).
 //
-// Skipped: "wordBoundary.moveByWordBoundary" (needs painting's TextPainter
-// and its WordBoundary, not ported yet).
+// "wordBoundary.moveByWordBoundary" is in text_boundary_word_test.go
+// (package services_test: it needs painting's TextPainter, and painting
+// imports services).
 
 import (
 	"testing"

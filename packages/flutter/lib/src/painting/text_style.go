@@ -489,7 +489,7 @@ func stepList[T any](t float64, a, b []T) []T {
 
 func colorPaintOf(c *ui.Color) *ui.Paint {
 	p := ui.NewPaint()
-	p.SetColor(*c) // Dart's `color!` throws on null.
+	p.SetColor(*nonNull(c)) // Dart's `color!`
 	return p
 }
 

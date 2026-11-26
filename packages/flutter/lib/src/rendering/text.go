@@ -6,6 +6,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/painting"
 	"github.com/jonathanperis/flutter-go/src/dart"
 	"github.com/jonathanperis/flutter-go/src/pub/characters"
 )
@@ -68,59 +69,48 @@ var textEngine TextEngine = FixedTextEngine{}
 // SetTextEngine installs the process-wide text engine.
 func SetTextEngine(e TextEngine) { textEngine = e }
 
-// UITextEngine lays text out with dart:ui's ParagraphBuilder (the engine's
-// SkParagraph; with ui.EngineUseTestFonts, flutter_test's FlutterTest font).
-// It stands in for TextPainter until the painting library is ported.
+// UITextEngine lays text out with painting's TextPainter (dart:ui's
+// ParagraphBuilder over the engine's SkParagraph; with
+// ui.EngineUseTestFonts, flutter_test's FlutterTest font). It stands in for
+// RenderParagraph's TextPainter until rendering is ported.
 type UITextEngine struct{}
 
-// UIParagraph is a Paragraph laid out by UITextEngine; Paragraph is the
-// dart:ui paragraph, for Canvas.DrawParagraph.
+// UIParagraph is a Paragraph laid out by UITextEngine; Painter paints it
+// (TextPainter.Paint, for a ui.Canvas).
 type UIParagraph struct {
-	text      string
-	Paragraph ui.Paragraph
+	text    string
+	Painter *painting.TextPainter
 }
 
 func (UITextEngine) Layout(text string, style TextStyle, maxWidth float64) Paragraph {
 	size, color := style.Size(), style.TextColor()
-	o := ui.TextStyleOptions{FontSize: &size, Color: &color}
+	o := painting.TextStyleOptions{FontSize: &size, Color: &color}
 	if style.Bold {
 		o.FontWeight = &ui.FontWeightBold
 	}
-	b := ui.NewParagraphBuilder(ui.NewParagraphStyle())
-	b.PushStyle(ui.NewTextStyle(o))
-	b.AddText(text)
-	p := b.Build()
-	p.Layout(ui.NewParagraphConstraints(maxWidth))
+	ltr := ui.TextDirectionLtr
+	p := painting.NewTextPainter(painting.TextPainterOptions{
+		Text:          painting.NewTextSpan(painting.TextSpanOptions{Text: &text, Style: painting.NewTextStyle(o)}),
+		TextDirection: &ltr,
+	})
+	p.Layout(painting.TextPainterLayoutOptions{MaxWidth: &maxWidth})
 	return &UIParagraph{text, p}
 }
 
 func (p *UIParagraph) Text() string               { return p.text }
-func (p *UIParagraph) Height() float64            { return p.Paragraph.Height() }
-func (p *UIParagraph) MaxIntrinsicWidth() float64 { return p.Paragraph.MaxIntrinsicWidth() }
-func (p *UIParagraph) Release()                   { p.Paragraph.Dispose() }
+func (p *UIParagraph) Height() float64            { return p.Painter.Height() }
+func (p *UIParagraph) MaxIntrinsicWidth() float64 { return p.Painter.MaxIntrinsicWidth() }
+func (p *UIParagraph) Release()                   { p.Painter.Dispose() }
 
-// CaretX is the left edge of the grapheme starting at off, or the right
-// edge of the last one at the end of the text (single line, LTR).
+// CaretX is the x of the caret before UTF-16 offset off
+// (TextPainter.getOffsetForCaret with a zero-width caret).
 func (p *UIParagraph) CaretX(off int) float64 {
-	n := dart.StringLength(p.text)
-	if n == 0 || off <= 0 {
-		return 0
-	}
-	if off >= n {
-		if g := p.Paragraph.GetGlyphInfoAt(n - 1); g != nil {
-			return g.GraphemeClusterLayoutBounds.Right
-		}
-		return p.Paragraph.MaxIntrinsicWidth()
-	}
-	if g := p.Paragraph.GetGlyphInfoAt(off); g != nil {
-		return g.GraphemeClusterLayoutBounds.Left
-	}
-	return 0
+	return p.Painter.GetOffsetForCaret(ui.NewTextPosition(off), ui.RectZero).Dx
 }
 
 // OffsetAtX is the caret offset closest to x on the first line.
 func (p *UIParagraph) OffsetAtX(x float64) int {
-	return p.Paragraph.GetPositionForOffset(ui.NewOffset(x, p.Paragraph.Height()/2)).Offset
+	return p.Painter.GetPositionForOffset(ui.NewOffset(x, p.Painter.Height()/2)).Offset
 }
 
 // FixedTextEngine mimics Flutter's test font: every glyph is a
