@@ -258,7 +258,7 @@ func stringOr(message map[string]any, key string, or string) string {
 	return or
 }
 
-func intPtr(message map[string]any, key string) *int {
+func messageIntPtr(message map[string]any, key string) *int {
 	if v, ok := message[key].(int); ok {
 		return &v
 	}
@@ -325,7 +325,7 @@ func RawKeyEventFromMessage(message map[string]any) RawKeyEvent {
 			CharactersIgnoringModifiers: stringOr(message, "charactersIgnoringModifiers", ""),
 			KeyCode:                     intOr(message, "keyCode", 0),
 			Modifiers:                   intOr(message, "modifiers", 0),
-			SpecifiedLogicalKey:         intPtr(message, "specifiedLogicalKey"),
+			SpecifiedLogicalKey:         messageIntPtr(message, "specifiedLogicalKey"),
 		})
 		if s, ok := message["characters"].(string); ok {
 			character = &s
@@ -348,7 +348,7 @@ func RawKeyEventFromMessage(message map[string]any) RawKeyEvent {
 				KeyCode:             intOr(message, "keyCode", 0),
 				ScanCode:            intOr(message, "scanCode", 0),
 				Modifiers:           intOr(message, "modifiers", 0),
-				SpecifiedLogicalKey: intPtr(message, "specifiedLogicalKey"),
+				SpecifiedLogicalKey: messageIntPtr(message, "specifiedLogicalKey"),
 			})
 		if unicodeScalarValues != 0 {
 			s := dart.StringFromCharCode(unicodeScalarValues)
