@@ -188,6 +188,7 @@ func (m *ServicesBindingMixin) InitInstances() {
 	})
 	SystemChannels.Lifecycle.SetMessageHandler(m.handleLifecycleMessage)
 	SystemChannels.Platform.SetMethodCallHandler(m.handlePlatformMessage)
+	TextInputEnsureInitialized()
 	self.ReadInitialLifecycleStateFromNativeWindow()
 	self.InitializationComplete()
 }

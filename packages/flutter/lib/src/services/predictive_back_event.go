@@ -55,7 +55,7 @@ func NewPredictiveBackEventFromMap(m any) PredictiveBackEvent {
 		if list.Len() < 2 {
 			panic(dart.IndexError{Index: list.Len(), Length: list.Len(), Name: "index"})
 		}
-		o := ui.NewOffset(numToDouble(list.Index(0).Interface()), numToDouble(list.Index(1).Interface()))
+		o := ui.NewOffset(numToDoubleNonNull(list.Index(0).Interface()), numToDoubleNonNull(list.Index(1).Interface()))
 		touchOffset = &o
 	}
 	progress, _ := MapLookup(m, "progress")
@@ -63,7 +63,7 @@ func NewPredictiveBackEventFromMap(m any) PredictiveBackEvent {
 	if progress == nil || swipeEdge == nil {
 		panic(dart.TypeError{Message: "Null check operator used on a null value"})
 	}
-	p := numToDouble(progress)
+	p := numToDoubleNonNull(progress)
 	if !(p >= 0.0 && p <= 1.0) {
 		panic(dart.NewAssertionError(nil))
 	}
@@ -75,7 +75,7 @@ func NewPredictiveBackEventFromMap(m any) PredictiveBackEvent {
 }
 
 // numToDouble is Dart's `(x! as num).toDouble()`.
-func numToDouble(v any) float64 {
+func numToDoubleNonNull(v any) float64 {
 	switch x := v.(type) {
 	case int:
 		return float64(x)

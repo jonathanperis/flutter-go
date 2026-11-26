@@ -1,8 +1,14 @@
 package dart
 
-// StringHashCode is String.hashCode as the Dart VM computes it (runtime/vm
-// hash.h: each UTF-16 code unit combined with CombineHashes, then
-// FinalizeHash to String::kHashBits = 30 bits; 0 becomes 1).
+// The Dart VM's String.hashCode and Null.hashCode (runtime/vm/hash.h's
+// CombineHashes/FinalizeHash over the string's UTF-16 code units, 30 bits:
+// String::kHashBits), for the few places Flutter puts a hash code into a
+// platform message (text_input.dart's IOSSystemContextMenuItemData).
+
+// NullHashCode is null.hashCode in the Dart VM.
+const NullHashCode = 2011
+
+// StringHashCode is String.hashCode as the Dart VM computes it.
 func StringHashCode(s string) int {
 	var hash uint32
 	for _, u := range utf16Units(s) {

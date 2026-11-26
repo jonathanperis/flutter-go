@@ -242,10 +242,6 @@ func (c *FakeAndroidViewController) RejectGesture(opts ...services.PlatformViewC
 	})
 }
 
-func testMessenger() *TestDefaultBinaryMessenger {
-	return TestDefaultBinaryMessengerBindingInstance().DefaultBinaryMessenger().(*TestDefaultBinaryMessenger)
-}
-
 func platformError(message string) *services.PlatformException {
 	return services.NewPlatformException("error", services.PlatformExceptionOptions{Message: &message})
 }
