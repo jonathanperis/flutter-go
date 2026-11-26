@@ -1,7 +1,7 @@
 package physics
 
 import (
-	"github.com/jonathanperis/flutter-go/flutter_go/dart"
+	"github.com/jonathanperis/flutter-go/src/dart"
 	"math"
 
 	"github.com/jonathanperis/flutter-go/engine/src/flutter/lib/ui/go"

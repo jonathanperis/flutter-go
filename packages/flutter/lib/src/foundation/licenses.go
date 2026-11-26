@@ -7,7 +7,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/jonathanperis/flutter-go/flutter_go/async"
+	"github.com/jonathanperis/flutter-go/src/async"
 )
 
 // LicenseEntryCollector returns a stream of license entries; it is called

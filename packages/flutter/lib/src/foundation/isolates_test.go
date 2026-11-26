@@ -18,7 +18,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/jonathanperis/flutter-go/flutter_go/async"
+	"github.com/jonathanperis/flutter-go/src/async"
 )
 
 func test1(value int) int { return value + 1 }

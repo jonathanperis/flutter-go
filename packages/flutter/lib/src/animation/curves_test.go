@@ -14,7 +14,7 @@ import (
 	"testing"
 
 	ui "github.com/jonathanperis/flutter-go/engine/src/flutter/lib/ui/go"
-	"github.com/jonathanperis/flutter-go/flutter_go/dart"
+	"github.com/jonathanperis/flutter-go/src/dart"
 )
 
 func off(dx, dy float64) ui.Offset { return ui.NewOffset(dx, dy) }

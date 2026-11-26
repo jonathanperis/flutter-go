@@ -15,7 +15,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/jonathanperis/flutter-go/flutter_go/dart"
+	"github.com/jonathanperis/flutter-go/src/dart"
 )
 
 // StackFrame is a single frame of a stack trace. Fields not given are Dart's

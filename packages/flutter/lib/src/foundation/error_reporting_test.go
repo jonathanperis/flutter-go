@@ -13,7 +13,7 @@ package foundation
 //   - getSampleStack is Future.sync(() => StackTrace.current) in Dart, which
 //     puts a dart:async frame between the closure and getSampleStack; here a
 //     microtask run synchronously by the async loop does the same with
-//     flutter_go/async frames (printed as dart:async and elided by the
+//     src/async frames (printed as dart:async and elided by the
 //     filter). There are two of them, so the frames kept are #0, #3 and #4
 //     where Dart keeps #0, #2 and #3.
 //   - NoSuchMethodError.withInvocation is a Go error type of that name with
@@ -26,8 +26,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jonathanperis/flutter-go/flutter_go/async"
-	"github.com/jonathanperis/flutter-go/flutter_go/dart"
+	"github.com/jonathanperis/flutter-go/src/async"
+	"github.com/jonathanperis/flutter-go/src/dart"
 )
 
 // assertFalse is the _AssertionError that assert(false, message) throws at

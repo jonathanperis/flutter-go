@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jonathanperis/flutter-go/flutter_go/dart"
+	"github.com/jonathanperis/flutter-go/src/dart"
 )
 
 const kSliceSize = 500

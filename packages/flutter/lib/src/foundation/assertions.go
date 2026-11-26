@@ -28,7 +28,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/jonathanperis/flutter-go/flutter_go/dart"
+	"github.com/jonathanperis/flutter-go/src/dart"
 )
 
 // FlutterExceptionHandler is the signature of FlutterErrorOnError handlers.

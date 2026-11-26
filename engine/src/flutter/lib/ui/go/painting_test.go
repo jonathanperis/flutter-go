@@ -3,7 +3,7 @@ package ui
 // Port of engine/src/flutter/testing/dart/color_test.dart (Flutter 3.50.1).
 // Not ported: cases that need Paint (not yet ported), Dart's arbitrary
 // precision int literals (`1 << 1000000`), and subclasses of Color (Go has
-// no inheritance; see flutter_go/docs/API_MAPPING.md).
+// no inheritance; see src/docs/API_MAPPING.md).
 
 import (
 	"math"

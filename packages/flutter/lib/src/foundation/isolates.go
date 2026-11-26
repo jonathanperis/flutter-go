@@ -13,7 +13,7 @@ package foundation
 // equivalent.
 
 import (
-	"github.com/jonathanperis/flutter-go/flutter_go/async"
+	"github.com/jonathanperis/flutter-go/src/async"
 )
 
 // ComputeCallback is the signature of a function Compute runs.

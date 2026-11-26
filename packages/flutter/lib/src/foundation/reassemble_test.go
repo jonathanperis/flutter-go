@@ -5,7 +5,7 @@ package foundation
 import (
 	"testing"
 
-	"github.com/jonathanperis/flutter-go/flutter_go/async"
+	"github.com/jonathanperis/flutter-go/src/async"
 )
 
 type testFoundationFlutterBinding struct {

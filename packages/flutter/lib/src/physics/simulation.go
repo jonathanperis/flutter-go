@@ -3,7 +3,7 @@ package physics
 import (
 	"math"
 
-	"github.com/jonathanperis/flutter-go/flutter_go/dart"
+	"github.com/jonathanperis/flutter-go/src/dart"
 )
 
 // Simulation is a one-dimensional simulation over time (Flutter's abstract

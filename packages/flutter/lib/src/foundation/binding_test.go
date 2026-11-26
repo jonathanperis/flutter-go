@@ -19,9 +19,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jonathanperis/flutter-go/flutter_go/async"
-	"github.com/jonathanperis/flutter-go/flutter_go/dart"
-	"github.com/jonathanperis/flutter-go/flutter_go/developer"
+	"github.com/jonathanperis/flutter-go/src/async"
+	"github.com/jonathanperis/flutter-go/src/dart"
+	"github.com/jonathanperis/flutter-go/src/developer"
 )
 
 // resetBindingStatics forgets the initialized binding (a new isolate, in

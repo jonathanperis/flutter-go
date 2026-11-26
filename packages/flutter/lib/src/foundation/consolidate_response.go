@@ -7,8 +7,8 @@ import (
 	"compress/gzip"
 	goio "io"
 
-	"github.com/jonathanperis/flutter-go/flutter_go/async"
-	"github.com/jonathanperis/flutter-go/flutter_go/io"
+	"github.com/jonathanperis/flutter-go/src/async"
+	"github.com/jonathanperis/flutter-go/src/io"
 )
 
 // BytesReceivedCallback reports download progress: the bytes received so

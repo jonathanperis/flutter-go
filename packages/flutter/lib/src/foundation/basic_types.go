@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/jonathanperis/flutter-go/flutter_go/async"
+	"github.com/jonathanperis/flutter-go/src/async"
 )
 
 // Callback signatures (basic_types.dart). Dart's Iterable is Go's iter.Seq

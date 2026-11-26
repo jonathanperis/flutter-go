@@ -23,9 +23,9 @@ import (
 	"strings"
 
 	ui "github.com/jonathanperis/flutter-go/engine/src/flutter/lib/ui/go"
-	"github.com/jonathanperis/flutter-go/flutter_go/async"
-	"github.com/jonathanperis/flutter-go/flutter_go/dart"
-	"github.com/jonathanperis/flutter-go/flutter_go/developer"
+	"github.com/jonathanperis/flutter-go/src/async"
+	"github.com/jonathanperis/flutter-go/src/dart"
+	"github.com/jonathanperis/flutter-go/src/developer"
 )
 
 // ServiceExtensionCallback is the signature of a service extension: it

@@ -6,7 +6,7 @@ package foundation
 import (
 	"testing"
 
-	"github.com/jonathanperis/flutter-go/flutter_go/dart"
+	"github.com/jonathanperis/flutter-go/src/dart"
 )
 
 type testNode struct {

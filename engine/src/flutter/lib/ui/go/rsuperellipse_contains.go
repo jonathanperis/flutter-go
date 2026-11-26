@@ -4,7 +4,7 @@ package ui
 // (lib/ui/painting/rsuperellipse.cc → impeller/geometry/
 // round_superellipse_param.cc). The prebuilt Impeller SDK doesn't expose
 // it, so this is a Go port of that C++ (an ENGINE GAP filled in Go; see
-// flutter_go/PLAN.md). The engine computes in float (32-bit), and so does
+// src/PLAN.md). The engine computes in float (32-bit), and so does
 // this port, including the one step C++ does in double (`* sqrt(2)`).
 
 import "math"

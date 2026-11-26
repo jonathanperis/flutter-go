@@ -10,7 +10,7 @@ package foundation
 //   - "Live handling of Stack Overflows": a Go stack overflow is a fatal
 //     error, not a recoverable panic, so there is no trace to parse.
 //   - "debugPrintStack does not throw on a ParallelWaitError stack": needs
-//     Dart's (f1, f2).wait and ParallelWaitError, which flutter_go/async
+//     Dart's (f1, f2).wait and ParallelWaitError, which src/async
 //     doesn't have, and a package:stack_trace-style trace; the parsing it
 //     exercises ("===== asynchronous gap" lines) is covered by "debugPrintStack
 //     does not throw on a stack carrying an async-gap marker".
@@ -20,7 +20,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jonathanperis/flutter-go/flutter_go/dart"
+	"github.com/jonathanperis/flutter-go/src/dart"
 )
 
 func framesEqual(t *testing.T, got, want []StackFrame) {

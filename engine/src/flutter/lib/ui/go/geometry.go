@@ -5,7 +5,7 @@ package ui
 import (
 	"math"
 
-	"github.com/jonathanperis/flutter-go/flutter_go/dart"
+	"github.com/jonathanperis/flutter-go/src/dart"
 )
 
 func fixed1(v float64) string { return dart.ToStringAsFixed(v, 1) }

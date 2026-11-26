@@ -11,7 +11,7 @@ import (
 	"time"
 
 	ui "github.com/jonathanperis/flutter-go/engine/src/flutter/lib/ui/go"
-	"github.com/jonathanperis/flutter-go/flutter_go/async"
+	"github.com/jonathanperis/flutter-go/src/async"
 )
 
 // runLoop runs body as an async test body on a fresh loop until it

@@ -4,7 +4,7 @@ package foundation
 // flutter-go is never a web build, so these are the dart:io versions, which
 // throw (Flutter only reads them under kIsWeb).
 
-import "github.com/jonathanperis/flutter-go/flutter_go/dart"
+import "github.com/jonathanperis/flutter-go/src/dart"
 
 // IsCanvasKit reports whether the web renderer is CanvasKit. Not
 // implemented outside the web: it panics with an UnimplementedError, as on

@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jonathanperis/flutter-go/flutter_go/async"
+	"github.com/jonathanperis/flutter-go/src/async"
 )
 
 func paragraphsOf(text string) []LicenseParagraph {

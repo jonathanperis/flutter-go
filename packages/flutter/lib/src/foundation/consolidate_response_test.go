@@ -10,8 +10,8 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/jonathanperis/flutter-go/flutter_go/async"
-	"github.com/jonathanperis/flutter-go/flutter_go/io"
+	"github.com/jonathanperis/flutter-go/src/async"
+	"github.com/jonathanperis/flutter-go/src/io"
 )
 
 var (

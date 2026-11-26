@@ -1,7 +1,7 @@
 package widgets
 
 import (
-	"github.com/jonathanperis/flutter-go/flutter_go/dart"
+	"github.com/jonathanperis/flutter-go/src/dart"
 	"math"
 	"time"
 

@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jonathanperis/flutter-go/flutter_go/async"
+	"github.com/jonathanperis/flutter-go/src/async"
 )
 
 type argumentError struct{}

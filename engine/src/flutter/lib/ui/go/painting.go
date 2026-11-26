@@ -7,7 +7,7 @@ package ui
 import (
 	"math"
 
-	"github.com/jonathanperis/flutter-go/flutter_go/dart"
+	"github.com/jonathanperis/flutter-go/src/dart"
 )
 
 // ColorSpace is the color space a Color's components are expressed in.

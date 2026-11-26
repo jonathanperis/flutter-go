@@ -3,7 +3,7 @@ package foundation
 import (
 	"time"
 
-	"github.com/jonathanperis/flutter-go/flutter_go/async"
+	"github.com/jonathanperis/flutter-go/src/async"
 )
 
 // SynchronousFuture is a Future whose then calls the callback synchronously

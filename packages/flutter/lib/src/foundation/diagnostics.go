@@ -69,7 +69,7 @@ import (
 	"time"
 	"unicode/utf16"
 
-	"github.com/jonathanperis/flutter-go/flutter_go/dart"
+	"github.com/jonathanperis/flutter-go/src/dart"
 )
 
 // debugAssertsEnabled says whether Dart's assert(() {...}()) blocks run.

@@ -5,7 +5,7 @@ package foundation
 //
 // Dart's print is dart.Print (capturable with dart.SetPrintHandler, Go's
 // stand-in for a Zone's print override); the throttle's Timer and Completer
-// are flutter_go/async's, so the pauses run on the current async.Loop
+// are src/async's, so the pauses run on the current async.Loop
 // exactly as Dart's run in fake_async. The throttle's Stopwatch measures
 // wall-clock time, as Dart's does (fake_async doesn't fake Stopwatch).
 //
@@ -19,8 +19,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jonathanperis/flutter-go/flutter_go/async"
-	"github.com/jonathanperis/flutter-go/flutter_go/dart"
+	"github.com/jonathanperis/flutter-go/src/async"
+	"github.com/jonathanperis/flutter-go/src/dart"
 )
 
 // DebugPrintOptions are a DebugPrintCallback's named parameters (WrapWidth

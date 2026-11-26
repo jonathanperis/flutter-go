@@ -11,7 +11,7 @@ import (
 	"slices"
 
 	ui "github.com/jonathanperis/flutter-go/engine/src/flutter/lib/ui/go"
-	"github.com/jonathanperis/flutter-go/flutter_go/dart"
+	"github.com/jonathanperis/flutter-go/src/dart"
 )
 
 // kMemoryAllocations is Dart's bool.fromEnvironment('flutter.memory_allocations')

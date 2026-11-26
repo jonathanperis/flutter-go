@@ -7,7 +7,7 @@ package foundation
 // closure, main.<anonymous closure>), and frame #1 is the Go test runner,
 // testing.tRunner, where Dart's is package:test_api's Declarer; Go has no
 // "<asynchronous suspension>" line to follow it. The async variant runs the
-// body as a flutter_go/async coroutine (Dart's async test body).
+// body as a src/async coroutine (Dart's async test body).
 
 import (
 	"regexp"
@@ -15,8 +15,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jonathanperis/flutter-go/flutter_go/async"
-	"github.com/jonathanperis/flutter-go/flutter_go/dart"
+	"github.com/jonathanperis/flutter-go/src/async"
+	"github.com/jonathanperis/flutter-go/src/dart"
 )
 
 func TestFlutterErrorDefaultStackFilter(t *testing.T) {
@@ -43,7 +43,7 @@ func TestFlutterErrorDefaultStackFilterAsyncTestBody(t *testing.T) {
 		t.Fatalf("too few frames: %q", filtered)
 	}
 	matches(t, filtered[0], `^#0 +TestFlutterErrorDefaultStackFilterAsyncTestBody\.<anonymous closure> \(.*stack_trace_test\.go:[0-9]+\)$`)
-	// The coroutine's own frames are flutter_go/async's, elided as dart:async.
+	// The coroutine's own frames are src/async's, elided as dart:async.
 	if !regexp.MustCompile(`^\(elided (one frame|[0-9]+ frames) from dart:async\)$`).MatchString(filtered[len(filtered)-1]) {
 		t.Errorf("last line: %q (all: %q)", filtered[len(filtered)-1], filtered)
 	}

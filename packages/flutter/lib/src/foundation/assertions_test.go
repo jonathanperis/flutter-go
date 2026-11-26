@@ -21,8 +21,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jonathanperis/flutter-go/flutter_go/async"
-	"github.com/jonathanperis/flutter-go/flutter_go/dart"
+	"github.com/jonathanperis/flutter-go/src/async"
+	"github.com/jonathanperis/flutter-go/src/dart"
 )
 
 func nodes(n ...DiagnosticsNode) iter.Seq[DiagnosticsNode] { return slices.Values(n) }
@@ -840,7 +840,7 @@ func TestReportErrorOnARealGoPanic(t *testing.T) {
 }
 
 func TestReportErrorOnAGoPanicInsideAsync(t *testing.T) {
-	// A panic in an async microtask: flutter_go/async frames are dart:async
+	// A panic in an async microtask: src/async frames are dart:async
 	// and the default filter elides them, as Flutter elides dart:async.
 	FlutterErrorResetErrorCount()
 	defer FlutterErrorResetErrorCount()
