@@ -558,6 +558,10 @@ func TestPaintingImagesMatchFlutter(t *testing.T) {
 	for name, scene := range imageScenes {
 		t.Run(name, func(t *testing.T) {
 			tester := flutter_test.New(t)
+			// Start from an empty cache: other difftests of this package share the
+			// process-wide cache (each Dart test file has its own isolate).
+			ImageCacheInstance().Clear()
+			ImageCacheInstance().ClearLiveImages()
 			f := &imgFixture{
 				img8: makeImage(tester, 8, 8), img10: makeImage(tester, 10, 10), img16: makeImage(tester, 16, 16),
 				img20: makeImage(tester, 20, 10), img40: makeImage(tester, 40, 40),
