@@ -129,7 +129,7 @@ func logicalKeyForModifier(keyCode, hidCode int) int {
 // toLower lower-cases ASCII and Latin-1 letters, independent of locale.
 func toLower(n int) int {
 	const (
-		lowerA, upperA, upperZ                     = 0x61, 0x41, 0x5a
+		lowerA, upperA, upperZ                      = 0x61, 0x41, 0x5a
 		lowerAGrave, upperAGrave, upperThorn, divis = 0xe0, 0xc0, 0xde, 0xf7
 	)
 	if n >= upperA && n <= upperZ {
