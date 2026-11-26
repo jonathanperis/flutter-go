@@ -22,15 +22,23 @@ type UnsupportedError struct{ Message string }
 func (e UnsupportedError) Error() string { return "Unsupported operation: " + e.Message }
 
 // TruncDiv is Dart's double ~/ operator converted back with toDouble():
-// the quotient truncated toward zero. It panics with UnsupportedError when
-// the quotient is infinite, NaN or outside int64, as Dart throws.
+// the VM's `(a / b).truncate()`, an int. It panics with UnsupportedError
+// ("Infinity or NaN toInt") when the quotient is infinite or NaN, as Dart
+// throws; a quotient outside int64 clamps to it (the VM's toInt), and a
+// zero is +0.0 (an int has no sign).
 func TruncDiv(a, b float64) float64 {
-	q := math.Trunc(a / b)
-	if math.IsNaN(q) || math.IsInf(q, 0) || q >= 9223372036854775808.0 || q < -9223372036854775808.0 {
-		panic(UnsupportedError{"Result of truncating division is " + DoubleToString(a/b) + ": " +
-			DoubleToString(a) + " ~/ " + DoubleToString(b)})
+	q := a / b
+	if math.IsNaN(q) || math.IsInf(q, 0) {
+		panic(UnsupportedError{"Infinity or NaN toInt"})
 	}
-	return q
+	q = math.Trunc(q)
+	switch {
+	case q >= 9223372036854775808.0:
+		return float64(math.MaxInt64)
+	case q < -9223372036854775808.0:
+		return float64(math.MinInt64)
+	}
+	return float64(int64(q))
 }
 
 // UnimplementedError is dart:core's UnimplementedError(message).
