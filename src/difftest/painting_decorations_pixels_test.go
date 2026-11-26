@@ -134,7 +134,7 @@ func decorationPixelScenes(img *ui.Image) map[string]func(c ui.Canvas) {
 		},
 		"image.colorFilter.matrix.invert": func(c ui.Canvas) {
 			PaintImage(c, ui.NewRectFromLTWH(8, 8, 48, 48), img, PaintImageOptions{Fit: fit(BoxFitFill), InvertColors: true,
-				ColorFilter: ui.NewColorFilterMatrix([]float64{0.5, 0, 0, 0, 20, 0, 1, 0, 0, 0, 0, 0, 0.25, 0, 40, 0, 0, 0, 1, 0}),
+				ColorFilter:   ui.NewColorFilterMatrix([]float64{0.5, 0, 0, 0, 20, 0, 1, 0, 0, 0, 0, 0, 0.25, 0, 40, 0, 0, 0, 1, 0}),
 				FilterQuality: &none})
 		},
 		"logo.mark": logo(NewFlutterLogoDecoration(), ui.OffsetZero, ui.NewSize(64, 64)),
