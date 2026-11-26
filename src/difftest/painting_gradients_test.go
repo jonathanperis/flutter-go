@@ -459,13 +459,13 @@ func paintingGradientsCases(t *testing.T, tester *flutter_test.Tester) map[strin
 			shEq = append(shEq, s == b)
 		}
 	}
+	defer func(old bool) { DebugDisableShadows = old }(DebugDisableShadows)
 	for _, disable := range []bool{false, true} {
 		DebugDisableShadows = disable
 		for _, s := range ss {
 			toPaint = append(toPaint, []any{pgPaint(s.ToPaint()), pgj(s.BlurSigma())})
 		}
 	}
-	DebugDisableShadows = false
 	out["boxShadow.scale"], out["boxShadow.copyWith"], out["boxShadow.equal"], out["boxShadow.toPaint"] =
 		shScale, copyWith, shEq, toPaint
 

@@ -173,6 +173,10 @@ var decorationPixelTolerance = map[string]struct{ max, over2 int }{
 }
 
 func TestPaintingDecorationsPixelsMatchFlutter(t *testing.T) {
+	// Shadows paint as in an app (the Dart side sets debugDisableShadows =
+	// false; a test binding created earlier in this process sets it true).
+	defer func(old bool) { DebugDisableShadows = old }(DebugDisableShadows)
+	DebugDisableShadows = false
 	data, err := os.ReadFile("flutter/build/painting_decorations_pixels.json")
 	if err != nil {
 		t.Skipf("no reference (%v); run scripts/difftest.sh", err)

@@ -52,6 +52,8 @@ var automatedTestBinding *AutomatedTestWidgetsFlutterBinding
 func AutomatedTestWidgetsFlutterBindingEnsureInitialized() *AutomatedTestWidgetsFlutterBinding {
 	if automatedTestBinding == nil {
 		b := &AutomatedTestWidgetsFlutterBinding{}
+		// TestWidgetsFlutterBinding(): debugDisableShadows = disableShadows.
+		painting.DebugDisableShadows = b.DisableShadows()
 		b.SchedulerBindingMixin.SetSelf(b)
 		b.ServicesBindingMixin.SetSelf(b)
 		b.GestureBindingMixin.SetSelf(b)
@@ -71,6 +73,11 @@ func AutomatedTestWidgetsFlutterBindingEnsureInitialized() *AutomatedTestWidgets
 	}
 	return automatedTestBinding
 }
+
+// DisableShadows is the value debugDisableShadows has while tests run:
+// true in AutomatedTestWidgetsFlutterBinding, as in Flutter (shadows paint
+// as solid outlines, which are stable across platforms).
+func (b *AutomatedTestWidgetsFlutterBinding) DisableShadows() bool { return true }
 
 // InitInstances also resets timeDilation (TestWidgetsFlutterBinding) and
 // adds the persistent frame callback that draws the tree
@@ -266,6 +273,7 @@ func (b *AutomatedTestWidgetsFlutterBinding) postTest(t *Tester) {
 				t.t.Errorf("%v", r)
 			}
 		}()
-		painting.DebugAssertAllPaintingVarsUnset("The value of a painting debug variable was changed by the test.")
+		painting.DebugAssertAllPaintingVarsUnset("The value of a painting debug variable was changed by the test.",
+			painting.DebugAssertAllPaintingVarsUnsetOptions{DebugDisableShadowsOverride: b.DisableShadows()})
 	}()
 }

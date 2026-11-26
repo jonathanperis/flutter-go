@@ -171,6 +171,9 @@ func TestPaintingBoxDecorationsPixelsMatchFlutter(t *testing.T) {
 		t.Fatal("no Metal device: the pixel difftest needs one")
 	}
 	flutter_test.New(t) // image providers resolve through PaintingBinding.instance
+	// As the Dart side: the test binding disables shadows; paint them.
+	defer func(old bool) { p.DebugDisableShadows = old }(p.DebugDisableShadows)
+	p.DebugDisableShadows = false
 	ui.NewPlatformConfiguration(nil).UpdateViewGestureMetrics(0, 3.0, ui.GestureSettings{})
 	defer ui.NewPlatformConfiguration(nil).UpdateViewGestureMetrics(0, 1.0, ui.GestureSettings{})
 	defer func() {

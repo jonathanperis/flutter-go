@@ -531,6 +531,9 @@ func TestPaintingDecorationsMatchFlutter(t *testing.T) {
 		t.Fatal(err)
 	}
 	tester := ft.New(t)
+	// As the Dart side: the test binding disables shadows; paint them.
+	defer func(old bool) { p.DebugDisableShadows = old }(p.DebugDisableShadows)
+	p.DebugDisableShadows = false
 	img := makeImage(tester, 16, 8)
 	got := paintingDecorationsCases(img)
 	p.ImageCacheInstance().Clear()

@@ -137,8 +137,8 @@ func TestBoxShadowToPaint(t *testing.T) {
 	if p.MaskFilter() == nil || p.MaskFilter().String() != want.String() || p.Color() != s.Color {
 		t.Errorf("paint %v", p)
 	}
+	defer func(old bool) { DebugDisableShadows = old }(DebugDisableShadows)
 	DebugDisableShadows = true
-	defer func() { DebugDisableShadows = false }()
 	if s.ToPaint().MaskFilter() != nil {
 		t.Error("debugDisableShadows")
 	}
