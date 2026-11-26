@@ -491,7 +491,7 @@ func (r BorderRadiusDirectional) ModGeometry(o float64) BorderRadiusGeometry { r
 // Resolve converts the radii to a BorderRadius for the given direction;
 // nil panics with Flutter's "No TextDirection found." error.
 func (r BorderRadiusDirectional) Resolve(direction *ui.TextDirection) BorderRadius {
-	checkCanResolveTextDirection(direction, "BorderRadiusDirectional")
+	DebugCheckCanResolveTextDirection(direction, "BorderRadiusDirectional")
 	if *direction == ui.TextDirectionRtl {
 		return BorderRadius{TopLeft: r.TopEnd, TopRight: r.TopStart, BottomLeft: r.BottomEnd, BottomRight: r.BottomStart}
 	}
@@ -558,7 +558,7 @@ func (m mixedBorderRadius) ModGeometry(o float64) BorderRadiusGeometry {
 }
 
 func (m mixedBorderRadius) Resolve(direction *ui.TextDirection) BorderRadius {
-	checkCanResolveTextDirection(direction, "_MixedBorderRadius")
+	DebugCheckCanResolveTextDirection(direction, "_MixedBorderRadius")
 	tl, tr, bl, br, ts, te, bs, be := m[0], m[1], m[2], m[3], m[4], m[5], m[6], m[7]
 	if *direction == ui.TextDirectionRtl {
 		return BorderRadius{TopLeft: tl.Add(te), TopRight: tr.Add(ts), BottomLeft: bl.Add(be), BottomRight: br.Add(bs)}

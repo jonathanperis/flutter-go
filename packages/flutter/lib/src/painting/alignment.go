@@ -442,7 +442,7 @@ func AlignmentDirectionalLerp(a, b *AlignmentDirectional, t float64) *AlignmentD
 // Resolve converts a to an Alignment for the given direction; nil panics
 // with Flutter's "No TextDirection found." FlutterError.
 func (a AlignmentDirectional) Resolve(direction *ui.TextDirection) Alignment {
-	checkCanResolveTextDirection(direction, "AlignmentDirectional")
+	DebugCheckCanResolveTextDirection(direction, "AlignmentDirectional")
 	if *direction == ui.TextDirectionRtl {
 		return Alignment{-a.Start, a.Y}
 	}
@@ -505,32 +505,11 @@ func (m mixedAlignment) mod(o float64) AlignmentGeometry {
 }
 
 func (m mixedAlignment) Resolve(direction *ui.TextDirection) Alignment {
-	checkCanResolveTextDirection(direction, "_MixedAlignment")
+	DebugCheckCanResolveTextDirection(direction, "_MixedAlignment")
 	if *direction == ui.TextDirectionRtl {
 		return Alignment{m.x - m.start, m.y}
 	}
 	return Alignment{m.x + m.start, m.y}
-}
-
-// checkCanResolveTextDirection is debug.dart's
-// debugCheckCanResolveTextDirection (asserts are always on in Go).
-// TODO(painting debug.dart port): route through DebugCheckCanResolveTextDirection.
-func checkCanResolveTextDirection(direction *ui.TextDirection, target string) {
-	if direction != nil {
-		return
-	}
-	panic(foundation.NewFlutterErrorFromParts([]foundation.DiagnosticsNode{
-		foundation.NewErrorSummary("No TextDirection found."),
-		foundation.NewErrorDescription("To resolve " + target + " properties, it must be provided with a TextDirection."),
-		foundation.NewErrorHint("This error usually occurs when " + target + " is used in a widget without " +
-			"a Directionality ancestor."),
-		foundation.NewErrorHint("Typically, the Directionality widget is introduced by the MaterialApp " +
-			"or WidgetsApp widget at the top of your application widget tree. It " +
-			"determines the ambient reading direction and is used, for example, to " +
-			"determine how to lay out text, how to interpret \"start\" and \"end\" " +
-			"values, and to resolve EdgeInsetsDirectional, " +
-			"AlignmentDirectional, and other *Directional objects."),
-	}))
 }
 
 // TextAlignVertical is the vertical alignment of text within an input

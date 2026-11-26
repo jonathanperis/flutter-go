@@ -19,7 +19,6 @@ import (
 	"math"
 
 	ui "github.com/jonathanperis/flutter-go/engine/src/flutter/lib/ui/go"
-	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/foundation"
 	"github.com/jonathanperis/flutter-go/src/dart"
 )
 
@@ -599,7 +598,7 @@ func (e EdgeInsetsDirectional) ModGeometry(o float64) EdgeInsetsGeometry      { 
 // Resolve converts the insets to EdgeInsets for the given direction; nil
 // panics with Flutter's "No TextDirection found." error.
 func (e EdgeInsetsDirectional) Resolve(direction *ui.TextDirection) EdgeInsets {
-	checkCanResolveTextDirection(direction, "EdgeInsetsDirectional")
+	DebugCheckCanResolveTextDirection(direction, "EdgeInsetsDirectional")
 	if *direction == ui.TextDirectionRtl {
 		return EdgeInsets{e.End, e.Top, e.Start, e.Bottom}
 	}
@@ -692,31 +691,10 @@ func (m mixedEdgeInsets) ModGeometry(o float64) EdgeInsetsGeometry {
 }
 
 func (m mixedEdgeInsets) Resolve(direction *ui.TextDirection) EdgeInsets {
-	checkCanResolveTextDirection(direction, "_MixedEdgeInsets")
+	DebugCheckCanResolveTextDirection(direction, "_MixedEdgeInsets")
 	if *direction == ui.TextDirectionRtl {
 		return EdgeInsets{m.end + m.left, m.top, m.start + m.right, m.bottom}
 	}
 	return EdgeInsets{m.start + m.left, m.top, m.end + m.right, m.bottom}
 }
 
-// checkCanResolveTextDirection is debug.dart's
-// debugCheckCanResolveTextDirection (assertions are always on in Go): it
-// panics with Flutter's FlutterError when direction is nil.
-// TODO(painting debug.dart port): call DebugCheckCanResolveTextDirection.
-func checkCanResolveTextDirection(direction *ui.TextDirection, target string) {
-	if direction != nil {
-		return
-	}
-	panic(foundation.NewFlutterErrorFromParts([]foundation.DiagnosticsNode{
-		foundation.NewErrorSummary("No TextDirection found."),
-		foundation.NewErrorDescription("To resolve " + target + " properties, it must be provided with a TextDirection."),
-		foundation.NewErrorHint("This error usually occurs when " + target + " is used in a widget without " +
-			"a Directionality ancestor."),
-		foundation.NewErrorHint("Typically, the Directionality widget is introduced by the MaterialApp " +
-			"or WidgetsApp widget at the top of your application widget tree. It " +
-			"determines the ambient reading direction and is used, for example, to " +
-			"determine how to lay out text, how to interpret \"start\" and \"end\" " +
-			"values, and to resolve EdgeInsetsDirectional, " +
-			"AlignmentDirectional, and other *Directional objects."),
-	}))
-}

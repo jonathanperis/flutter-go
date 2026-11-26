@@ -16,7 +16,6 @@ import (
 	"testing"
 
 	ui "github.com/jonathanperis/flutter-go/engine/src/flutter/lib/ui/go"
-	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/foundation"
 )
 
 var (
@@ -325,22 +324,6 @@ func TestEdgeInsetsGeometryFactories(t *testing.T) {
 	eqInsets(t, NewEdgeInsetsGeometryFromLTRB(10, 20, 30, 40), NewEdgeInsetsFromLTRB(10, 20, 30, 40))
 	eqInsets(t, NewEdgeInsetsGeometryFromSTEB(10, 20, 20, 40), NewEdgeInsetsDirectionalFromSTEB(10, 20, 20, 40))
 	eqInsets(t, EdgeInsetsGeometryZero, EdgeInsetsZero)
-}
-
-func expectNoTextDirection(t *testing.T, f func()) {
-	t.Helper()
-	defer func() {
-		t.Helper()
-		e, ok := recover().(*foundation.FlutterError)
-		if !ok {
-			t.Fatal("want a FlutterError")
-		}
-		m := e.Message()
-		if !strings.Contains(m, "No TextDirection found.") || !strings.Contains(m, "without a Directionality ancestor") {
-			t.Errorf("message %q", m)
-		}
-	}()
-	f()
 }
 
 func TestEdgeInsetsResolveNullDirection(t *testing.T) {
