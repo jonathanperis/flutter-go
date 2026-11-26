@@ -91,6 +91,31 @@ type tadOp struct {
 	Ms      int       `json:"ms"`
 }
 
+// PassiveRecognizer is the Dart test's PassiveRecognizer: it joins the arena and
+// never resolves until it stops tracking (or resigns).
+type PassiveRecognizer struct {
+	g.OneSequenceGestureRecognizerBase
+	name string
+}
+
+func (r *PassiveRecognizer) AddPointer(event *g.PointerDownEvent) {
+	r.StartTrackingPointer(event.Pointer())
+}
+func (r *PassiveRecognizer) DebugDescription() string       { return "passive" }
+func (r *PassiveRecognizer) DidStopTrackingLastPointer(int) { r.Resolve(g.GestureDispositionRejected) }
+func (r *PassiveRecognizer) HandleEvent(event g.PointerEvent) {
+	switch event.(type) {
+	case *g.PointerUpEvent, *g.PointerCancelEvent:
+		r.StopTrackingPointer(event.Pointer())
+	}
+}
+func (r *PassiveRecognizer) AcceptGesture(pointer int) {
+	tadlog(r.name + " accept " + strconv.Itoa(pointer))
+}
+func (r *PassiveRecognizer) RejectGesture(pointer int) {
+	tadlog(r.name + " reject " + strconv.Itoa(pointer))
+}
+
 func tadMakeRecognizer(op tadOp) g.GestureRecognizer {
 	id := op.ID
 	add := func(s string) { tadlog(id + " " + s) }
@@ -223,6 +248,12 @@ func tadMakeRecognizer(op tadOp) g.GestureRecognizer {
 		return r
 	case "eager":
 		return g.NewEagerGestureRecognizer()
+	case "passive":
+		r := &PassiveRecognizer{name: id}
+		r.Construct(r, g.GestureRecognizerOptions{})
+		return r
+	case "tadnone":
+		return g.NewTapAndPanGestureRecognizer()
 	}
 	panic(op.Type)
 }
@@ -321,6 +352,9 @@ func TestRecognizersTapAndDragMatchFlutter(t *testing.T) {
 						" down=" + ptr(r.CurrentDown(), r.CurrentDown() == nil) +
 						" up=" + ptr(r.CurrentUp(), r.CurrentUp() == nil) +
 						" " + tadHashless(r.String()) + " " + r.DebugDescription())
+				case "resign":
+					recognizers[op.ID].(g.OneSequenceGestureRecognizer).Resolve(g.GestureDispositionRejected)
+					tester.Async.FlushMicrotasks()
 				case "dispose":
 					recognizers[op.ID].Dispose()
 				default:

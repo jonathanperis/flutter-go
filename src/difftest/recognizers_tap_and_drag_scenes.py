@@ -72,6 +72,9 @@ class S:
     def state(self, id):
         self.ops.append({"op": "state", "id": id})
 
+    def resign(self, id):
+        self.ops.append({"op": "resign", "id": id})
+
     def dispose(self, id):
         self.ops.append({"op": "dispose", "id": id})
 
@@ -394,6 +397,119 @@ s.move("a", 50, 50)
 s.dispose("r")
 s.up("a")
 s.sweep("a")
+
+# 15. Mutation-driven scenes.
+# A move past the hit slop (not the pan slop) ends the tap series.
+for back in [False, True]:
+    s = S(f"slop move ends series back={back}")
+    s.new("r", "pan", dsb="down", max=5)
+    s.ptr("a")
+    s.down("a", 10, 10, ["r"])
+    s.close("a")
+    s.rdown("a")
+    s.move("a", 28.5, 10)
+    if back:
+        s.move("a", 10, 10)
+    s.up("a")
+    s.sweep("a")
+    s.elapse(50)
+    s.tap("a", 10, 10, ["r"])
+    s.state("r")
+    s.dispose("r")
+# Past the slop and back without reaching the drag distance: still a drag.
+for t in ["hd", "pan"]:
+    s = S(f"slop and back {t}")
+    s.new("r", t, dsb="down")
+    s.ptr("a")
+    s.down("a", 10, 10, ["r"])
+    s.close("a")
+    s.rdown("a")
+    if t == "hd":
+        s.move("a", 10, 28.5)
+        s.move("a", 10, 19)
+    else:
+        s.move("a", 28.5, 10)
+        s.move("a", 19, 10)
+    s.up("a")
+    s.sweep("a")
+    s.dispose("r")
+# A recognizer without callbacks doesn't take part.
+s = S("no callbacks")
+s.new("r", "tadnone")
+s.new("c", "tap")
+s.ptr("a")
+s.tap("a", 10, 10, ["r", "c"])
+s.dispose("r")
+s.dispose("c")
+# A secondary pointer before the primary pointer won.
+s = S("secondary pointer before win")
+s.new("r", "pan", dsb="down")
+s.new("c", "tap")
+s.ptr("a")
+s.ptr("b", buttons=2)
+s.down("a", 10, 10, ["r", "c"])
+s.close("a")
+s.rdown("a")
+s.down("b", 20, 20, ["r"])
+s.close("b")
+s.rdown("b")
+s.up("b")
+s.sweep("b")
+s.up("a")
+s.sweep("a")
+s.dispose("r")
+s.dispose("c")
+# Moves before the arena closes (eager victory while open).
+for t in ["hd", "pan"]:
+    for comp in ["tap", "passive", "hdrag"]:
+        s = S(f"move before close {t} {comp}")
+        s.new("r", t, dsb="down")
+        s.new("c", comp)
+        s.ptr("a")
+        s.down("a", 10, 10, ["r", "c"])
+        s.rdown("a")
+        s.move("a", 40, 45)
+        s.close("a")
+        s.move("a", 50, 55)
+        s.up("a")
+        s.sweep("a")
+        s.dispose("r")
+        s.dispose("c")
+# Without eager victory, against a member that resigns later: the drag
+# starts at the first move past the slop.
+for t in ["hd", "pan"]:
+    for dsb in ["down", "start"]:
+        s = S(f"late win {t} {dsb}")
+        s.new("r", t, dsb=dsb, eager=False)
+        s.new("c", "passive")
+        s.ptr("a")
+        s.down("a", 10, 10, ["r", "c"])
+        s.close("a")
+        s.rdown("a")
+        s.move("a", 40, 12, ts=10)
+        s.move("a", 60, 14, ts=20)
+        s.move("a", 80, 20, ts=30)
+        s.resign("c")
+        s.move("a", 90, 25, ts=40)
+        s.up("a", ts=50)
+        s.sweep("a")
+        s.dispose("r")
+        s.dispose("c")
+# Default drag start behavior (start), eagerVictoryOnDrag (true).
+for t in ["hd", "pan", "tad"]:
+    s = S(f"defaults {t}")
+    s.new("r", t)
+    s.new("c", "tap")
+    s.ptr("a")
+    s.down("a", 10, 10, ["r", "c"])
+    s.close("a")
+    s.rdown("a")
+    s.move("a", 40, 45)
+    s.move("a", 50, 46)
+    s.up("a")
+    s.sweep("a")
+    s.dispose("r")
+    s.dispose("c")
 
 json.dump(scenes, open(sys.argv[1], "w"), indent=0)
 print(len(scenes), "scenes", sum(len(s["ops"]) for s in scenes), "ops")

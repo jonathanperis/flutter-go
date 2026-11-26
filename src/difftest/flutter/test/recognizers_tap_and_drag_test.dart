@@ -38,6 +38,34 @@ PointerDeviceKind kindOf(String name) =>
 
 void logDetails(Object details) => log.add('  ${hashless('$details')}');
 
+class PassiveRecognizer extends OneSequenceGestureRecognizer {
+  PassiveRecognizer(this.name);
+  final String name;
+  @override
+  void addPointer(PointerDownEvent event) {
+    startTrackingPointer(event.pointer);
+  }
+
+  @override
+  String get debugDescription => 'passive';
+  @override
+  void didStopTrackingLastPointer(int pointer) {
+    resolve(GestureDisposition.rejected);
+  }
+
+  @override
+  void handleEvent(PointerEvent event) {
+    if (event is PointerUpEvent || event is PointerCancelEvent) {
+      stopTrackingPointer(event.pointer);
+    }
+  }
+
+  @override
+  void acceptGesture(int pointer) => log.add('$name accept $pointer');
+  @override
+  void rejectGesture(int pointer) => log.add('$name reject $pointer');
+}
+
 GestureRecognizer makeRecognizer(Map<String, Object?> spec) {
   final id = spec['id']! as String;
   final type = spec['type']! as String;
@@ -144,6 +172,10 @@ GestureRecognizer makeRecognizer(Map<String, Object?> spec) {
         ..onDoubleTapCancel = () { add('onDoubleTapCancel'); };
     case 'eager':
       return EagerGestureRecognizer();
+    case 'passive':
+      return PassiveRecognizer(id);
+    case 'tadnone':
+      return TapAndPanGestureRecognizer();
   }
   throw StateError(type);
 }
@@ -233,6 +265,12 @@ void main() {
                 'state count=${r.consecutiveTapCount} down=${r.currentDown?.pointer} '
                 'up=${r.currentUp?.pointer} ${hashless('$r')} ${r.debugDescription}',
               );
+            case 'resign':
+              // ignore: invalid_use_of_protected_member
+              (recognizers[op['id']! as String]! as OneSequenceGestureRecognizer).resolve(
+                GestureDisposition.rejected,
+              );
+              async.flushMicrotasks();
             case 'dispose':
               recognizers[op['id']! as String]!.dispose();
           }
