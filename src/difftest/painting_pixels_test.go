@@ -274,8 +274,8 @@ func TestPaintingPixelsMatchFlutter(t *testing.T) {
 	}
 	// flutter_tester's implicit view has a device pixel ratio of 3.0
 	// (tester_main.cc), which drawShadow uses.
-	defer func(d float64) { EngineDevicePixelRatio = d }(EngineDevicePixelRatio)
-	EngineDevicePixelRatio = 3.0
+	_, restoreTester := useTesterPlatform()
+	defer restoreTester()
 	img := checkerImage(t)
 	scenes := pixelScenes(img)
 	if len(ref) != len(scenes) {

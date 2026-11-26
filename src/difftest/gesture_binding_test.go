@@ -213,7 +213,8 @@ func TestGestureBindingMatchesFlutter(t *testing.T) {
 	loop := async.NewLoop()
 	defer async.SetCurrent(loop)()
 	// flutter_test's test view: device pixel ratio 3.
-	ui.NewPlatformConfiguration(nil).UpdateViewGestureMetrics(0, 3, ui.GestureSettings{})
+	_, restoreTester := useTesterPlatform()
+	defer restoreTester()
 
 	binding := &gbBinding{loop: loop}
 	binding.GestureBindingMixin.SetSelf(binding)

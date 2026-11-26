@@ -559,9 +559,7 @@ Each divergence is listed here when it is introduced.
   package variable of a struct of channels. `BinaryMessenger.
   HandlePlatformMessage` returns `Future[[]byte]` for every messenger (Dart:
   `Future<void>`, which TestDefaultBinaryMessenger overrides as
-  `Future<ByteData?>`). ServicesBinding is complete except view focus
-  (`onViewFocusChange`/`handleViewFocusChanged` wait for dart:ui's
-  ViewFocusEvent).
+  `Future<ByteData?>`). ServicesBinding is complete.
   `BackgroundIsolateBinaryMessenger.send` panics (ENGINE GAP: no isolates).
   The int/double key merge follows the VM on arm64, where the double 2^63
   hashes as 2^63-1.
@@ -756,11 +754,9 @@ Each divergence is listed here when it is introduced.
   pointer; nil is null); `PlatformDispatcher.onPointerDataPacket`/
   `onKeyData`/`onHitTest` are getter/setter pairs; the engine side is
   `PlatformConfiguration.DispatchPointerDataPacket(bytes)` and
-  `PlatformConfiguration.HitTest(viewID, x, y)`. ENGINE GAP: views have no
-  metrics: the device pixel ratio is 1.0 and the gesture settings empty
-  unless an embedder sets them with
-  `PlatformConfiguration.UpdateViewGestureMetrics` (a stand-in for
-  `_updateWindowMetrics`).
+  `PlatformConfiguration.HitTest(viewID, x, y)`. A view's device pixel ratio
+  and gesture settings come from the metrics the embedder reports
+  (`PlatformConfiguration.UpdateViewMetrics`, see "dart:ui views" below).
 - flutter_test: `TestPointer` is ported (`NewTestPointer(opts)`, events'
   named parameters as options); `TestGesture` is not. The gesture tests'
   helper `testGesture`/`GestureTester` (test/gestures/gesture_tester.dart)
@@ -806,7 +802,8 @@ Each divergence is listed here when it is introduced.
   `Picture.toImage` returns `async.Future[*Image]` completed in a later
   event of the current loop. Engine hooks: `ui.EngineImpellerContext()`
   (the process's Impeller context), `ui.EnginePictureDisplayList(p)`,
-  `ui.EngineDevicePixelRatio` (drawShadow), `ui.EngineAssetLoader`
+  drawShadow reads the implicit view's device pixel ratio from the
+  engine's metrics (1.0 without them), `ui.EngineAssetLoader`
   (assets); `Canvas.DrawParagraph` is text.dart's (see below). ENGINE
   GAPs: see PLAN.md "dart:ui drawing over Impeller".
 - dart:ui Path: used by pointer (`ui.NewPath()`, `Path.from` →
@@ -889,6 +886,70 @@ Each divergence is listed here when it is introduced.
   name (the engine's dynamic font manager lowercases ASCII names); the
   builder's `impeller_enabled` flag is always true (it only selects the
   painting path).
+- dart:ui compositing (compositing.dart): `SceneBuilder` and `Scene` are
+  interfaces (`NewSceneBuilder()` returns the engine's), `EngineLayer` an
+  interface implemented by the typed layers `*TransformEngineLayer` ...
+  `*ShaderMaskEngineLayer` (used by pointer). Named arguments are
+  `PushTransformOptions{OldLayer}`, `PushClipRectOptions{ClipBehavior,
+  OldLayer}` (nil `ClipBehavior`: `Clip.antiAlias`), `PushOpacityOptions{Offset,
+  OldLayer}`, `PushBackdropFilterOptions{BlendMode, OldLayer, BackdropID}`,
+  `PushShaderMaskOptions{OldLayer, FilterQuality}`, `AddPictureOptions`,
+  `AddTextureOptions`, `AddPlatformViewOptions` (zero `Offset` is
+  `Offset.zero`; Dart's explicit `offset: null` to pushOpacity, which
+  throws, has no Go form). `Float64List matrix4` is `[]float64`. Native
+  calls after `build()` or `Scene.dispose()` panic with the "native peer
+  has been collected" StateError, as in Dart. Engine side: the layer tree
+  is Go (flow/layers and LayerStateStack ported), handed to the embedder
+  as `*ui.EngineLayerTree` (`Flatten()` → an Impeller display list) by
+  `FlutterView.Render` through the client's optional
+  `PlatformConfigurationRenderClient`. ENGINE GAPs: no texture registry
+  (texture layers paint nothing), no platform views (platform view layers
+  paint nothing), the performance overlay paints nothing, toImageSync
+  renders eagerly, a picture's bounds and group-opacity flag are unknown
+  (no culling; opacity always via saveLayer, which Impeller collapses).
+  `FlutterView.render` of a disposed scene crashes flutter_tester; Go
+  panics with the StateError.
+- dart:ui views (window.dart, platform_dispatcher.dart): `FlutterView`,
+  `Display` (fields `ID`, `DevicePixelRatio`, `Size`, `RefreshRate`) and
+  `SingletonFlutterWindow` (embeds `FlutterView`; `ui.Window`) are used by
+  pointer; `ViewPadding` (`WindowPadding` is an alias; `ViewPaddingZero`),
+  `ViewConstraints` (`NewViewConstraints(ViewConstraintsOptions)` — the
+  zero struct's maxima are 0, not Dart's infinity —, `NewViewConstraintsTight`,
+  `/` is `Div`), `DisplayFeature` (`NewDisplayFeature(bounds, type,
+  state)`), `DisplayCornerRadii`, `ViewFocusEvent`, `GestureSettings` and
+  `SystemColor` are comparable values. `PlatformDispatcher.views/displays`
+  are `iter.Seq`; `view(id:)` is `View(id)`; `implicitView` is never nil
+  (every flutter-go embedder has the implicit view, id 0, from the start);
+  nullable getters return pointers (`EngineID`, `SystemFontFamily`,
+  `LineHeightScaleFactorOverride`..., `DisplayCornerRadii`,
+  `ComputePlatformResolvedLocale`). `requestViewFocusChange`'s required
+  named parameters are positional. `SystemColor.light/dark` are
+  `SystemColorLight/Dark`, `platformProvidesSystemColors` is
+  `SystemColorPlatformProvidesSystemColors()`. Engine side: hooks.dart's
+  entry points are `PlatformConfiguration.AddView/RemoveView/
+  UpdateViewMetrics(viewID, ViewportMetrics)` (the engine's
+  `ViewportMetrics`, `NewViewportMetrics()` for its defaults),
+  `UpdateDisplays([]DisplayData)`, `UpdateLocales`,
+  `UpdateUserSettingsData(json)`, `SendViewFocusEvent`, `SetEngineID`,
+  `DispatchError` (hooks.dart's `_onError`), `LocaleClosure`; the natives
+  reach optional client interfaces (`PlatformConfigurationRenderClient`,
+  `...LocaleClient`, `...ViewFocusClient`, `...RouteClient`,
+  `...PersistentDataClient`, `...ResetClient`, `...FontScaleClient`), with
+  the engine's defaults without them. `PlatformDispatcher.onError`'s
+  `ErrorCallback` is `func(exception any, stackTrace dart.StackTrace) bool`.
+- dart:ui plugins and isolates: `PluginUtilities`, `IsolateNameServer` and
+  `DartPluginRegistrant` (classes of statics) are package variables
+  (`ui.PluginUtilities.GetCallbackHandle(f)`); `CallbackHandle` is a
+  comparable value (`NewCallbackHandleFromRawHandle`). A callback handle
+  exists for package-level functions only (Dart: top-level and static);
+  its value is a hash of the Go qualified name, and the cache is in memory
+  (ENGINE GAP: not persisted). dart:isolate's `SendPort`/`ReceivePort`
+  are `src/isolate` (a ReceivePort delivers on its creator's
+  `async.Loop`; goroutines stand for isolates). `runOnPlatformThread<R>`
+  is `ui.RunOnPlatformThread[R]`; the UI runs on the platform thread, so
+  it is `Future(computation)` and `IsRunningOnPlatformThread` is true (as
+  in flutter_tester). `keepToString` is `ui.KeepToString`, a
+  `dart.Pragma`.
 - services (keyboard): `LogicalKeyboardKey`/`PhysicalKeyboardKey` are
   comparable value structs (`KeyID`, `UsbHidUsage`) implementing
   Diagnosticable directly (a mixin's self pointer would break `==`); build

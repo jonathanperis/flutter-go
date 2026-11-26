@@ -379,6 +379,10 @@ func declOnLine(t string) (Decl, bool) {
 		switch m[2] {
 		case "get", "set", "operator", "const", "final", "var", "class", "enum":
 			return Decl{}, false
+		case "Function":
+			// A function-typed return type (`void Function(Uri) _name(...)`,
+			// hooks.dart), not a declaration: dart:core's Function.
+			return Decl{}, false
 		}
 		return Decl{Name: m[2], Kind: "function"}, true
 	}

@@ -15,8 +15,7 @@ package services_test
 //   - binding_test.dart: the licenses and memory pressure tests are in
 //     binding_assets_test.go, the keyboard state test in
 //     binding_keyboard_test.go, the textInput handler test at the end of
-//     text_input_test.go; the view focus test needs dart:ui's
-//     ViewFocusEvent (not ported yet).
+//     text_input_test.go, the view focus test in binding_view_focus_test.go.
 //   - lifecycle_test.dart: TestPlatformDispatcher's
 //     initialLifecycleStateTestValue doesn't exist yet; the two testWidgets
 //     are ported by sending the states on flutter/lifecycle, as the engine

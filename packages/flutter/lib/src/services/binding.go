@@ -1,6 +1,6 @@
 package services
 
-// Partial port of binding.dart (Flutter 3.50.1): ServicesBinding's
+// Port of binding.dart (Flutter 3.50.1): ServicesBinding's
 // messaging (defaultBinaryMessenger, createBinaryMessenger, channelBuffers,
 // rootIsolateToken, _DefaultBinaryMessenger), the system, accessibility,
 // lifecycle and platform channel handlers (memory pressure, accessibility
@@ -11,11 +11,8 @@ package services
 // Also the keyboard (HardwareKeyboard, KeyEventManager, the key event
 // channel; hardware_keyboard.go), the restoration manager, the licenses
 // read from the asset bundle (initLicenses), the root bundle's clear/evict
-// and SystemChrome's lifecycle hook.
-//
-// Not ported yet: TextInput.ensureInitialized (comes with text_input.go),
-// and PlatformDispatcher.onViewFocusChange / handleViewFocusChanged
-// (dart:ui's ViewFocusEvent is not ported yet).
+// and SystemChrome's lifecycle hook, TextInput.ensureInitialized and
+// PlatformDispatcher.onViewFocusChange (handleViewFocusChanged).
 
 import (
 	"bytes"
@@ -60,6 +57,10 @@ type ServicesBinding interface {
 	// from PlatformDispatcher.InitialLifecycleState, unless it is already
 	// set or the initial state is empty.
 	ReadInitialLifecycleStateFromNativeWindow()
+	// HandleViewFocusChanged is called whenever the PlatformDispatcher
+	// receives a notification that the focus state on a view has changed
+	// (PlatformDispatcher.onViewFocusChange); overrides must call it.
+	HandleViewFocusChanged(event ui.ViewFocusEvent)
 	// AccessibilityFocus is the id of the semantics node that has
 	// accessibility focus on the platform (nil when none).
 	AccessibilityFocus() *foundation.ValueNotifier[*int]
@@ -188,6 +189,7 @@ func (m *ServicesBindingMixin) InitInstances() {
 	})
 	SystemChannels.Lifecycle.SetMessageHandler(m.handleLifecycleMessage)
 	SystemChannels.Platform.SetMethodCallHandler(m.handlePlatformMessage)
+	self.PlatformDispatcher().SetOnViewFocusChange(self.HandleViewFocusChanged)
 	TextInputEnsureInitialized()
 	self.ReadInitialLifecycleStateFromNativeWindow()
 	self.InitializationComplete()
@@ -342,6 +344,10 @@ func parseLicenses(rawLicenses string) []foundation.LicenseEntry {
 	}
 	return out
 }
+
+// HandleViewFocusChanged is handleViewFocusChanged: it does nothing (later
+// bindings override it).
+func (m *ServicesBindingMixin) HandleViewFocusChanged(event ui.ViewFocusEvent) {}
 
 func (m *ServicesBindingMixin) ReadInitialLifecycleStateFromNativeWindow() {
 	self := m.outer()
