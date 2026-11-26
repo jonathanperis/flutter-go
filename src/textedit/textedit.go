@@ -5,7 +5,7 @@
 //
 // Offsets are UTF-16 code units, exactly as in Flutter, so behavior can be
 // compared offset for offset. Text itself is a normal Go (UTF-8) string.
-package services
+package textedit
 
 import (
 	"unicode"

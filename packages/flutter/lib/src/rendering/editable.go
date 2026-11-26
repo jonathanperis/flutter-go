@@ -4,7 +4,7 @@ import (
 	ui "github.com/jonathanperis/flutter-go/engine/src/flutter/lib/ui/go"
 	"math"
 
-	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/services"
+	"github.com/jonathanperis/flutter-go/src/textedit"
 )
 
 // CursorWidth is Flutter's default cursorWidth.
@@ -15,7 +15,7 @@ const CursorWidth = 2.0
 // It is the render half of TextField (Flutter's RenderEditable, single line).
 type RenderEditable struct {
 	Box
-	value          services.Value
+	value          textedit.Value
 	style          TextStyle
 	focused        bool
 	caretVisible   bool
@@ -32,9 +32,9 @@ func NewEditable(style TextStyle) *RenderEditable {
 
 func (r *RenderEditable) Children() []RenderBox   { return nil }
 func (r *RenderEditable) HitTestSelf(Offset) bool { return true }
-func (r *RenderEditable) Value() services.Value   { return r.value }
+func (r *RenderEditable) Value() textedit.Value   { return r.value }
 
-func (r *RenderEditable) Set(v services.Value, style TextStyle, focused, caretVisible bool) {
+func (r *RenderEditable) Set(v textedit.Value, style TextStyle, focused, caretVisible bool) {
 	if v.Text != r.value.Text || style != r.style {
 		MarkNeedsLayout(r)
 	} else if v != r.value || focused != r.focused || caretVisible != r.caretVisible {

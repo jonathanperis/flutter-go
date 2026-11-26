@@ -13,20 +13,20 @@ import (
 	"time"
 
 	r "github.com/jonathanperis/flutter-go/packages/flutter/lib/src/rendering"
-	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/services"
+	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/foundation"
 	. "github.com/jonathanperis/flutter-go/packages/flutter/lib/src/widgets"
 	flutter_test "github.com/jonathanperis/flutter-go/packages/flutter_test/lib/src"
 	"github.com/jonathanperis/flutter-go/src/dart"
 )
 
-func sgPlatform(name string) services.Platform {
+func sgPlatform(name string) foundation.TargetPlatform {
 	switch {
 	case strings.HasPrefix(name, "ios"):
-		return services.IOS
+		return foundation.TargetPlatformIOS
 	case strings.HasPrefix(name, "mac"):
-		return services.MacOS
+		return foundation.TargetPlatformMacOS
 	}
-	return services.Android
+	return foundation.TargetPlatformAndroid
 }
 
 func sgList(c *ScrollController, log *[]string) Widget {
@@ -139,7 +139,7 @@ func TestScrollGesturesMatchFlutter(t *testing.T) {
 	})
 	t.Run("ios_tappable_drag_stop", func(t *testing.T) {
 		tester := flutter_test.New(t)
-		tester.Owner.Platform = services.IOS
+		tester.Owner.Platform = foundation.TargetPlatformIOS
 		var log []string
 		c := NewScrollController(500)
 		tester.PumpWidget(sgList(c, &log))
@@ -158,7 +158,7 @@ func TestScrollGesturesMatchFlutter(t *testing.T) {
 	})
 	t.Run("ios_hold_overscroll_under_outer_tap", func(t *testing.T) {
 		tester := flutter_test.New(t)
-		tester.Owner.Platform = services.IOS
+		tester.Owner.Platform = foundation.TargetPlatformIOS
 		var log []string
 		c := NewScrollController(0)
 		tester.PumpWidget(GestureDetector{OnTap: func() { log = append(log, "outer tap") }, Child: sgList(c, nil)})

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/services"
+	"github.com/jonathanperis/flutter-go/src/textedit"
 )
 
 type TextStyle struct {
@@ -101,7 +101,7 @@ func (p *UIParagraph) Release()                   { p.Paragraph.Dispose() }
 // CaretX is the left edge of the grapheme starting at off, or the right
 // edge of the last one at the end of the text (single line, LTR).
 func (p *UIParagraph) CaretX(off int) float64 {
-	n := services.Len16(p.text)
+	n := textedit.Len16(p.text)
 	if n == 0 || off <= 0 {
 		return 0
 	}
@@ -141,7 +141,7 @@ func (p fixedParagraph) Release()                   {}
 
 // In the test font every grapheme cluster is one square glyph.
 func (p fixedParagraph) CaretX(off int) float64 {
-	stops := services.GraphemeStops(p.text)
+	stops := textedit.GraphemeStops(p.text)
 	n := 0
 	for i, st := range stops {
 		if st <= off {
@@ -152,7 +152,7 @@ func (p fixedParagraph) CaretX(off int) float64 {
 }
 
 func (p fixedParagraph) OffsetAtX(x float64) int {
-	stops := services.GraphemeStops(p.text)
+	stops := textedit.GraphemeStops(p.text)
 	i := int(math.Round(x / p.size))
 	return stops[max(0, min(i, len(stops)-1))]
 }
