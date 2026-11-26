@@ -28,6 +28,7 @@ type mockHttpClientResponse struct {
 }
 
 func (r *mockHttpClientResponse) ContentLength() int { return r.contentLength }
+func (r *mockHttpClientResponse) StatusCode() int    { return 200 }
 func (r *mockHttpClientResponse) CompressionState() io.HttpClientResponseCompressionState {
 	return r.compressionState
 }

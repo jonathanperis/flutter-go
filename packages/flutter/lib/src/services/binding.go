@@ -192,7 +192,7 @@ func (m *ServicesBindingMixin) CreateBinaryMessenger() BinaryMessenger {
 }
 
 func (m *ServicesBindingMixin) HandleMemoryPressure() {
-	// rootBundle.clear(): the asset bundle is not ported yet.
+	RootBundle.Clear()
 }
 
 func (m *ServicesBindingMixin) HandleSystemMessage(systemMessage any) async.Future[async.Void] {
@@ -226,7 +226,7 @@ func (m *ServicesBindingMixin) InitServiceExtensions() {
 }
 
 func (m *ServicesBindingMixin) Evict(asset string) {
-	// rootBundle.evict(asset): the asset bundle is not ported yet.
+	RootBundle.Evict(asset)
 }
 
 func (m *ServicesBindingMixin) ReadInitialLifecycleStateFromNativeWindow() {

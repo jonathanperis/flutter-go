@@ -37,6 +37,7 @@ func (s HttpClientResponseCompressionState) String() string {
 // its content length (-1 when unknown) and compression state.
 type HttpClientResponse interface {
 	async.Stream[[]byte]
+	StatusCode() int
 	ContentLength() int
 	CompressionState() HttpClientResponseCompressionState
 }

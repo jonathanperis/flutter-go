@@ -4,7 +4,7 @@ package flutter_test
 // AutomatedTestWidgetsFlutterBinding, the binding `testWidgets` runs in,
 // composed as TestWidgetsFlutterBinding is (BindingBase with
 // SchedulerBinding, ServicesBinding, GestureBinding, SemanticsBinding,
-// TestDefaultBinaryMessengerBinding; RendererBinding, PaintingBinding and
+// PaintingBinding, TestDefaultBinaryMessengerBinding; RendererBinding and
 // WidgetsBinding are not in it yet). The persistent
 // frame callback draws the current Tester's BuildOwner, as
 // RendererBinding/WidgetsBinding's drawFrame would.
@@ -19,6 +19,7 @@ import (
 	ui "github.com/jonathanperis/flutter-go/engine/src/flutter/lib/ui/go"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/foundation"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/gestures"
+	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/painting"
 	r "github.com/jonathanperis/flutter-go/packages/flutter/lib/src/rendering"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/scheduler"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/semantics"
@@ -37,6 +38,7 @@ type AutomatedTestWidgetsFlutterBinding struct {
 	services.ServicesBindingMixin
 	gestures.GestureBindingMixin
 	semantics.SemanticsBindingMixin
+	painting.PaintingBindingMixin
 	TestDefaultBinaryMessengerBindingMixin
 
 	tester *Tester // the test in progress (flutter_test: inTest)
@@ -54,10 +56,11 @@ func AutomatedTestWidgetsFlutterBindingEnsureInitialized() *AutomatedTestWidgets
 		b.ServicesBindingMixin.SetSelf(b)
 		b.GestureBindingMixin.SetSelf(b)
 		b.SemanticsBindingMixin.SetSelf(b)
+		b.PaintingBindingMixin.SetSelf(b)
 		b.TestDefaultBinaryMessengerBindingMixin.SetSelf(b)
 		loop := async.Current()
 		b.Construct(b, &b.SchedulerBindingMixin, &b.ServicesBindingMixin, &b.GestureBindingMixin, &b.SemanticsBindingMixin,
-			&b.TestDefaultBinaryMessengerBindingMixin)
+			&b.PaintingBindingMixin, &b.TestDefaultBinaryMessengerBindingMixin)
 		// ServicesBinding's channel buffers drain in a microtask, and the
 		// engine answers initializationComplete with a posted event: run
 		// them, as Dart's event loop would before the first test.
@@ -84,7 +87,14 @@ func (b *AutomatedTestWidgetsFlutterBinding) InitInstances() {
 func (b *AutomatedTestWidgetsFlutterBinding) InitServiceExtensions() {
 	b.ServicesBindingMixin.InitServiceExtensions()
 }
-func (b *AutomatedTestWidgetsFlutterBinding) Unlocked() { b.GestureBindingMixin.Unlocked() }
+func (b *AutomatedTestWidgetsFlutterBinding) Unlocked()          { b.GestureBindingMixin.Unlocked() }
+func (b *AutomatedTestWidgetsFlutterBinding) Evict(asset string) { b.PaintingBindingMixin.Evict(asset) }
+func (b *AutomatedTestWidgetsFlutterBinding) HandleMemoryPressure() {
+	b.PaintingBindingMixin.HandleMemoryPressure()
+}
+func (b *AutomatedTestWidgetsFlutterBinding) HandleSystemMessage(systemMessage any) async.Future[async.Void] {
+	return b.PaintingBindingMixin.HandleSystemMessage(systemMessage)
+}
 
 // DebugSamplingClock is the test clock (_TestSamplingClock): fake time on
 // the test's own event loop (testWidgets' FakeAsync clock, even inside a
@@ -250,4 +260,12 @@ func (b *AutomatedTestWidgetsFlutterBinding) postTest(t *Tester) {
 	if scheduler.TimeDilation() != 1.0 {
 		t.t.Errorf("The timeDilation was changed and not reset by the test.")
 	}
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				t.t.Errorf("%v", r)
+			}
+		}()
+		painting.DebugAssertAllPaintingVarsUnset("The value of a painting debug variable was changed by the test.")
+	}()
 }
