@@ -27,10 +27,23 @@ func TestTruncDiv(t *testing.T) {
 			t.Errorf("TruncDiv(%v, %v) = %v, want %v", c[0], c[1], got, c[2])
 		}
 	}
+	// The quotient is an int converted back to a double: never -0.0.
+	for _, c := range [][2]float64{{-0.5, 1}, {0.5, -1}, {-0.0, 3}} {
+		if got := TruncDiv(c[0], c[1]); got != 0 || math.Signbit(got) {
+			t.Errorf("TruncDiv(%v, %v) = %v, want +0.0", c[0], c[1], got)
+		}
+	}
+	// Outside int64 the VM's int saturates.
+	for _, c := range [][3]float64{{1e22, 1.5, 9223372036854775808.0}, {-1e22, 1.5, -9223372036854775808.0},
+		{9.3e18, 1, 9223372036854775808.0}, {-9.3e18, 1, -9223372036854775808.0}} {
+		if got := TruncDiv(c[0], c[1]); got != c[2] {
+			t.Errorf("TruncDiv(%v, %v) = %v, want %v", c[0], c[1], got, c[2])
+		}
+	}
 	for _, c := range [][2]float64{{1e300, 1e-10}, {1, 0}, {math.NaN(), 1}, {math.Inf(1), 1}} {
 		func() {
 			defer func() {
-				if _, ok := recover().(UnsupportedError); !ok {
+				if e, ok := recover().(UnsupportedError); !ok || e.Error() != "Unsupported operation: Infinity or NaN toInt" {
 					t.Errorf("TruncDiv(%v, %v): want UnsupportedError panic", c[0], c[1])
 				}
 			}()
