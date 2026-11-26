@@ -729,10 +729,10 @@ func (c *ImageStreamCompleterBase) DebugFillProperties(description *foundation.D
 		}
 		return s
 	}
-	description.Add(foundation.NewObjectFlagProperty("listeners", c.listeners, foundation.ObjectFlagPropertyOptions{
+	description.Add(foundation.NewObjectFlagProperty("listeners", append([]ImageStreamListener{}, c.listeners...), foundation.ObjectFlagPropertyOptions{
 		IfPresent: strp(plural(len(c.listeners), "listener")),
 	}))
-	description.Add(foundation.NewObjectFlagProperty("ephemeralErrorListeners", c.ephemeralErrorListeners, foundation.ObjectFlagPropertyOptions{
+	description.Add(foundation.NewObjectFlagProperty("ephemeralErrorListeners", append([]ImageErrorListener{}, c.ephemeralErrorListeners...), foundation.ObjectFlagPropertyOptions{
 		IfPresent: strp(plural(len(c.ephemeralErrorListeners), "ephemeralErrorListener")),
 	}))
 	description.Add(foundation.NewFlagProperty("disposed", c.disposed, foundation.FlagPropertyOptions{IfTrue: strp("<disposed>")}))
