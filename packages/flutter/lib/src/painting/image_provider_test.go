@@ -333,3 +333,30 @@ func TestShaderWarmUp(t *testing.T) {
 		t.Errorf("captured %d", captured)
 	}
 }
+
+// twiceErrorProvider reports an error twice from ResolveStreamForKey.
+type twiceErrorProvider struct{ ImageProviderBase }
+
+func (p *twiceErrorProvider) ObtainKey(ImageConfiguration) async.Future[any] {
+	return foundation.NewSynchronousFuture[any](p)
+}
+
+func (p *twiceErrorProvider) ResolveStreamForKey(_ ImageConfiguration, _ *ImageStream, _ any, handleError ImageErrorListener) {
+	handleError("first", nil)
+	handleError("second", nil)
+}
+
+// Not in Flutter's tests (found by mutation testing): resolve reports only
+// the first error of a provider.
+func TestImageProviderReportsOnlyFirstError(t *testing.T) {
+	tester := newProviderTester(t)
+	p := &twiceErrorProvider{}
+	p.SetSelf(p)
+	var errs []any
+	p.Resolve(ImageConfigurationEmpty).AddListener(NewImageStreamListener(func(*ImageInfo, bool) {},
+		ImageStreamListenerOptions{OnError: func(e any, _ dart.StackTrace) { errs = append(errs, e) }}))
+	tester.Loop().Elapse(0)
+	if len(errs) != 1 || errs[0] != "first" {
+		t.Errorf("errors %v", errs)
+	}
+}

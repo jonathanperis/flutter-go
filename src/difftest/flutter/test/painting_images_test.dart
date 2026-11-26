@@ -171,6 +171,27 @@ void main() {
     dump('clear');
     c.clearLiveImages();
     dump('clearLive');
+    c.maximumSize = 4;
+    c.maximumSizeBytes = 256 + 400;
+    for (final (int k, ui.Image i) in <(int, ui.Image)>[(0, img8), (1, img10)]) {
+      final TestCompleter e = TestCompleter()..set(i);
+      c.putIfAbsent(k, () => e);
+    }
+    dump('exactly full');
+    c.clear();
+    c.maximumSizeBytes = 256;
+    final TestCompleter e8 = TestCompleter()..set(img8);
+    c.putIfAbsent(0, () => e8);
+    dump('image of max bytes');
+    c.maximumSizeBytes = 0;
+    c.maximumSizeBytes = 0;
+    final TestCompleter noBytes = TestCompleter();
+    c.putIfAbsent(1, () => noBytes);
+    dump('no bytes pending');
+    noBytes.set(img8);
+    dump('no bytes complete');
+    c.clearLiveImages();
+    c.maximumSizeBytes = 100 << 20;
     c.maximumSize = 0;
     final TestCompleter disabled = TestCompleter();
     c.putIfAbsent(6, () => disabled);
@@ -186,6 +207,19 @@ void main() {
 
   scene('stream_listeners', (WidgetTester tester, void Function(String) log) async {
     final TestCompleter c = TestCompleter();
+    final ImageStream pre = ImageStream();
+    final List<ImageStreamListener> preListeners = <ImageStreamListener>[
+      for (final String n in <String>['a', 'b', 'c'])
+        ImageStreamListener((ImageInfo i, bool sync) {
+          log('pre $n sync $sync');
+          i.dispose();
+        }),
+    ];
+    preListeners.forEach(pre.addListener);
+    pre.removeListener(preListeners[1]);
+    log(norm(pre));
+    final TestCompleter preC = TestCompleter()..set(img8);
+    pre.setCompleter(preC);
     final ImageStream stream = ImageStream();
     log(norm(stream));
     late ImageStreamListener l2;
@@ -326,6 +360,25 @@ void main() {
       log('removed: disposed ${codec.disposed}');
     }
     timeDilation = 1.0;
+    // A restarted decode completing before the pending frame callback ran:
+    // one frame callback only.
+    final MockCodec codec = MockCodec(2, -1);
+    final MultiFrameImageStreamCompleter c =
+        MultiFrameImageStreamCompleter(codec: SynchronousFuture<ui.Codec>(codec), scale: 1.0);
+    final ImageStreamListener l = ImageStreamListener((ImageInfo i, bool sync) => i.dispose());
+    c.addListener(l);
+    codec.completeNextFrame(FakeFrame(Duration.zero, img8.clone()));
+    await tester.idle();
+    log('scheduled ${SchedulerBinding.instance.transientCallbackCount}');
+    final ImageStreamCompleterHandle h = c.keepAlive();
+    c.removeListener(l);
+    c.addListener(l);
+    codec.completeNextFrame(FakeFrame(Duration.zero, img10.clone()));
+    await tester.idle();
+    log('rescheduled ${SchedulerBinding.instance.transientCallbackCount} asked ${codec.numFramesAsked}');
+    await tester.pump();
+    c.removeListener(l);
+    h.dispose();
   });
 
   scene('asset_variants', (WidgetTester tester, void Function(String) log) async {
@@ -419,6 +472,9 @@ void main() {
     log(const ExactAssetImage('e.png', scale: 3.0, package: 'p').toString());
     log(FileImage(File('/tmp/f.png'), scale: 0.5).toString());
     log(norm(MemoryImage(Uint8List(3), scale: 1.05)));
+    final Uint8List bytes = Uint8List(2);
+    log('${MemoryImage(bytes) == MemoryImage(bytes)} ${MemoryImage(bytes) == MemoryImage(bytes, scale: 2)} '
+        '${MemoryImage(bytes) == MemoryImage(Uint8List(2))}');
     log(norm(AssetBundleImageKey(bundle: ManifestBundle(const <String, List<Object>>{}), name: 'n', scale: 1.5)));
     log(norm(imageCache.statusForKey('nothing')));
     log(norm(const ImageChunkEvent(cumulativeBytesLoaded: 10, expectedTotalBytes: null)));

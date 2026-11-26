@@ -271,3 +271,22 @@ func TestAssetManifestContentHashedMainVariant(t *testing.T) {
 		expect(len(spaced) == 1 && spaced[0].Key == "assets/sub dir/space image.1a2b3c4d.png" && spaced[0].Main, "spaced %v", spaced)
 	})
 }
+
+// Not in Flutter's tests (found by mutation testing): a failed structured
+// load is not cached.
+func TestCachingAssetBundleFailedStructuredLoadIsNotCached(t *testing.T) {
+	ensureInitialized()
+	runAsync(t, func() {
+		bundle := newTestAssetBundle()
+		err := awaitError(bundle.LoadStructuredData("AssetManifest.json", func(string) async.Future[any] {
+			return async.FutureError[any](async.PanicError{Value: "fail"})
+		}))
+		expect(err != nil, "no error")
+		expect(bundle.LoadStructuredData("AssetManifest.json", strFuture("ok")).Await() == "ok", "cached failure")
+		err = awaitError(bundle.LoadStructuredBinaryData("AssetManifest.bin", func([]byte) any {
+			return async.EraseFuture(async.FutureError[any](async.PanicError{Value: "fail"}))
+		}))
+		expect(err != nil, "no error")
+		expect(bundle.LoadStructuredBinaryData("AssetManifest.bin", binFuture("ok")).Await() == "ok", "cached failure")
+	})
+}

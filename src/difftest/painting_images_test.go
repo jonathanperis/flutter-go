@@ -173,6 +173,29 @@ var imageScenes = map[string]func(tester *flutter_test.Tester, f *imgFixture, lo
 		dump("clear")
 		c.ClearLiveImages()
 		dump("clearLive")
+		c.SetMaximumSize(4)
+		c.SetMaximumSizeBytes(256 + 400)
+		for k, i := range []*ui.Image{f.img8, f.img10} {
+			e := newTestCompleter()
+			e.set(i)
+			c.PutIfAbsent(k, func() ImageStreamCompleter { return e })
+		}
+		dump("exactly full")
+		c.Clear()
+		c.SetMaximumSizeBytes(256)
+		e8 := newTestCompleter()
+		e8.set(f.img8)
+		c.PutIfAbsent(0, func() ImageStreamCompleter { return e8 })
+		dump("image of max bytes")
+		c.SetMaximumSizeBytes(0)
+		c.SetMaximumSizeBytes(0)
+		noBytes := newTestCompleter()
+		c.PutIfAbsent(1, func() ImageStreamCompleter { return noBytes })
+		dump("no bytes pending")
+		noBytes.set(f.img8)
+		dump("no bytes complete")
+		c.ClearLiveImages()
+		c.SetMaximumSizeBytes(100 << 20)
 		c.SetMaximumSize(0)
 		disabled := newTestCompleter()
 		c.PutIfAbsent(6, func() ImageStreamCompleter { return disabled })
@@ -195,6 +218,22 @@ var imageScenes = map[string]func(tester *flutter_test.Tester, f *imgFixture, lo
 		tester.Pump()
 	},
 	"stream_listeners": func(tester *flutter_test.Tester, f *imgFixture, log func(string)) {
+		pre := NewImageStream()
+		var preListeners []ImageStreamListener
+		for _, n := range []string{"a", "b", "c"} {
+			preListeners = append(preListeners, NewImageStreamListener(func(i *ImageInfo, sync bool) {
+				log(fmt.Sprintf("pre %s sync %t", n, sync))
+				i.Dispose()
+			}))
+		}
+		for _, l := range preListeners {
+			pre.AddListener(l)
+		}
+		pre.RemoveListener(preListeners[1])
+		log(imgNorm(pre))
+		preC := newTestCompleter()
+		preC.set(f.img8)
+		pre.SetCompleter(preC)
 		c := newTestCompleter()
 		stream := NewImageStream()
 		log(imgNorm(stream))
@@ -344,6 +383,25 @@ var imageScenes = map[string]func(tester *flutter_test.Tester, f *imgFixture, lo
 			log(fmt.Sprintf("removed: disposed %t", codec.disposed))
 		}
 		scheduler.SetTimeDilation(1.0)
+		// A restarted decode completing before the pending frame callback
+		// ran: one frame callback only.
+		codec := &MockCodec{frameCount: 2, repetitionCount: -1, next: async.NewCompleter[*ui.FrameInfo]()}
+		c := NewMultiFrameImageStreamCompleter(foundation.NewSynchronousFuture[ui.Codec](codec), 1.0)
+		l := NewImageStreamListener(func(i *ImageInfo, sync bool) { i.Dispose() })
+		c.AddListener(l)
+		codec.completeNextFrame(&ui.FrameInfo{Image: f.img8.Clone()})
+		tester.Loop().Elapse(0)
+		b := scheduler.SchedulerBindingInstance()
+		log(fmt.Sprintf("scheduled %d", b.TransientCallbackCount()))
+		h := c.KeepAlive()
+		c.RemoveListener(l)
+		c.AddListener(l)
+		codec.completeNextFrame(&ui.FrameInfo{Image: f.img10.Clone()})
+		tester.Loop().Elapse(0)
+		log(fmt.Sprintf("rescheduled %d asked %d", b.TransientCallbackCount(), codec.numFramesAsked))
+		tester.Pump()
+		c.RemoveListener(l)
+		h.Dispose()
 	},
 	"asset_variants": func(tester *flutter_test.Tester, f *imgFixture, log func(string)) {
 		manifests := [][]*float64{
@@ -465,6 +523,10 @@ var imageScenes = map[string]func(tester *flutter_test.Tester, f *imgFixture, lo
 		log(NewExactAssetImage("e.png", ExactAssetImageOptions{Scale: imgOpt(3.0), Package: imgOpt("p")}).String())
 		log(NewFileImage(io.NewFile("/tmp/f.png"), FileImageOptions{Scale: imgOpt(0.5)}).String())
 		log(imgNorm(NewMemoryImage(make([]byte, 3), MemoryImageOptions{Scale: imgOpt(1.05)})))
+		bytes := make([]byte, 2)
+		log(fmt.Sprintf("%t %t %t", NewMemoryImage(bytes).Equal(NewMemoryImage(bytes)),
+			NewMemoryImage(bytes).Equal(NewMemoryImage(bytes, MemoryImageOptions{Scale: imgOpt(2.0)})),
+			NewMemoryImage(bytes).Equal(NewMemoryImage(make([]byte, 2)))))
 		log(imgNorm(AssetBundleImageKey{Bundle: newManifestBundleD(map[string]any{}), Name: "n", Scale: 1.5}))
 		log(imgNorm(ImageCacheInstance().StatusForKey("nothing")))
 		log(imgNorm(NewImageChunkEvent(10, nil)))

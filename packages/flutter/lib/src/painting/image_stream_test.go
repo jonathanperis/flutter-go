@@ -971,3 +971,18 @@ func TestImageStreamErrorsReportedAfterListenerRemovalByDefault(t *testing.T) {
 		t.Errorf("reported %d", len(reported))
 	}
 }
+
+// Not in Flutter's tests (found by mutation testing): an image clears the
+// ephemeral error listeners, so a later error doesn't reach them.
+func TestImageStreamSetImageClearsEphemeralErrorListeners(t *testing.T) {
+	f := newStreamFixture(t)
+	c := newFakeEventReportingImageStreamCompleter(nil)
+	called := 0
+	c.AddEphemeralErrorListener(func(any, dart.StackTrace) { called++ })
+	c.AddListener(NewImageStreamListener(f.disposing(nil), ImageStreamListenerOptions{OnError: func(any, dart.StackTrace) {}}))
+	c.SetImage(NewImageInfo(f.image20x10.Clone()))
+	c.ReportError("late error")
+	if called != 0 {
+		t.Errorf("ephemeral listener called %d times", called)
+	}
+}
