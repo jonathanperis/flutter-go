@@ -699,23 +699,6 @@ func (r *ScaleGestureRecognizer) reconfigure(pointer int) bool {
 	return true
 }
 
-// dartMax is dart:math's max for doubles (NaN wins; max(-0.0, 0.0) is
-// 0.0).
-func dartMax(a, b float64) float64 {
-	if a > b {
-		return a
-	}
-	if a < b {
-		return b
-	}
-	if math.IsNaN(b) {
-		return b
-	}
-	if a == 0 && math.Signbit(a) {
-		return b
-	}
-	return a
-}
 
 func (r *ScaleGestureRecognizer) advanceStateMachine(shouldStartIfAccepted bool, event PointerEvent) {
 	if r.state == scaleStateReady {

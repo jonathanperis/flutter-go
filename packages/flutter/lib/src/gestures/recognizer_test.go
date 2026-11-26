@@ -97,8 +97,6 @@ func (r *testPrimaryPointerGestureRecognizer) DebugDescription() string { return
 func isUp(e PointerEvent) bool   { _, ok := e.(*PointerUpEvent); return ok }
 func isMove(e PointerEvent) bool { _, ok := e.(*PointerMoveEvent); return ok }
 
-func f64(v float64) *float64 { return &v }
-
 func expectStrings(t *testing.T, got []string, want ...string) {
 	t.Helper()
 	if strings.Join(got, ",") != strings.Join(want, ",") {
