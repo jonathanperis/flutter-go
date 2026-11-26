@@ -196,6 +196,7 @@ func bpEdgePixel(px []byte, x, y int) bool {
 //   - drawCircle (border.uniform.circle, circle, circle.outside) is
 //     Impeller's circle geometry: ≤8 on edge pixels (as in
 //     painting_pixels' "circle").
+//
 // Every pixel differing by more than 2 must be an edge pixel (bpEdgePixel).
 var bordersPixelTolerance = map[string]struct{ max, over2 int }{
 	"border.nonuniform.circle": {65, 5},
