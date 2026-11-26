@@ -1650,3 +1650,92 @@ The standing goal is now full API parity with Flutter 3.50.1's Dart layer
   min fling velocity, holds under a competing outer tap.
 - Parity: 400 → 603 of 2889 exposed (tested 309 → 432); gestures 0 →
   188/188, dart:ui 60 → 75.
+
+### dart:ui drawing over Impeller (P1 core): painting.dart in full
+
+- **Scope.** Every declaration of painting.dart: Paint (with its 68-byte
+  float32/int32 storage reproduced: values read back float32-rounded,
+  alpha stored as 1 - a, blend mode XOR srcOver, and the 3.50.1 quirk that
+  `strokeMiterLimit` returns the stored limit minus 4, so a new Paint
+  reports 0.0 and prints "up to 0.0"), the drawing enums, MaskFilter,
+  ColorFilter, ImageFilter (blur/dilate/erode/matrix/compose/shader),
+  Shader/Gradient/ImageShader, Canvas (every method), PictureRecorder,
+  Picture, Vertices, Shadow, Path/PathMetrics/Tangent, Image/codecs/
+  ImmutableBuffer/ImageDescriptor/decoding, FragmentProgram/
+  FragmentShader/uniform slots. dart:ui parity 75 → 133 of 195; what is
+  left is text.dart, compositing.dart and window/platform pieces.
+- **How it maps to the engine.** Canvas calls go to the Impeller SDK's
+  display list builder, which is the engine's own DisplayListBuilder: the
+  current matrix and save count are read back from it, so getTransform is
+  the engine's float math for free. The SDK doesn't expose the builder's
+  clip tracking, so `DisplayListMatrixClipState` (cull rects, AA
+  round-out, difference cutouts, saveLayer bounds and the filters'
+  `get_input_device_bounds`) and the impeller rect/matrix operations it
+  needs (Invert, TransformBounds...) are ported in float32. Paths are Go
+  (a port of SkPathBuilder) converted to SDK paths when drawn (conics to
+  quads at a scale-aware tolerance). Picture.toImage renders the display
+  list into an offscreen CAMetalLayer drawable and reads it back
+  (src/platform/metal); the SDK hides its command queue, so the commits
+  made during the draw are captured (the command buffer class's `commit`
+  is wrapped) and waited for before the blit — without that the readback
+  raced the GPU. Images are CPU pixels uploaded lazily as SDK textures in
+  dart:ui's process-wide Impeller context, which src/app now also
+  presents with.
+- **Exactness: the engine's compiler.** The reference binary is arm64 and
+  the engine builds with clang's default -ffp-contract=on: within one
+  expression `a*b + c` becomes an FMA (left product first). Reproducing
+  that made getLocalClipBounds after rotations exact (the cofactor
+  expansion of Matrix::Invert is fused term by term); the Path helper
+  needed an exact float32 FMA (round-to-odd; a float64 FMA double-rounds)
+  and found that clang merges sinf+cosf of one value into Apple's
+  `__sincosf_stret`, which differs from separate sinf/cosf in the last bit
+  for ~2.6% of inputs (16 arc cases failed until it was called via cgo).
+- **Difftests.** painting_api (87 cases: Paint state/toString, filters'
+  toString/==, saturation matrices, argument errors, Shadow, enums, 40
+  Canvas states: transforms, save counts, local/destination clip bounds
+  under rotation/skew/perspective/saveLayer filters): exact. path (3408
+  cases over 136 paths: bounds, contains grids and probes ±1/4096 off the
+  outline, metrics/tangents/extractPath, transforms): exact.
+  painting_pixels (39 scenes, Impeller on Metal vs flutter_tester's
+  Impeller on Vulkan/SwiftShader): 24 bit-exact (gradients, images, image
+  shader, color filters, invertColors, blur/dilate, mask blur ≤1, layers,
+  shadow ≤1 once drawShadow gets the tester's device pixel ratio 3.0);
+  anti-aliased edges differ by exactly one MSAA sample (64) on a few edge
+  pixels (the GPUs' sample positions); circle ≤5; clip.rect is an ENGINE
+  GAP (the SDK's clips record is_aa=false). image_codec (Impeller
+  reference; the Skia backend fails some cases): PNG/GIF/APNG/BMP pixels
+  exact; JPEG ≤4–13 (Go's IDCT vs libjpeg-turbo, scaled IDCTs), Metal's
+  bilinear resize ≤2, PNG encoder bytes differ (pixels compared).
+  fragment_shader: reflection/errors exact, pixels exact except one case
+  at an 8-bit rounding tie (Metal correct, SwiftShader off by 1).
+- **Found by the difftests:** saveLayer/draw blurs without a tile mode are
+  decal (canvas.cc passes kDecal, drawPaint kClamp); Impeller draws a
+  point-mode polygon as separate lines; Flutter's ColorFilter.matrix
+  translation is 0..255 and the engine scales it (the SDK header's
+  "0..255" comment is wrong: it passes the matrix straight through);
+  calling a native method after endRecording throws "native peer has been
+  collected"; the blur/dilate/erode NOP thresholds (SK_ScalarNearlyZero).
+- **Mutations.** Canvas/Paint/filters: 22 valid, 21 caught (two only after
+  adding difftest cases: a paint alpha whose float32 rounding differs,
+  rotations 0.5 and 1.3 whose float-vs-double degree conversion differs);
+  1 equivalent (Invert's `1.0/det` in double vs float: no difference
+  found over 10^5 values). Path: 95 caught, ~25 equivalent, 11 below what
+  grids/probes resolve (listed in the Path report). Fragment shaders: 51 of
+  52 (1 equivalent). Images/codecs: see image_codec_test.go.
+- **ENGINE GAPs (Impeller SDK):** Path.combine (Skia PathOps, 18k lines;
+  panics with UnimplementedError); Path.transform with a perspective
+  crossing w=0 (SkEdgeClipper); clips are never anti-aliased; no gamma
+  color filters, no ColorFilter as ImageFilter, no composition of a
+  non-matrix color filter with invertColors; drawVertices ignores colors
+  and texture coordinates (triangles as paths); blur `bounds`; sampling is
+  nearest/linear only (medium/high = linear); toImageSync renders eagerly
+  and ignores targetFormat; Picture.approximateBytesUsed is an estimate;
+  image decoding is Go's (JPEG/WebP/ICC/resize differences above); shader
+  samplers always linear; Canvas.drawParagraph waits for text.dart
+  (`ui.EngineDrawParagraph` meanwhile).
+- **src/app** builds each frame with ui.PictureRecorder/ui.Canvas (the
+  interim rendering.Canvas is an adapter over it) and presents the
+  picture's display list with dart:ui's Impeller context. The counter demo
+  ran for 8 s with no errors (window opened; screenshots don't work on
+  this machine, so the pixels were not inspected on screen — the offscreen
+  pixel difftest covers rendering).

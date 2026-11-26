@@ -113,7 +113,25 @@ Start here when continuing flutter-go in a new session.
      (transformed_*, resample_event_on_widget); flutter_test's TestGesture
      and WidgetController (tester.fling/drag on real TestGestures);
      src/app's mouse as a mouse pointer kind (it sends touch events today).
-  9. Split `services` (text-editing model under non-Flutter names) by
+  9. Done (P1): dart:ui's drawing API over the Impeller SDK — everything
+     painting.dart declares: Paint, BlendMode & co., MaskFilter,
+     ColorFilter, ImageFilter, Shader/Gradient/ImageShader, Canvas,
+     PictureRecorder, Picture (toImage/toImageSync through an offscreen
+     Metal render + readback), Vertices, Shadow, Path/PathMetrics (Skia's
+     SkPathBuilder/contains/SkContourMeasure ported bit for bit), Image,
+     codecs and decoding (Go decoders), FragmentProgram/FragmentShader
+     (impellerc runtime stages). src/app records frames with
+     ui.PictureRecorder/ui.Canvas and presents with dart:ui's Impeller
+     context. Next for it: text.dart (Paragraph; Canvas.drawParagraph is
+     `ui.EngineDrawParagraph` for now) and compositing.dart (Scene,
+     SceneBuilder, EngineLayers); then move rendering off its interim
+     `rendering.Canvas` onto ui.Canvas (painting library: BoxPainter,
+     decorations, image providers). ENGINE GAPs to revisit: Path.combine
+     (Skia PathOps — the Flutter SDK's prebuilt libpath_ops.dylib exposes
+     an Op for lines/cubics only), AA clips (the SDK records is_aa=false),
+     gamma color filters and ColorFilter-as-ImageFilter, drawVertices'
+     colors/texture coordinates, blur bounds, mipmap/cubic sampling.
+  10. Split `services` (text-editing model under non-Flutter names) by
      library; RendererBinding/PaintingBinding/WidgetsBinding into the
      bindings as their libraries are ported.
 
@@ -146,6 +164,13 @@ Start here when continuing flutter-go in a new session.
 - zsh: never name a shell variable `path` (it is tied to `PATH`).
 - Bit-exact parity with Flutter is achievable (physics, scroll simulations,
   geometry and color are exact); see the exactness rules above.
+- Engine float code (Skia, DisplayList, impeller geometry) is compiled by
+  clang for arm64 with -ffp-contract=on: `a*b + c` in one expression is a
+  fused multiply-add, and sinf+cosf of one value is one `__sincosf_stret`
+  call. Ports of that C++ must reproduce both (see PLAN, dart:ui drawing).
+- Pixel references come from `flutter test --enable-impeller`
+  (`src/difftest/flutter/test/impeller/`, written only in that mode); plain
+  `flutter test` is Skia's software renderer.
 - Window screenshots (`screencapture -l`) stopped working on this machine;
   environmental.
 - Benchmarks vary about ±30% between runs here.

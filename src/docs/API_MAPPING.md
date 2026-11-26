@@ -788,3 +788,50 @@ Each divergence is listed here when it is introduced.
   `GestureBinding.HandlePointerEvent` (it moves the pointer to where it is
   lifted first, as the engine synthesizes that move). src/app sends touch
   events for the mouse.
+- dart:ui drawing: Paint is `*Paint` (`NewPaint`, `Paint.from` →
+  `NewPaintFrom`), getters/setters as methods; `strokeMiterLimit` returns
+  the stored value as 3.50.1 does (limit − 4). Nullable named arguments
+  are pointers in options structs (`CanvasClipRectOptions{ClipOp,
+  DoAntiAlias}`, `ImageFilterBlurOptions{TileMode, Bounds}`,
+  `ImageShaderOptions{FilterQuality}`...); optional positional arguments
+  are options structs (`GradientLinearOptions{ColorStops, TileMode,
+  Matrix4}`, `GradientRadialOptions{..., Focal *Offset, FocalRadius}`,
+  `GradientSweepOptions{..., EndAngle *float64}`); `Canvas.scale(sx, [sy])`
+  is `Scale(sx, sy...)`. `Canvas` is an interface (Flutter's tests
+  implement it), `NewCanvas(recorder, cullRect...)` returns the engine's;
+  `ImageFilter` and `Shader` are interfaces only dart:ui implements;
+  `ColorFilter` is `*ColorFilter` with `Equal`; `ImageFilterEqual(a, b)` is
+  `==` on image filters; `MaskFilter` and `Shadow` are comparable values.
+  `Picture.toImage` returns `async.Future[*Image]` completed in a later
+  event of the current loop. Engine hooks: `ui.EngineImpellerContext()`
+  (the process's Impeller context), `ui.EnginePictureDisplayList(p)`,
+  `ui.EngineDevicePixelRatio` (drawShadow), `ui.EngineAssetLoader`
+  (assets), `ui.EngineDrawParagraph` (until Paragraph is ported). ENGINE
+  GAPs: see PLAN.md "dart:ui drawing over Impeller".
+- dart:ui Path: used by pointer (`ui.NewPath()`, `Path.from` →
+  `NewPathFrom`, `Path.combine` → `PathCombine`); `Float64List matrix4` is
+  `[]float64` (nil is null). Named parameters are `ArcToPointOptions`
+  (`RelativeArcToPointOptions` is the same type; nil `Clockwise` is Dart's
+  default true), `AddPathOptions` (`ExtendWithPathOptions`),
+  `ComputeMetricsOptions` and `ExtractPathOptions` (nil `StartWithMoveTo`
+  is true). ENGINE GAPs: `PathCombine` (Skia PathOps) and `Transform` with
+  a perspective whose w=0 plane crosses the path (SkEdgeClipper) panic with
+  `dart.UnimplementedError`. `Reset` also resets the fill type to nonZero
+  (SkPathBuilder::reset).
+- dart:ui PathMetrics: Dart's Iterable is `All()` (iter.Seq) plus
+  `Iterator()`, which, as in Dart, always returns the same
+  PathMetricIterator, so iterating (or `String()`) consumes it; use
+  `slices.Collect(m.All())` for `toList()`/`first`.
+  `PathMetricIterator.Current` panics with an error printing Dart's
+  "RangeError: …" text. `PathMetric.length/isClosed/contourIndex` are
+  fields; `getTangentForOffset` returns `*Tangent` (nil is null); `Tangent`
+  is a comparable struct (Dart's class has no ==).
+- dart:ui images: `Image` is `*Image` (fields `Width`/`Height`);
+  `toByteData` returns `async.Future[[]byte]` (nil is null); codecs,
+  `ImmutableBuffer` and `ImageDescriptor` follow the Futures rules. Images
+  are decoded in Go (golang.org/x/image for WebP/BMP); see PLAN.md for the
+  measured differences from Skia's codecs.
+- dart:ui runtime effects: `FragmentProgram.fromAsset` reads impellerc
+  runtime-stage bundles through `ui.EngineAssetLoader`; `ImageFilter.shader`
+  is `NewImageFilterShader`. ENGINE GAPs: the SDK samples shader samplers
+  linearly and the filter input nearest, whatever the FilterQuality.
