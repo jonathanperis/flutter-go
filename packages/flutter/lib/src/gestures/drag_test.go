@@ -1,17 +1,5 @@
 // Port of packages/flutter/test/gestures/drag_test.dart (Flutter 3.50.1):
-// 35 of 43 tests.
-//
-// Skipped (they need TapGestureRecognizer's callbacks; tap.dart is ported
-// by another fork, add them when merging): "Should recognize pan" (asserts
-// the tap never fires), the group "Recognizers listening on different
-// buttons do not form competition" (2), the five "On multiple pointers,
-// ..." tests logging downT/upT and "the last tracking pointer can be
-// rejected by [resolvePointer]...", and "Does not crash when one of the 2
-// pointers wins by default and is then released" (disposes a tap).
-// Adapted: in the group "Enforce consistent-button restriction" and the
-// two "A secondary drag should not trigger primary", a
-// `TapGestureRecognizer()..onTap = () {}` is only a competitor in the
-// arena; a plain GestureArenaMember stands in for it.
+// all 43 tests.
 package gestures_test
 
 import (
@@ -796,18 +784,20 @@ func TestDragCanFilterByDeviceKind(t *testing.T) {
 	})
 }
 
-// competitor stands in for the tests' `TapGestureRecognizer()..onTap =
-// () {}`, whose only role there is to compete in the arena (it never
-// resolves until it is the last member).
-type competitor struct{ entry GestureArenaEntry }
+// competitor is the tests' `TapGestureRecognizer()..onTap = () {}`, only
+// a competitor in the arena.
+type competitor struct{ tap *TapGestureRecognizer }
 
-func (c *competitor) addPointer(down *PointerDownEvent) {
-	c.entry = GestureBindingInstance().GestureArena().Add(down.Pointer(), c)
+func newCompetitor(t *testing.T) *competitor {
+	tap := NewTapGestureRecognizer()
+	tap.OnTap = func() {}
+	t.Cleanup(tap.Dispose)
+	return &competitor{tap: tap}
 }
-func (c *competitor) AcceptGesture(int) {}
-func (c *competitor) RejectGesture(int) {}
 
-func consistentButtonSetUp() (*PanGestureRecognizer, *competitor, *[]string) {
+func (c *competitor) addPointer(down *PointerDownEvent) { c.tap.AddPointer(down) }
+
+func consistentButtonSetUp(t *testing.T) (*PanGestureRecognizer, *competitor, *[]string) {
 	logs := []string{}
 	pan := NewPanGestureRecognizer()
 	pan.OnStart = func(*DragStartDetails) { logs = append(logs, "start") }
@@ -815,12 +805,12 @@ func consistentButtonSetUp() (*PanGestureRecognizer, *competitor, *[]string) {
 	pan.OnUpdate = func(*DragUpdateDetails) { logs = append(logs, "update") }
 	pan.OnCancel = func() { logs = append(logs, "cancel") }
 	pan.OnEnd = func(*DragEndDetails) { logs = append(logs, "end") }
-	return pan, &competitor{}, &logs
+	return pan, newCompetitor(t), &logs
 }
 
 func TestDragButtonChangeBeforeAcceptanceCancels(t *testing.T) {
 	testGesture(t, func(tester *flutter_test.GestureTester) {
-		pan, tap, logs := consistentButtonSetUp()
+		pan, tap, logs := consistentButtonSetUp(t)
 		t.Cleanup(pan.Dispose)
 		pointer := tp(5, ui.PointerDeviceKindMouse, KPrimaryButton)
 		down := pointer.Down(off(10, 10))
@@ -837,7 +827,7 @@ func TestDragButtonChangeBeforeAcceptanceCancels(t *testing.T) {
 
 func TestDragButtonChangeBeforeAcceptanceAllowsNextDrag(t *testing.T) {
 	testGesture(t, func(tester *flutter_test.GestureTester) {
-		pan, tap, logs := consistentButtonSetUp()
+		pan, tap, logs := consistentButtonSetUp(t)
 		t.Cleanup(pan.Dispose)
 		pointer := tp(5, ui.PointerDeviceKindMouse, KPrimaryButton)
 		down := pointer.Down(off(10, 10))
@@ -866,7 +856,7 @@ func TestDragButtonChangeBeforeAcceptanceAllowsNextDrag(t *testing.T) {
 
 func TestDragButtonChangeAfterAcceptanceEnds(t *testing.T) {
 	testGesture(t, func(tester *flutter_test.GestureTester) {
-		pan, tap, logs := consistentButtonSetUp()
+		pan, tap, logs := consistentButtonSetUp(t)
 		t.Cleanup(pan.Dispose)
 		pointer := tp(5, ui.PointerDeviceKindMouse, KPrimaryButton)
 		down := pointer.Down(off(10, 10))
@@ -887,7 +877,7 @@ func TestDragButtonChangeAfterAcceptanceEnds(t *testing.T) {
 
 func TestDragButtonChangeAfterAcceptanceAllowsNextDrag(t *testing.T) {
 	testGesture(t, func(tester *flutter_test.GestureTester) {
-		pan, tap, logs := consistentButtonSetUp()
+		pan, tap, logs := consistentButtonSetUp(t)
 		t.Cleanup(pan.Dispose)
 		pointer := tp(5, ui.PointerDeviceKindMouse, KPrimaryButton)
 		down := pointer.Down(off(10, 10))
@@ -918,7 +908,7 @@ func TestDragButtonChangeAfterAcceptanceAllowsNextDrag(t *testing.T) {
 func TestDragSecondaryDragShouldNotTriggerPrimary(t *testing.T) {
 	testGesture(t, func(tester *flutter_test.GestureTester) {
 		var recognized []string
-		tap := &competitor{}
+		tap := newCompetitor(t)
 		pan := NewPanGestureRecognizer()
 		logDrag(&recognized, "primary", &pan.DragGestureRecognizerBase)
 		t.Cleanup(pan.Dispose)
@@ -1101,4 +1091,308 @@ func TestDragMultiplePointersDownLatestPointer(t *testing.T) {
 	dexpect(t, "log", log, append(append([]string{}, multiPointerPrefix...), "-e", "-f", "drag1-update", "-g",
 		"drag1-update", "-h", "drag2-down", "drag2-cancel", "-i", "-j", "drag1-update", "-k", "drag1-update", "-l",
 		"drag1-end"))
+}
+
+func TestDragShouldRecognizePan(t *testing.T) {
+	testGesture(t, func(tester *flutter_test.GestureTester) {
+		pan := NewPanGestureRecognizer()
+		tap := NewTapGestureRecognizer()
+		t.Cleanup(pan.Dispose)
+		t.Cleanup(tap.Dispose)
+		didStartPan, didEndPan, didTap := false, false, false
+		var updatedScrollDelta *ui.Offset
+		pan.OnStart = func(*DragStartDetails) { didStartPan = true }
+		pan.OnUpdate = func(d *DragUpdateDetails) { delta := d.Delta; updatedScrollDelta = &delta }
+		pan.OnEnd = func(*DragEndDetails) { didEndPan = true }
+		tap.OnTap = func() { didTap = true }
+		check := func(step string, start bool, delta *ui.Offset, end bool) {
+			t.Helper()
+			if didStartPan != start || didEndPan != end || didTap || (updatedScrollDelta == nil) != (delta == nil) ||
+				(delta != nil && *updatedScrollDelta != *delta) {
+				t.Fatalf("%s: start=%v delta=%v end=%v tap=%v", step, didStartPan, updatedScrollDelta, didEndPan, didTap)
+			}
+		}
+		pointer := testPointerN(5)
+		down := pointer.Down(off(10, 10))
+		pan.AddPointer(down)
+		tap.AddPointer(down)
+		tester.CloseArena(5)
+		check("closed", false, nil, false)
+		tester.Route(down)
+		check("down", false, nil, false)
+		tester.Route(pointer.Move(off(20, 20)))
+		check("14px", false, nil, false)
+		tester.Route(pointer.Move(off(20, 30)))
+		if !didStartPan {
+			t.Fatal("pan not started at 22px")
+		}
+		didStartPan = false
+		updatedScrollDelta = nil
+		tester.Route(pointer.Move(off(20, 25)))
+		check("move", false, offp(0, -5), false)
+		updatedScrollDelta = nil
+		tester.Route(pointer.Up())
+		check("up", false, nil, true)
+	})
+}
+
+// buttonCompetition is the group "Recognizers listening on different
+// buttons do not form competition".
+func buttonCompetition(t *testing.T) (tapPrimary, tapSecondary *TapGestureRecognizer, pan *PanGestureRecognizer, recognized *[]string) {
+	recognized = &[]string{}
+	tapPrimary = NewTapGestureRecognizer()
+	tapPrimary.OnTapDown = func(*TapDownDetails) { *recognized = append(*recognized, "tapPrimary") }
+	tapSecondary = NewTapGestureRecognizer()
+	tapSecondary.OnSecondaryTapDown = func(*TapDownDetails) { *recognized = append(*recognized, "tapSecondary") }
+	pan = NewPanGestureRecognizer()
+	pan.OnStart = func(*DragStartDetails) { *recognized = append(*recognized, "drag") }
+	t.Cleanup(func() { tapPrimary.Dispose(); tapSecondary.Dispose(); pan.Dispose() })
+	return
+}
+
+func TestDragPrimaryPanDoesNotCompeteWithSecondaryTap(t *testing.T) {
+	testGesture(t, func(tester *flutter_test.GestureTester) {
+		_, tapSecondary, pan, recognized := buttonCompetition(t)
+		pointer := flutter_test.NewTestPointer(flutter_test.TestPointerOptions{Pointer: intp(1), Device: intp(0),
+			Buttons: intp(KSecondaryButton)})
+		down := pointer.Down(off(10, 10))
+		pan.AddPointer(down)
+		tapSecondary.AddPointer(down)
+		tester.CloseArena(down.Pointer())
+		tester.Route(down)
+		dexpect(t, "recognized", *recognized, []string{"tapSecondary"})
+	})
+}
+
+func TestDragPrimaryPanCompetesWithPrimaryTap(t *testing.T) {
+	testGesture(t, func(tester *flutter_test.GestureTester) {
+		tapPrimary, _, pan, recognized := buttonCompetition(t)
+		// TestPointer(1, touch, kPrimaryButton): the third positional
+		// parameter is the device.
+		pointer := flutter_test.NewTestPointer(flutter_test.TestPointerOptions{Pointer: intp(1), Device: intp(KPrimaryButton)})
+		down := pointer.Down(off(10, 10))
+		pan.AddPointer(down)
+		tapPrimary.AddPointer(down)
+		tester.CloseArena(down.Pointer())
+		tester.Route(down)
+		dexpect(t, "recognized", *recognized, []string{})
+		tester.Route(pointer.Up())
+		dexpect(t, "recognized", *recognized, []string{"tapPrimary"})
+	})
+}
+
+// multiPointerLogs builds the "On multiple pointers" tests' logged
+// horizontal drag and competing tap.
+func multiPointerLogs(t *testing.T) (*HorizontalDragGestureRecognizer, *TapGestureRecognizer, *[]string) {
+	logs := &[]string{}
+	add := func(s string) { *logs = append(*logs, s) }
+	hori := NewHorizontalDragGestureRecognizer()
+	hori.OnDown = func(*DragDownDetails) { add("downH") }
+	hori.OnStart = func(*DragStartDetails) { add("startH") }
+	hori.OnUpdate = func(*DragUpdateDetails) { add("updateH") }
+	hori.OnEnd = func(*DragEndDetails) { add("endH") }
+	hori.OnCancel = func() { add("cancelH") }
+	vert := NewTapGestureRecognizer()
+	vert.OnTapDown = func(*TapDownDetails) { add("downT") }
+	vert.OnTapUp = func(*TapUpDetails) { add("upT") }
+	vert.OnTapCancel = func() {}
+	t.Cleanup(hori.Dispose)
+	t.Cleanup(vert.Dispose)
+	return hori, vert, logs
+}
+
+func expectAndClear(t *testing.T, logs *[]string, want ...string) {
+	t.Helper()
+	if want == nil {
+		want = []string{}
+	}
+	dexpect(t, "logs", append([]string{}, *logs...), want)
+	*logs = (*logs)[:0]
+}
+
+// multiPointerStart adds P1 then P2 to the drag and the tap, routing each
+// down before closing its arena, as the Dart tests do.
+func multiPointerStart(t *testing.T, tester *flutter_test.GestureTester, hori, vert GestureRecognizer, logs *[]string,
+	p1, p2 *flutter_test.TestPointer) {
+	down1 := p1.Down(off(10, 10))
+	down2 := p2.Down(off(11, 10))
+	hori.AddPointer(down1)
+	vert.AddPointer(down1)
+	tester.Route(down1)
+	tester.CloseArena(p1.Pointer)
+	expectAndClear(t, logs, "downH")
+	hori.AddPointer(down2)
+	vert.AddPointer(down2)
+	tester.Route(down2)
+	tester.CloseArena(p2.Pointer)
+	expectAndClear(t, logs)
+}
+
+func TestDragMultiplePointersCanceledWhenAllCanceledFIFO(t *testing.T) {
+	testGesture(t, func(tester *flutter_test.GestureTester) {
+		hori, vert, logs := multiPointerLogs(t)
+		p1, p2 := testPointerN(4), testPointerN(5)
+		multiPointerStart(t, tester, hori, vert, logs, p1, p2)
+		tester.Route(p1.Up())
+		tapArena().Sweep(p1.Pointer)
+		expectAndClear(t, logs, "downT", "upT")
+		tester.Route(p2.Up())
+		tapArena().Sweep(p2.Pointer)
+		expectAndClear(t, logs, "cancelH")
+	})
+}
+
+func TestDragMultiplePointersCanceledWhenAllCanceledFILO(t *testing.T) {
+	testGesture(t, func(tester *flutter_test.GestureTester) {
+		hori, vert, logs := multiPointerLogs(t)
+		p1, p2 := testPointerN(4), testPointerN(5)
+		multiPointerStart(t, tester, hori, vert, logs, p1, p2)
+		tester.Route(p2.Up())
+		tapArena().Sweep(p2.Pointer)
+		expectAndClear(t, logs)
+		tester.Route(p1.Up())
+		tapArena().Sweep(p1.Pointer)
+		expectAndClear(t, logs, "cancelH", "downT", "upT")
+	})
+}
+
+func TestDragMultiplePointersAcceptedWhenFirstAccepted(t *testing.T) {
+	testGesture(t, func(tester *flutter_test.GestureTester) {
+		hori, vert, logs := multiPointerLogs(t)
+		p1, p2 := testPointerN(4), testPointerN(5)
+		multiPointerStart(t, tester, hori, vert, logs, p1, p2)
+		tester.Route(p1.Move(off(100, 100)))
+		expectAndClear(t, logs, "startH")
+		tester.Route(p2.Up())
+		tapArena().Sweep(p2.Pointer)
+		expectAndClear(t, logs)
+		tester.Route(p1.Up())
+		tapArena().Sweep(p1.Pointer)
+		expectAndClear(t, logs, "endH")
+	})
+}
+
+func TestDragMultiplePointersCanceledByUpDoNotPreventLater(t *testing.T) {
+	testGesture(t, func(tester *flutter_test.GestureTester) {
+		hori, vert, logs := multiPointerLogs(t)
+		p1, p2 := testPointerN(4), testPointerN(5)
+		multiPointerStart(t, tester, hori, vert, logs, p1, p2)
+		tester.Route(p1.Up())
+		tapArena().Sweep(p1.Pointer)
+		expectAndClear(t, logs, "downT", "upT")
+		tester.Route(p2.Move(off(100, 100)))
+		expectAndClear(t, logs, "startH")
+		tester.Route(p2.Up())
+		tapArena().Sweep(p2.Pointer)
+		expectAndClear(t, logs, "endH")
+	})
+}
+
+func TestDragMultiplePointersCanceledByButtonsDoNotPreventLater(t *testing.T) {
+	testGesture(t, func(tester *flutter_test.GestureTester) {
+		hori, vert, logs := multiPointerLogs(t)
+		p1, p2 := testPointerN(1), testPointerN(2)
+		down1 := p1.Down(off(10, 10))
+		down2 := p2.Down(off(11, 10))
+		hori.AddPointer(down1)
+		vert.AddPointer(down1)
+		tester.Route(down1)
+		tester.CloseArena(p1.Pointer)
+		hori.AddPointer(down2)
+		vert.AddPointer(down2)
+		tester.Route(down2)
+		tester.CloseArena(p2.Pointer)
+		expectAndClear(t, logs, "downH")
+		tester.Route(p1.Move(off(9.9, 9.9), withButtons(KSecondaryButton)))
+		expectAndClear(t, logs, "startH")
+		tester.Route(p2.Move(off(100, 100)))
+		expectAndClear(t, logs, "updateH")
+		tester.Route(p2.Up())
+		tapArena().Sweep(p2.Pointer)
+		expectAndClear(t, logs, "endH")
+	})
+}
+
+func TestDragMultiplePointersLastTrackingPointerRejectedByResolvePointer(t *testing.T) {
+	testGesture(t, func(tester *flutter_test.GestureTester) {
+		logs := &[]string{}
+		add := func(s string) { *logs = append(*logs, s) }
+		drag := NewVerticalDragGestureRecognizer()
+		drag.OnDown = func(*DragDownDetails) { add("downD") }
+		drag.OnStart = func(*DragStartDetails) { add("startD") }
+		drag.OnUpdate = func(*DragUpdateDetails) { add("updateD") }
+		drag.OnEnd = func(*DragEndDetails) { add("endD") }
+		drag.OnCancel = func() { add("cancelD") }
+		tap := NewTapGestureRecognizer()
+		tap.OnTapDown = func(*TapDownDetails) { add("downT") }
+		tap.OnTapUp = func(*TapUpDetails) { add("upT") }
+		tap.OnTapCancel = func() {}
+		t.Cleanup(tap.Dispose)
+		t.Cleanup(drag.Dispose)
+		p1, p2, p3, p4 := testPointerN(1), testPointerN(2), testPointerN(3), testPointerN(4)
+		down1, down2 := p1.Down(off(10, 10)), p2.Down(off(11, 11))
+		down3, down4 := p3.Down(off(12, 12)), p4.Down(off(13, 13))
+		tap.AddPointer(down1)
+		drag.AddPointer(down1)
+		tester.CloseArena(1)
+		tester.Route(down1)
+		expectAndClear(t, logs, "downD")
+		tap.AddPointer(down2)
+		drag.AddPointer(down2)
+		tester.CloseArena(2)
+		tester.Route(down2)
+		expectAndClear(t, logs)
+		tap.AddPointer(down3)
+		drag.AddPointer(down3)
+		tester.CloseArena(3)
+		tester.Route(down3)
+		expectAndClear(t, logs)
+		drag.AddPointer(down4)
+		tester.CloseArena(4)
+		tester.Route(down4)
+		expectAndClear(t, logs, "startD")
+		tester.Route(p2.Up())
+		tapArena().Sweep(2)
+		expectAndClear(t, logs)
+		tester.Route(p4.Cancel())
+		expectAndClear(t, logs)
+		tester.Route(p3.Cancel())
+		expectAndClear(t, logs)
+		tester.Route(p1.Cancel())
+		expectAndClear(t, logs, "endD")
+	})
+}
+
+func TestDragDoesNotCrashWhenOneOfTwoPointersWinsByDefaultAndIsReleased(t *testing.T) {
+	testGesture(t, func(tester *flutter_test.GestureTester) {
+		didStartDrag := false
+		drag := NewHorizontalDragGestureRecognizer()
+		drag.OnStart = func(*DragStartDetails) { didStartDrag = true }
+		drag.OnEnd = func(*DragEndDetails) {} // Crash triggers at onEnd.
+		drag.DragStartBehavior = DragStartBehaviorDown
+		tap := NewTapGestureRecognizer()
+		tap.OnTap = func() {}
+		tap2 := NewTapGestureRecognizer()
+		tap2.OnTap = func() {}
+		p1 := testPointerN(5)
+		down1 := p1.Down(off(10, 10))
+		drag.AddPointer(down1)
+		tap.AddPointer(down1)
+		tester.CloseArena(p1.Pointer)
+		tester.Route(down1)
+		p2 := testPointerN(6)
+		down2 := p2.Down(off(10, 10))
+		drag.AddPointer(down2)
+		tap2.AddPointer(down2)
+		tester.CloseArena(p2.Pointer)
+		tester.Route(down2)
+		tap.Dispose()
+		tester.Async.FlushMicrotasks()
+		if !didStartDrag {
+			t.Fatal("drag did not start")
+		}
+		tester.Route(p1.Up())
+		drag.Dispose()
+		tap2.Dispose()
+	})
 }
