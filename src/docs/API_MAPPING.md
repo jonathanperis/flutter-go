@@ -54,6 +54,8 @@ re-exporting library.
 | Dart | Go | Example |
 |---|---|---|
 | top-level name `fooBar` | `FooBar` | `nearZero` → `physics.NearZero` |
+| a name with an initialism (`Id`, `Url`, `Uri`, `Json`, `Http`, `Html`, `Api`, `Utf`, `Gpu`) | Go's capitals (`ID`, `URL`...) | `viewId` → `ViewID`, `TextInputType.url` → `TextInputTypeURL`, `toJson` → `ToJSON` |
+| a `snake_case` name | MixedCaps (Go names have no underscores) | `SystemChannels.platform_views_2` → `SystemChannels.PlatformViews2` |
 | class `Foo` | type `Foo` | `Tolerance` → `physics.Tolerance` |
 | abstract class or interface implemented by user code | interface `Foo` (+ embeddable `FooBase` when it carries state or default methods) | `Simulation` → `physics.Simulation` + `physics.SimulationBase` |
 | mixin `Foo` | interface `Foo` + embeddable struct `FooMixin` | |
@@ -72,6 +74,7 @@ re-exporting library.
 | `Foo(a, {x = 1, y})` (optional named) | `NewFoo(a, FooOptions{X: ..., Y: ...})`, options passed variadically so they can be left out; an unset option takes the Dart default |
 | `Foo.named(...)` | `NewFooNamed(...)` (`SpringDescription.withDampingRatio` → `NewSpringDescriptionWithDampingRatio`) |
 | widget constructors | struct literals, as before (`widgets.SizedBox{Width: widgets.F(100)}`) |
+| constructor of an abstract class, or of a class Go types extend (Dart's `super(...)`) | embed `FooBase`/`FooMixin` (or `Foo`) and call its `Construct(self, ...)` or `InitFoo(...)` (`GestureRecognizerBase.Construct`, `PointerEventBase.InitPointerEvent`); an abstract class without state is implemented, not constructed |
 
 A nullable option (`double? x`) is a pointer in the options struct, so "not
 given" and "zero" stay distinct.
@@ -85,6 +88,7 @@ given" and "zero" stay distinct.
 | setter `foo=` | method `SetFoo(v)` |
 | public final field on a concrete class | exported struct field, when no Go method of the same name is needed |
 | static member `Foo.bar` | package-level `FooBar`; `Bar` alone when `bar` already contains `Foo` (`Tolerance.defaultTolerance` → `DefaultTolerance`) |
+| static setter `Foo.bar=` (or a static field that isn't final) | an assignable package-level variable `FooBar`, or a function `SetFooBar` / `FooSetBar` (`ServicesBinding.systemContextMenuClient=` → `ServicesBindingSetSystemContextMenuClient`) |
 | class of static members only (`Colors`, `Curves`, `Icons`) | package-level variable of that name holding a struct: `material.Colors.Red` |
 
 ## Operators
@@ -420,7 +424,12 @@ list, typed data, a map) panics with `UnsupportedError`.
 
 ## Known divergences
 
-Each divergence is listed here when it is introduced.
+Each divergence is listed here when it is introduced. When the rules above
+don't reach a Dart name (a rename, or something Go can't express), also add
+it to [api_divergences.json](api_divergences.json), citing the section here
+that documents it: `cmd/apiparity` counts those names as exposed only
+through that table (and fails on entries that are stale or that the rules
+already cover).
 
 - scheduler: `scheduleTask<T>` (a generic method) is the function
   `scheduler.ScheduleTask[T](binding, task, priority, opts)`, and

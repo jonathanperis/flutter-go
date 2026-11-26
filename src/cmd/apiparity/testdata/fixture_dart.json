@@ -1,0 +1,131 @@
+{
+ "libraries": [
+  {
+   "name": "fixture",
+   "decls": [
+    {"name": "Point", "kind": "class", "file": "lib/point.dart", "members": [
+     {"name": "", "kind": "constructor", "params": [{"name": "x", "required": true}, {"name": "y", "required": true}]},
+     {"name": "polar", "kind": "constructor", "params": [{"name": "radius", "required": true}, {"name": "angle", "required": true}]},
+     {"name": "unit", "kind": "constructor", "factory": true, "params": []},
+     {"name": "x", "kind": "field"},
+     {"name": "y", "kind": "field", "settable": true},
+     {"name": "label", "kind": "field", "settable": true},
+     {"name": "tag", "kind": "field", "settable": true},
+     {"name": "length", "kind": "getter"},
+     {"name": "length", "kind": "setter"},
+     {"name": "width", "kind": "setter"},
+     {"name": "label", "kind": "setter"},
+     {"name": "+", "kind": "operator", "params": [{"name": "other", "required": true}]},
+     {"name": "unary-", "kind": "operator"},
+     {"name": "~/", "kind": "operator", "params": [{"name": "other", "required": true}]},
+     {"name": "<", "kind": "operator", "params": [{"name": "other", "required": true}]},
+     {"name": "*", "kind": "operator", "params": [{"name": "other", "required": true}]},
+     {"name": "[]", "kind": "operator", "params": [{"name": "i", "required": true}]},
+     {"name": "==", "kind": "operator", "params": [{"name": "other", "required": true}]},
+     {"name": "hashCode", "kind": "getter"},
+     {"name": "toString", "kind": "method", "params": [{"name": "minLevel", "named": true}]},
+     {"name": "scale", "kind": "method", "params": [{"name": "f", "required": true}, {"name": "fy"}, {"name": "fz"}]},
+     {"name": "moveBy", "kind": "method", "params": [{"name": "dx", "named": true}, {"name": "dy", "named": true}, {"name": "dz", "named": true}]},
+     {"name": "cast", "kind": "method", "generic": true},
+     {"name": "drive", "kind": "method", "generic": true},
+     {"name": "spin", "kind": "method", "generic": true},
+     {"name": "origin", "kind": "field", "static": true, "settable": true},
+     {"name": "zero", "kind": "field", "static": true},
+     {"name": "rotate", "kind": "method"}
+    ]},
+    {"name": "Shape", "kind": "class", "abstract": true, "file": "lib/shape.dart", "members": [
+     {"name": "", "kind": "constructor", "params": [{"name": "name", "required": true}, {"name": "sides", "named": true}, {"name": "color", "named": true}]},
+     {"name": "name", "kind": "getter"},
+     {"name": "paint", "kind": "method", "params": [{"name": "canvas", "required": true}]}
+    ]},
+    {"name": "Hue", "kind": "enum", "file": "lib/hue.dart", "members": [
+     {"name": "red", "kind": "enumValue"},
+     {"name": "darkBlue", "kind": "enumValue"},
+     {"name": "url_link", "kind": "enumValue"},
+     {"name": "green", "kind": "enumValue"},
+     {"name": "isDark", "kind": "getter"}
+    ]},
+    {"name": "Registry", "kind": "class", "file": "lib/registry.dart", "members": [
+     {"name": "instance", "kind": "getter", "static": true},
+     {"name": "count", "kind": "field", "static": true, "settable": true},
+     {"name": "mode", "kind": "setter", "static": true},
+     {"name": "level", "kind": "field", "static": true, "settable": true},
+     {"name": "registryName", "kind": "field", "static": true},
+     {"name": "client", "kind": "setter", "static": true},
+     {"name": "total", "kind": "setter", "static": true}
+    ]},
+    {"name": "Colors", "kind": "class", "file": "lib/colors.dart", "members": [
+     {"name": "red", "kind": "field", "static": true},
+     {"name": "blue", "kind": "field", "static": true},
+     {"name": "green", "kind": "field", "static": true}
+    ]},
+    {"name": "Widget", "kind": "class", "file": "lib/widget.dart", "members": [
+     {"name": "", "kind": "constructor", "const": true, "params": [{"name": "key", "named": true}, {"name": "child", "named": true, "required": true}, {"name": "flex", "named": true}]}
+    ]},
+    {"name": "Viewer", "kind": "class", "file": "lib/viewer.dart", "members": [
+     {"name": "", "kind": "constructor", "params": [{"name": "viewId", "required": true}]},
+     {"name": "viewId", "kind": "field"},
+     {"name": "url", "kind": "field", "settable": true},
+     {"name": "actionIds", "kind": "field"}
+    ]},
+    {"name": "Box", "kind": "class", "file": "lib/box.dart", "members": [
+     {"name": "fromCorners", "kind": "constructor", "params": [{"name": "tl", "required": true}, {"name": "topLeft", "named": true}, {"name": "topRight", "named": true}, {"name": "bottomLeft", "named": true}]},
+     {"name": "==", "kind": "operator", "params": [{"name": "other", "required": true}]},
+     {"name": "hashCode", "kind": "getter"},
+     {"name": "[]", "kind": "operator", "params": [{"name": "key", "required": true}]}
+    ]},
+    {"name": "Hidden", "kind": "class", "file": "lib/hidden.dart", "members": [
+     {"name": "", "kind": "constructor", "params": [{"name": "x", "required": true}]}
+    ]},
+    {"name": "Listenable", "kind": "class", "abstract": true, "file": "lib/listenable.dart", "members": [
+     {"name": "", "kind": "constructor", "const": true},
+     {"name": "merge", "kind": "constructor", "factory": true, "params": [{"name": "listenables", "required": true}]},
+     {"name": "empty", "kind": "constructor", "factory": true}
+    ]},
+    {"name": "Node", "kind": "class", "abstract": true, "file": "lib/node.dart", "members": [
+     {"name": "", "kind": "constructor", "params": [{"name": "depth", "required": true}]}
+    ]},
+    {"name": "thing", "kind": "getter", "file": "lib/thing.dart"},
+    {"name": "runIt", "kind": "function", "file": "lib/run.dart", "params": [{"name": "a", "required": true}, {"name": "b", "named": true, "required": true}, {"name": "c", "named": true}, {"name": "d", "named": true}]},
+    {"name": "debugLevel", "kind": "variable", "settable": true, "file": "lib/debug.dart"},
+    {"name": "RunIt", "kind": "class", "file": "lib/run.dart"},
+    {"name": "missingFunction", "kind": "function", "file": "lib/run.dart", "params": [{"name": "a", "required": true}]},
+    {"name": "Alias", "kind": "class", "file": "package:port/port.dart", "package": "port", "members": [
+     {"name": "onError", "kind": "field", "static": true, "settable": true},
+     {"name": "ping", "kind": "method"}
+    ]},
+    {"name": "Fails", "kind": "class", "file": "lib/fails.dart", "members": [
+     {"name": "toString", "kind": "method"}
+    ]},
+    {"name": "Mixed", "kind": "mixin", "file": "lib/mixed.dart", "members": [
+     {"name": "ping", "kind": "method"}
+    ]},
+    {"name": "Untested", "kind": "class", "file": "lib/untested.dart", "members": [
+     {"name": "quiet", "kind": "method"}
+    ]},
+    {"name": "Event", "kind": "class", "abstract": true, "file": "lib/event.dart", "members": [
+     {"name": "", "kind": "constructor", "params": [{"name": "id", "required": true}, {"name": "at", "named": true}]}
+    ]},
+    {"name": "Sealed", "kind": "class", "abstract": true, "file": "lib/sealed.dart", "members": [
+     {"name": "", "kind": "constructor", "params": [{"name": "v", "required": true}]}
+    ]},
+    {"name": "Calm", "kind": "class", "abstract": true, "file": "lib/calm.dart", "members": [
+     {"name": "", "kind": "constructor", "const": true}
+    ]},
+    {"name": "Channel", "kind": "class", "file": "lib/channel.dart", "members": [
+     {"name": "", "kind": "constructor", "params": [{"name": "name", "required": true}, {"name": "codec"}]}
+    ]},
+    {"name": "channel", "kind": "function", "file": "lib/channel.dart"},
+    {"name": "Manager", "kind": "class", "file": "lib/manager.dart", "members": [
+     {"name": "", "kind": "constructor"}
+    ]},
+    {"name": "Pad", "kind": "class", "file": "lib/pad.dart", "members": [
+     {"name": "of", "kind": "constructor", "params": [{"name": "insets", "required": true}, {"name": "left", "named": true}]},
+     {"name": "all", "kind": "constructor", "params": [{"name": "value", "required": true}]}
+    ]},
+    {"name": "place", "kind": "function", "file": "lib/place.dart", "params": [{"name": "a", "required": true}, {"name": "b", "named": true, "required": true}]},
+    {"name": "Other", "kind": "class", "file": "package:port/port.dart", "package": "port"}
+   ]
+  }
+ ]
+}
