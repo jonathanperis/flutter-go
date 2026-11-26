@@ -284,9 +284,20 @@ void main() {
       base.copyWith(inherit: false),
       base.copyWith(debugLabel: 'x'),
       base.copyWith(package: 'p'),
+      base.copyWith(foreground: fg),
+      base.copyWith(background: bg),
     ]) {
       out.add('cmp ${base.compareTo(other)} ${other.compareTo(base)} ${base == other}');
     }
+
+    out.add('pkg eq ${const TextStyle(fontFamily: 'packages/p/f') == const TextStyle(fontFamily: 'f', package: 'p')} '
+        '${const TextStyle(fontFamily: 'packages/p/f').compareTo(const TextStyle(fontFamily: 'f', package: 'p'))}');
+    final TextPainter bad = TextPainter(
+      text: TextSpan(text: String.fromCharCodes(<int>[0xD800, 0x78]), style: const TextStyle(fontSize: 10)),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    out.add('malformed ${bad.size} ${bad.plainText.length}');
+    bad.dispose();
 
     // lerpFontVariations.
     final List<List<FontVariation>?> variations = <List<FontVariation>?>[
@@ -354,7 +365,7 @@ void main() {
       out.add('strut $i props: ${props(s, 'q.')}');
       out.add('strut $i fallback: ${s.fontFamilyFallback} family: ${s.fontFamily}');
       for (int k = 0; k < styles.length; k++) {
-        out.add('strut $i inherit $k: ${err(() => s.inheritFromTextStyle(styles[k]))}');
+        out.add('strut $i inherit $k: ${err(() => s.inheritFromTextStyle(styles[k]))} ${s.inheritFromTextStyle(styles[k]).leading}');
       }
     }
     for (int i = 0; i < struts.length; i++) {
@@ -415,6 +426,7 @@ void main() {
       const TestPlaceholder(),
       const TextSpan(text: 'x', style: TextStyle(color: Color(0xFF000000)), children: <InlineSpan>[TextSpan(text: 'y')]),
       const TextSpan(text: '\u{1F600}\u{1F600}', children: <InlineSpan>[TextSpan(text: 'q', semanticsLabel: 'Q', spellOut: true)]),
+      const TextSpan(text: '', locale: Locale('en'), spellOut: true),
     ];
     for (int i = 0; i < spans.length; i++) {
       final InlineSpan s = spans[i];

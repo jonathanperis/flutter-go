@@ -280,11 +280,21 @@ func paintingTextStyleLines(t *testing.T) []string {
 		{FontStyle: &fsItalic}, {LetterSpacing: f(1)}, {WordSpacing: f(1)}, {TextBaseline: &alpha}, {Height: f(1)},
 		{LeadingDistribution: &even}, {Locale: loc("en")}, {Shadows: []ui.Shadow{}}, {FontFeatures: []ui.FontFeature{}},
 		{FontVariations: []ui.FontVariation{}}, {FontFamily: s("f")}, {FontFamilyFallback: []string{}}, {Overflow: &clip},
-		{Inherit: b(false)}, {DebugLabel: s("x")}, {Package: s("p")},
+		{Inherit: b(false)}, {DebugLabel: s("x")}, {Package: s("p")}, {Foreground: fg}, {Background: bg},
 	} {
 		other := base.CopyWith(o)
 		add(fmt.Sprintf("cmp %s %s %t", base.CompareTo(other), other.CompareTo(base), base.Equal(other)))
 	}
+
+	add(fmt.Sprintf("pkg eq %t %s", NewTextStyle(TextStyleOptions{FontFamily: s("packages/p/f")}).Equal(NewTextStyle(TextStyleOptions{FontFamily: s("f"), Package: s("p")})),
+		NewTextStyle(TextStyleOptions{FontFamily: s("packages/p/f")}).CompareTo(NewTextStyle(TextStyleOptions{FontFamily: s("f"), Package: s("p")}))))
+	ltrDir := ui.TextDirectionLtr
+	badText := dart.StringFromCharCodes([]uint16{0xD800, 0x78})
+	bad := NewTextPainter(TextPainterOptions{Text: NewTextSpan(TextSpanOptions{Text: &badText, Style: NewTextStyle(TextStyleOptions{FontSize: f(10)})}),
+		TextDirection: &ltrDir})
+	bad.Layout()
+	add(fmt.Sprintf("malformed %s %d", bad.Size(), dart.StringLength(bad.PlainText())))
+	bad.Dispose()
 
 	fv := ui.NewFontVariation
 	variations := [][]ui.FontVariation{
@@ -330,7 +340,7 @@ func paintingTextStyleLines(t *testing.T) []string {
 		add(pre + " props: " + tsProps(func(b *foundation.DiagnosticPropertiesBuilder) { st.DebugFillPropertiesWithPrefix(b, "q.") }))
 		add(pre + " fallback: " + tsStrings(st.FontFamilyFallback()) + " family: " + nullableStr(st.FontFamily))
 		for k := range styles {
-			add(fmt.Sprintf("%s inherit %d: %s", pre, k, tstErr(func() any { return st.InheritFromTextStyle(styles[k]) })))
+			add(fmt.Sprintf("%s inherit %d: %s %s", pre, k, tstErr(func() any { return st.InheritFromTextStyle(styles[k]) }), tpStr(ptrF(st.InheritFromTextStyle(styles[k]).Leading))))
 		}
 	}
 	for i, a := range struts {
@@ -393,6 +403,7 @@ func paintingTextStyleLines(t *testing.T) []string {
 		span(xy(NewTextStyle(TextStyleOptions{Color: c(0xFF000000)}))),
 		span(TextSpanOptions{Text: s("\U0001F600\U0001F600"), Children: []InlineSpan{
 			span(TextSpanOptions{Text: s("q"), SemanticsLabel: s("Q"), SpellOut: b(true)})}}),
+		span(TextSpanOptions{Text: s(""), Locale: loc("en"), SpellOut: b(true)}),
 	}
 	fls := false
 	for i, sp := range spans {
@@ -507,4 +518,12 @@ func TestPaintingTextStyleMatchesFlutter(t *testing.T) {
 		}
 	}
 	t.Logf("%d lines, %d differ", len(want), bad)
+}
+
+// ptrF prints a nullable double as Dart does.
+func ptrF(v *float64) any {
+	if v == nil {
+		return nil
+	}
+	return *v
 }
