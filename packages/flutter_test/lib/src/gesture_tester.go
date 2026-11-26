@@ -40,6 +40,13 @@ type TestGestureFunc func(tester *GestureTester)
 func RunTestGesture(t *testing.T, callback TestGestureFunc) {
 	t.Helper()
 	New(t)
+	RunTestGestureInCurrentTest(callback)
+}
+
+// RunTestGestureInCurrentTest runs callback in a FakeAsync of its own
+// inside the widget test in progress (`FakeAsync().run` inside
+// testWidgets), with a GestureTester on it.
+func RunTestGestureInCurrentTest(callback TestGestureFunc) {
 	loop := async.NewLoop()
 	restore := async.SetCurrent(loop)
 	defer restore()
