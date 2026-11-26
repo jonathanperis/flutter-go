@@ -17,7 +17,6 @@ import (
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/services"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/widgets"
 	"github.com/jonathanperis/flutter-go/src/async"
-	"github.com/jonathanperis/flutter-go/src/impeller"
 	"github.com/jonathanperis/flutter-go/src/platform/metal"
 )
 
@@ -147,9 +146,8 @@ func Run(root widgets.Widget, o Options) error {
 	}
 	layer := metal.Attach(win.GetCocoaWindow())
 	defer layer.Release()
-	tc := impeller.NewTypographyContext()
-	defer tc.Release()
-	r.SetTextEngine(impellerText{tc})
+
+	r.SetTextEngine(r.UITextEngine{})
 
 	eng := &engine{}
 	pc := ui.NewPlatformConfiguration(eng)

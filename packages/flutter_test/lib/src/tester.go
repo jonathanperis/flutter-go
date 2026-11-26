@@ -54,7 +54,9 @@ func (t *Tester) TakeException() any {
 // FakeAsync zone). When the test ends, the tree is unmounted and
 // flutter_test's post-test invariants are checked.
 func New(t testing.TB) *Tester {
-	r.SetTextEngine(r.FixedTextEngine{})
+	// `flutter test` runs flutter_tester with --use-test-fonts.
+	ui.EngineUseTestFonts()
+	r.SetTextEngine(r.UITextEngine{})
 	binding := AutomatedTestWidgetsFlutterBindingEnsureInitialized()
 	// flutter_test's default view: 800×600 logical pixels at DPR 3.
 	o := &widgets.BuildOwner{DevicePixelRatio: 3}

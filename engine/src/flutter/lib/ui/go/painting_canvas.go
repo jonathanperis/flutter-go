@@ -52,6 +52,9 @@ type Canvas interface {
 	DrawImageRect(image *Image, src, dst Rect, paint *Paint)
 	DrawImageNine(image *Image, center, dst Rect, paint *Paint)
 	DrawPicture(picture *Picture)
+	// DrawParagraph draws a laid-out paragraph with its top left corner at
+	// offset (text_paragraph.go).
+	DrawParagraph(paragraph Paragraph, offset Offset)
 	DrawPoints(pointMode PointMode, points []Offset, paint *Paint)
 	DrawRawPoints(pointMode PointMode, points []float32, paint *Paint)
 	DrawVertices(vertices *Vertices, blendMode BlendMode, paint *Paint)
@@ -753,18 +756,4 @@ func (c *nativeCanvas) DrawShadow(path *Path, color Color, elevation float64, tr
 	b.DrawShadow(p, ic, safeNarrow(elevation), transparentOccluder, float32(EngineDevicePixelRatio))
 	p.Release()
 	c.ops++
-}
-
-// EngineDrawParagraph draws a paragraph laid out by the Impeller SDK's
-// typography. It stands in for Canvas.drawParagraph until text.dart's
-// Paragraph is ported.
-func EngineDrawParagraph(canvas Canvas, p *impeller.Paragraph, offset Offset) {
-	c, ok := canvas.(*nativeCanvas)
-	if !ok {
-		panic(argumentError("EngineDrawParagraph needs the engine Canvas"))
-	}
-	if b := c.builder(); b != nil {
-		b.DrawParagraph(p, float32(offset.Dx), float32(offset.Dy))
-		c.ops++
-	}
 }
