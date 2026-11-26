@@ -73,6 +73,10 @@ GestureRecognizer makeRecognizer(Map<String, Object?> spec) {
         'immediate' => ImmediateMultiDragGestureRecognizer(supportedDevices: devices),
         'hmulti' => HorizontalMultiDragGestureRecognizer(supportedDevices: devices),
         'vmulti' => VerticalMultiDragGestureRecognizer(supportedDevices: devices),
+        _ when spec['delay'] != null => DelayedMultiDragGestureRecognizer(
+          supportedDevices: devices,
+          delay: Duration(milliseconds: spec['delay']! as int),
+        ),
         _ => DelayedMultiDragGestureRecognizer(supportedDevices: devices),
       };
       final nullDrag = spec['nullDrag'] == true;

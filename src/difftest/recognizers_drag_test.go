@@ -107,7 +107,12 @@ func rdMakeRecognizer(spec rdSpec) gestures.GestureRecognizer {
 			m := gestures.NewVerticalMultiDragGestureRecognizer(opts)
 			r, base = m, &m.MultiDragGestureRecognizerBase
 		default:
-			m := gestures.NewDelayedMultiDragGestureRecognizer(gestures.DelayedMultiDragGestureRecognizerOptions{GestureRecognizerOptions: opts})
+			o := gestures.DelayedMultiDragGestureRecognizerOptions{GestureRecognizerOptions: opts}
+			if d, ok := spec["delay"].(float64); ok {
+				delay := time.Duration(d) * time.Millisecond
+				o.Delay = &delay
+			}
+			m := gestures.NewDelayedMultiDragGestureRecognizer(o)
 			r, base = m, &m.MultiDragGestureRecognizerBase
 		}
 		nullDrag := spec["nullDrag"] == true
