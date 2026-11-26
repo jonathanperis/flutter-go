@@ -1,15 +1,19 @@
 package rendering
 
 import (
-	ui "github.com/jonathanperis/flutter-go/engine/src/flutter/lib/ui/go"
 	"math"
+
+	ui "github.com/jonathanperis/flutter-go/engine/src/flutter/lib/ui/go"
+	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/painting"
 )
 
-type Axis int
+// Axis is painting's Axis; Horizontal and Vertical are short names kept
+// for flutter-go's interim RenderFlex callers.
+type Axis = painting.Axis
 
 const (
-	Horizontal Axis = iota
-	Vertical
+	Horizontal = painting.AxisHorizontal
+	Vertical   = painting.AxisVertical
 )
 
 // MainAxisAlignment zero value is Start, as in Flutter.

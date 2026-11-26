@@ -12,6 +12,7 @@ import (
 
 	"github.com/go-gl/glfw/v3.3/glfw"
 
+	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/painting"
 	r "github.com/jonathanperis/flutter-go/packages/flutter/lib/src/rendering"
 	. "github.com/jonathanperis/flutter-go/packages/flutter/lib/src/widgets"
 	"github.com/jonathanperis/flutter-go/src/app"
@@ -40,15 +41,15 @@ func (s *todoState) add(text string) {
 
 func (s *todoState) Build(*Element) Widget {
 	rows := []Widget{
-		ColoredBox{Color: r.RGB(0x6750a4), Child: Padding{Padding: r.Symmetric(24, 18), Child: Text{
+		ColoredBox{Color: r.RGB(0x6750a4), Child: Padding{Padding: painting.NewEdgeInsetsSymmetric(painting.EdgeInsetsSymmetricOptions{Horizontal: 24, Vertical: 18}), Child: Text{
 			Text: fmt.Sprintf("To do · %d items", len(s.items)), Style: r.TextStyle{FontSize: 20, Color: r.RGB(0xffffff)}}}},
-		Padding{Padding: r.All(16), Child: DecoratedBox{Color: r.RGB(0xece6f0), BorderRadius: 12, Child: Padding{
-			Padding: r.Symmetric(14, 12),
+		Padding{Padding: painting.NewEdgeInsetsAll(16), Child: DecoratedBox{Color: r.RGB(0xece6f0), BorderRadius: 12, Child: Padding{
+			Padding: painting.NewEdgeInsetsSymmetric(painting.EdgeInsetsSymmetricOptions{Horizontal: 14, Vertical: 12}),
 			Child:   TextField{Controller: s.input, Autofocus: true, Style: r.TextStyle{FontSize: 18}, OnSubmitted: s.add},
 		}}},
 	}
 	for i, it := range s.items {
-		rows = append(rows, Padding{Padding: r.Symmetric(24, 8), Child: Text{
+		rows = append(rows, Padding{Padding: painting.NewEdgeInsetsSymmetric(painting.EdgeInsetsSymmetricOptions{Horizontal: 24, Vertical: 8}), Child: Text{
 			Text: fmt.Sprintf("%d. %s", i+1, it), Style: r.TextStyle{FontSize: 16}}})
 	}
 	return ColoredBox{Color: r.RGB(0xfef7ff), Child: Column{CrossAxisAlignment: r.CrossStretch, Children: rows}}

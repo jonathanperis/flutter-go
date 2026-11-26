@@ -16,6 +16,7 @@ import (
 	"github.com/go-gl/glfw/v3.3/glfw"
 
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/animation"
+	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/painting"
 	r "github.com/jonathanperis/flutter-go/packages/flutter/lib/src/rendering"
 	. "github.com/jonathanperis/flutter-go/packages/flutter/lib/src/widgets"
 	"github.com/jonathanperis/flutter-go/src/app"
@@ -47,12 +48,12 @@ func (s *demoState) Build(*Element) Widget {
 		SizedBox{Width: F(260), Child: Column{CrossAxisAlignment: r.CrossStretch, Children: []Widget{
 			GestureDetector{
 				OnTap: func() { s.scroll.AnimateTo(0, 800*time.Millisecond, animation.Curves.EaseInOut) },
-				Child: ColoredBox{Color: r.RGB(0x1d1b20), Child: Padding{Padding: r.All(16), Child: Text{
+				Child: ColoredBox{Color: r.RGB(0x1d1b20), Child: Padding{Padding: painting.NewEdgeInsetsAll(16), Child: Text{
 					Text: "↑ animate to top", Style: r.TextStyle{FontSize: 16, Color: r.RGB(0xffffff)}}}},
 			},
 			Expanded{Child: ColoredBox{Color: r.RGB(0xffffff), Child: ListViewBuilder{ItemCount: 10_000, ItemExtent: 40, Controller: s.scroll,
 				ItemBuilder: func(_ *Element, i int) Widget {
-					return Padding{Padding: r.Symmetric(16, 10), Child: Text{Text: fmt.Sprint("Row ", i)}}
+					return Padding{Padding: painting.NewEdgeInsetsSymmetric(painting.EdgeInsetsSymmetricOptions{Horizontal: 16, Vertical: 10}), Child: Text{Text: fmt.Sprint("Row ", i)}}
 				}}}},
 		}}},
 	}}

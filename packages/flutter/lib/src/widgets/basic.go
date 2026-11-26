@@ -1,6 +1,9 @@
 package widgets
 
-import r "github.com/jonathanperis/flutter-go/packages/flutter/lib/src/rendering"
+import (
+	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/painting"
+	r "github.com/jonathanperis/flutter-go/packages/flutter/lib/src/rendering"
+)
 
 // F returns a pointer to v, for optional fields (Flutter's nullable double).
 func F(v float64) *float64 { return &v }
@@ -56,7 +59,7 @@ func (w SizedBox) UpdateRenderObject(ro r.RenderBox) {
 
 // Padding insets its child.
 type Padding struct {
-	Padding r.EdgeInsets
+	Padding painting.EdgeInsets
 	Child   Widget
 }
 
@@ -68,7 +71,7 @@ func (w Padding) UpdateRenderObject(ro r.RenderBox) {
 
 // Align positions its child. The zero Alignment is center.
 type Align struct {
-	Alignment                 r.Alignment
+	Alignment                 painting.Alignment
 	WidthFactor, HeightFactor *float64
 	Child                     Widget
 }
@@ -89,10 +92,10 @@ type Center struct {
 
 func (w Center) ChildWidget() Widget { return w.Child }
 func (w Center) CreateRenderObject() r.RenderBox {
-	return r.NewPositionedBox(r.Center, w.WidthFactor, w.HeightFactor)
+	return r.NewPositionedBox(painting.AlignmentCenter, w.WidthFactor, w.HeightFactor)
 }
 func (w Center) UpdateRenderObject(ro r.RenderBox) {
-	ro.(*r.RenderPositionedBox).Set(r.Center, w.WidthFactor, w.HeightFactor)
+	ro.(*r.RenderPositionedBox).Set(painting.AlignmentCenter, w.WidthFactor, w.HeightFactor)
 }
 
 // Row lays children out horizontally.

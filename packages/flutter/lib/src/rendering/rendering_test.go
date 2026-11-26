@@ -2,6 +2,7 @@ package rendering
 
 import (
 	ui "github.com/jonathanperis/flutter-go/engine/src/flutter/lib/ui/go"
+	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/painting"
 	"strings"
 	"testing"
 )
@@ -41,8 +42,8 @@ func assertRect(t *testing.T, name string, r RenderBox, want Rect) {
 
 func TestCenterPadding(t *testing.T) {
 	leaf := sized(100, 50)
-	pad := withChild(NewPadding(All(10)), leaf)
-	center := withChild(NewPositionedBox(Center, nil, nil), pad)
+	pad := withChild(NewPadding(painting.NewEdgeInsetsAll(10)), leaf)
+	center := withChild(NewPositionedBox(painting.AlignmentCenter, nil, nil), pad)
 	Layout(center, screen)
 
 	assertRect(t, "center", center, ui.NewRectFromLTWH(0, 0, 800, 600))
@@ -52,8 +53,8 @@ func TestCenterPadding(t *testing.T) {
 
 func TestAlignFactors(t *testing.T) {
 	leaf := sized(100, 40)
-	align := withChild(NewPositionedBox(BottomRight, f(2), f(1.5)), leaf)
-	root := withChild(NewPositionedBox(TopLeft, nil, nil), align)
+	align := withChild(NewPositionedBox(painting.AlignmentBottomRight, f(2), f(1.5)), leaf)
+	root := withChild(NewPositionedBox(painting.AlignmentTopLeft, nil, nil), align)
 	Layout(root, screen)
 	assertRect(t, "align", align, ui.NewRectFromLTWH(0, 0, 200, 60))
 	assertRect(t, "leaf", leaf, ui.NewRectFromLTWH(100, 20, 100, 40))
@@ -80,7 +81,7 @@ func TestColumnSpaceBetweenStretch(t *testing.T) {
 func TestRowMinSizeCentered(t *testing.T) {
 	a, b := sized(30, 10), sized(50, 40)
 	row := flex(Horizontal, MainStart, CrossCenter, MainMin, a, b)
-	center := withChild(NewPositionedBox(Center, nil, nil), row)
+	center := withChild(NewPositionedBox(painting.AlignmentCenter, nil, nil), row)
 	Layout(center, screen)
 	assertRect(t, "row", row, ui.NewRectFromLTWH(360, 280, 80, 40))
 	assertRect(t, "a", a, ui.NewRectFromLTWH(360, 295, 30, 10))
@@ -90,7 +91,7 @@ func TestRowMinSizeCentered(t *testing.T) {
 func TestParagraphWrapsWithTestFont(t *testing.T) {
 	p := NewParagraph("hello world", TextStyle{FontSize: 10})
 	box := withChild(NewConstrainedBox(Constraints{0, 60, 0, Inf}), p)
-	Layout(withChild(NewPositionedBox(TopLeft, nil, nil), box), screen)
+	Layout(withChild(NewPositionedBox(painting.AlignmentTopLeft, nil, nil), box), screen)
 	// 11 glyphs × 10px = 110px unwrapped; at 60px wide that's 6 per line → 2 lines.
 	if got := p.Base().Size; got != (ui.NewSize(60, 20)) {
 		t.Errorf("size = %+v", got)
@@ -99,7 +100,7 @@ func TestParagraphWrapsWithTestFont(t *testing.T) {
 
 func TestLayoutIsCachedUntilMarkedDirty(t *testing.T) {
 	leaf := &countingBox{}
-	root := withChild(NewPadding(All(1)), leaf)
+	root := withChild(NewPadding(painting.NewEdgeInsetsAll(1)), leaf)
 	Layout(root, screen)
 	Layout(root, screen)
 	if leaf.layouts != 1 {
@@ -118,7 +119,7 @@ func TestHitTestDeepestFirst(t *testing.T) {
 	leaf := NewDecoratedBox(RGB(0xff0000), 0)
 	sizedLeaf := withChild(sized(100, 100), leaf)
 	tap := withChild(NewTapRegion(nil), sizedLeaf)
-	root := withChild(NewPositionedBox(Center, nil, nil), tap)
+	root := withChild(NewPositionedBox(painting.AlignmentCenter, nil, nil), tap)
 	Layout(root, screen)
 
 	path := HitTest(root, ui.NewOffset(400, 300))
@@ -134,8 +135,8 @@ func TestPaintOrderAndOffsets(t *testing.T) {
 	inner := NewDecoratedBox(RGB(0x00ff00), 4)
 	inner.SetChild(inner, sized(20, 10))
 	outer := NewDecoratedBox(RGB(0xff0000), 0)
-	outer.SetChild(outer, withChild(NewPadding(All(5)), inner))
-	Layout(withChild(NewPositionedBox(TopLeft, nil, nil), outer), screen)
+	outer.SetChild(outer, withChild(NewPadding(painting.NewEdgeInsetsAll(5)), inner))
+	Layout(withChild(NewPositionedBox(painting.AlignmentTopLeft, nil, nil), outer), screen)
 
 	var rec Recorder
 	outer.Paint(&rec, Offset{})

@@ -8,6 +8,7 @@ import (
 	"math"
 
 	ui "github.com/jonathanperis/flutter-go/engine/src/flutter/lib/ui/go"
+	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/painting"
 )
 
 // Inf is an unbounded extent (Flutter's double.infinity).
@@ -64,39 +65,8 @@ func (c Constraints) Enforce(outer Constraints) Constraints {
 }
 
 // Deflate shrinks constraints by insets (Flutter's deflate).
-func (c Constraints) Deflate(e EdgeInsets) Constraints {
-	h, v := e.Left+e.Right, e.Top+e.Bottom
+func (c Constraints) Deflate(e painting.EdgeInsets) Constraints {
+	h, v := e.Horizontal(), e.Vertical()
 	minW, minH := math.Max(0, c.MinW-h), math.Max(0, c.MinH-v)
 	return Constraints{minW, math.Max(minW, c.MaxW-h), minH, math.Max(minH, c.MaxH-v)}
-}
-
-type EdgeInsets struct{ Left, Top, Right, Bottom float64 }
-
-func All(v float64) EdgeInsets           { return EdgeInsets{v, v, v, v} }
-func Symmetric(h, v float64) EdgeInsets  { return EdgeInsets{h, v, h, v} }
-func LTRB(l, t, r, b float64) EdgeInsets { return EdgeInsets{l, t, r, b} }
-func (e EdgeInsets) TopLeft() Offset     { return ui.NewOffset(e.Left, e.Top) }
-func (e EdgeInsets) Inflate(s Size) Size {
-	return ui.NewSize(s.Width+e.Left+e.Right, s.Height+e.Top+e.Bottom)
-}
-
-// Alignment is Flutter's Alignment: (-1,-1) top-left, (0,0) center, (1,1)
-// bottom-right. The zero value is center, which is also Flutter's default.
-type Alignment struct{ X, Y float64 }
-
-var (
-	TopLeft     = Alignment{-1, -1}
-	TopCenter   = Alignment{0, -1}
-	TopRight    = Alignment{1, -1}
-	CenterLeft  = Alignment{-1, 0}
-	Center      = Alignment{0, 0}
-	CenterRight = Alignment{1, 0}
-	BottomLeft  = Alignment{-1, 1}
-	BottomRight = Alignment{1, 1}
-)
-
-// Along returns where a child of size child sits inside parent.
-func (a Alignment) Along(parent, child Size) Offset {
-	dx, dy := parent.Width-child.Width, parent.Height-child.Height
-	return ui.NewOffset(dx*(a.X+1)/2, dy*(a.Y+1)/2)
 }

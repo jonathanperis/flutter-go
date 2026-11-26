@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	r "github.com/jonathanperis/flutter-go/packages/flutter/lib/src/rendering"
+	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/painting"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/services"
 	. "github.com/jonathanperis/flutter-go/packages/flutter/lib/src/widgets"
 	"github.com/jonathanperis/flutter-go/packages/flutter_test/lib/src"
@@ -52,7 +52,7 @@ func TestCaretBlinksWithTimersNotFrames(t *testing.T) {
 func TestTapPlacesCaret(t *testing.T) {
 	c := NewTextEditingController("hello world")
 	tester := flutter_test.New(t)
-	tester.PumpWidget(Align{Alignment: r.TopLeft, Child: SizedBox{Width: F(400), Child: TextField{Controller: c}}})
+	tester.PumpWidget(Align{Alignment: painting.AlignmentTopLeft, Child: SizedBox{Width: F(400), Child: TextField{Controller: c}}})
 	// Test font: 14px per glyph. x=45 is nearest the boundary after "hel" (42).
 	tester.TapAt(45, 5)
 	tester.Pump()

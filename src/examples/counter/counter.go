@@ -4,6 +4,7 @@ package counter
 import (
 	"fmt"
 
+	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/painting"
 	r "github.com/jonathanperis/flutter-go/packages/flutter/lib/src/rendering"
 	. "github.com/jonathanperis/flutter-go/packages/flutter/lib/src/widgets"
 )
@@ -29,8 +30,8 @@ func (s *counterState) Build(*Element) Widget {
 	return ColoredBox{Color: r.RGB(0xfef7ff), Child: Column{
 		Children: []Widget{
 			ColoredBox{Color: purple, Child: SizedBox{Height: F(64), Child: Align{
-				Alignment: r.CenterLeft,
-				Child: Padding{Padding: r.Symmetric(24, 0), Child: Text{
+				Alignment: painting.AlignmentCenterLeft,
+				Child: Padding{Padding: painting.NewEdgeInsetsSymmetric(painting.EdgeInsetsSymmetricOptions{Horizontal: 24, Vertical: 0}), Child: Text{
 					Text: s.Widget().Title, Style: r.TextStyle{FontSize: 22, Color: white},
 				}},
 			}}},
@@ -42,7 +43,7 @@ func (s *counterState) Build(*Element) Widget {
 					Text{Text: fmt.Sprint(s.count), Style: r.TextStyle{FontSize: 48, Color: ink, Bold: true}},
 				},
 			}}},
-			Align{Alignment: r.BottomRight, Child: Padding{Padding: r.All(24), Child: IncrementButton{OnTap: s.increment}}},
+			Align{Alignment: painting.AlignmentBottomRight, Child: Padding{Padding: painting.NewEdgeInsetsAll(24), Child: IncrementButton{OnTap: s.increment}}},
 		},
 	}}
 }

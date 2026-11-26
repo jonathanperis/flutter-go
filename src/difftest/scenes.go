@@ -5,6 +5,7 @@
 package difftest
 
 import (
+	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/painting"
 	r "github.com/jonathanperis/flutter-go/packages/flutter/lib/src/rendering"
 	. "github.com/jonathanperis/flutter-go/packages/flutter/lib/src/widgets"
 )
@@ -14,9 +15,9 @@ var red = ColoredBox{Color: r.RGB(0xff0000)}
 func box(w, h float64) Widget { return SizedBox{Width: F(w), Height: F(h)} }
 
 var Scenes = map[string]Widget{
-	"center_padding": Center{Child: Padding{Padding: r.All(10), Child: box(100, 50)}},
+	"center_padding": Center{Child: Padding{Padding: painting.NewEdgeInsetsAll(10), Child: box(100, 50)}},
 	"align_factors": Align{
-		Alignment: r.BottomRight, WidthFactor: F(2), HeightFactor: F(1.5),
+		Alignment: painting.AlignmentBottomRight, WidthFactor: F(2), HeightFactor: F(1.5),
 		Child: box(100, 40),
 	},
 	"root_colored_box": ColoredBox{Color: r.RGB(0x00ff00)},
@@ -50,13 +51,13 @@ var Scenes = map[string]Widget{
 			Children: []Widget{box(10, 30), box(20, 10), box(30, 20)},
 		},
 		Expanded{Child: Padding{
-			Padding: r.Symmetric(20, 5),
+			Padding: painting.NewEdgeInsetsSymmetric(painting.EdgeInsetsSymmetricOptions{Horizontal: 20, Vertical: 5}),
 			Child: Row{
 				MainAxisAlignment: r.MainSpaceAround, CrossAxisAlignment: r.CrossStart,
-				Children: []Widget{box(40, 40), Align{Alignment: r.TopRight, Child: box(10, 10)}},
+				Children: []Widget{box(40, 40), Align{Alignment: painting.AlignmentTopRight, Child: box(10, 10)}},
 			},
 		}},
-		Align{Alignment: r.CenterRight, Child: box(25, 25)},
+		Align{Alignment: painting.AlignmentCenterRight, Child: box(25, 25)},
 		Row{
 			MainAxisAlignment: r.MainCenter,
 			Children:          []Widget{box(10, 10), Expanded{Child: SizedBox{Height: F(4)}}, box(10, 10)},
@@ -72,7 +73,7 @@ var Scenes = map[string]Widget{
 		Child: Center{Child: Text{Text: "hello"}},
 	},
 	"text_wrap": Align{
-		Alignment: r.TopLeft,
+		Alignment: painting.AlignmentTopLeft,
 		Child:     SizedBox{Width: F(100), Child: Text{Text: "hello wrapping world", Style: r.TextStyle{FontSize: 10}}},
 	},
 }

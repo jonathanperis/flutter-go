@@ -12,6 +12,7 @@ import (
 
 	"github.com/go-gl/glfw/v3.3/glfw"
 
+	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/painting"
 	r "github.com/jonathanperis/flutter-go/packages/flutter/lib/src/rendering"
 	. "github.com/jonathanperis/flutter-go/packages/flutter/lib/src/widgets"
 	"github.com/jonathanperis/flutter-go/src/app"
@@ -33,7 +34,7 @@ func (s *listState) Build(*Element) Widget {
 		header = fmt.Sprintf("Selected row %d", s.selected)
 	}
 	return Column{CrossAxisAlignment: r.CrossStretch, Children: []Widget{
-		ColoredBox{Color: r.RGB(0x6750a4), Child: Padding{Padding: r.Symmetric(24, 18), Child: Text{
+		ColoredBox{Color: r.RGB(0x6750a4), Child: Padding{Padding: painting.NewEdgeInsetsSymmetric(painting.EdgeInsetsSymmetricOptions{Horizontal: 24, Vertical: 18}), Child: Text{
 			Text: header, Style: r.TextStyle{FontSize: 20, Color: r.RGB(0xffffff)},
 		}}},
 		Expanded{Child: ListViewBuilder{ItemCount: 1_000_000, ItemExtent: 56, ItemBuilder: s.row}},
@@ -50,8 +51,8 @@ func (s *listState) row(_ *Element, i int) Widget {
 	}
 	return GestureDetector{
 		OnTap: func() { s.SetState(func() { s.selected = i }) },
-		Child: ColoredBox{Color: bg, Child: Align{Alignment: r.CenterLeft, Child: Padding{
-			Padding: r.Symmetric(24, 0),
+		Child: ColoredBox{Color: bg, Child: Align{Alignment: painting.AlignmentCenterLeft, Child: Padding{
+			Padding: painting.NewEdgeInsetsSymmetric(painting.EdgeInsetsSymmetricOptions{Horizontal: 24, Vertical: 0}),
 			Child:   Text{Text: fmt.Sprintf("Row %d", i), Style: r.TextStyle{FontSize: 16, Color: r.RGB(0x1d1b20)}},
 		}}},
 	}

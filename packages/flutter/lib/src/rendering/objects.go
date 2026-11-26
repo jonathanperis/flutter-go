@@ -1,6 +1,9 @@
 package rendering
 
-import ui "github.com/jonathanperis/flutter-go/engine/src/flutter/lib/ui/go"
+import (
+	ui "github.com/jonathanperis/flutter-go/engine/src/flutter/lib/ui/go"
+	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/painting"
+)
 
 // Proxy-style objects: one optional child that gets the same constraints.
 
@@ -84,12 +87,12 @@ func (r *RenderConstrainedBox) Paint(cv Canvas, offset Offset) {
 type RenderPadding struct {
 	Box
 	SingleChild
-	padding EdgeInsets
+	padding painting.EdgeInsets
 }
 
-func NewPadding(p EdgeInsets) *RenderPadding { return &RenderPadding{padding: p} }
+func NewPadding(p painting.EdgeInsets) *RenderPadding { return &RenderPadding{padding: p} }
 
-func (r *RenderPadding) Set(p EdgeInsets) {
+func (r *RenderPadding) Set(p painting.EdgeInsets) {
 	if p != r.padding {
 		r.padding = p
 		MarkNeedsLayout(r)
@@ -97,12 +100,13 @@ func (r *RenderPadding) Set(p EdgeInsets) {
 }
 
 func (r *RenderPadding) PerformLayout(c Constraints) Size {
+	padding := r.padding
 	if r.child == nil {
-		return c.Constrain(r.padding.Inflate(Size{}))
+		return c.Constrain(ui.NewSize(padding.Horizontal(), padding.Vertical()))
 	}
-	childSize := Layout(r.child, c.Deflate(r.padding))
-	r.child.Base().Offset = r.padding.TopLeft()
-	return c.Constrain(r.padding.Inflate(childSize))
+	childSize := Layout(r.child, c.Deflate(padding))
+	r.child.Base().Offset = ui.NewOffset(padding.Left, padding.Top)
+	return c.Constrain(ui.NewSize(padding.Horizontal()+childSize.Width, padding.Vertical()+childSize.Height))
 }
 
 func (r *RenderPadding) Paint(cv Canvas, offset Offset) {
@@ -116,17 +120,17 @@ func (r *RenderPadding) Paint(cv Canvas, offset Offset) {
 type RenderPositionedBox struct {
 	Box
 	SingleChild
-	alignment                 Alignment
+	alignment                 painting.Alignment
 	widthFactor, heightFactor *float64
 }
 
-func NewPositionedBox(a Alignment, widthFactor, heightFactor *float64) *RenderPositionedBox {
+func NewPositionedBox(a painting.Alignment, widthFactor, heightFactor *float64) *RenderPositionedBox {
 	return &RenderPositionedBox{alignment: a, widthFactor: widthFactor, heightFactor: heightFactor}
 }
 
 func eqPtr(a, b *float64) bool { return (a == nil && b == nil) || (a != nil && b != nil && *a == *b) }
 
-func (r *RenderPositionedBox) Set(a Alignment, widthFactor, heightFactor *float64) {
+func (r *RenderPositionedBox) Set(a painting.Alignment, widthFactor, heightFactor *float64) {
 	if a != r.alignment || !eqPtr(widthFactor, r.widthFactor) || !eqPtr(heightFactor, r.heightFactor) {
 		r.alignment, r.widthFactor, r.heightFactor = a, widthFactor, heightFactor
 		MarkNeedsLayout(r)
@@ -161,7 +165,8 @@ func (r *RenderPositionedBox) PerformLayout(c Constraints) Size {
 		h = float64(cs.Height * factor(r.heightFactor))
 	}
 	size := c.Constrain(ui.NewSize(w, h))
-	r.child.Base().Offset = r.alignment.Along(size, cs)
+	// alignChild: alignment.alongOffset(size - child.size as Offset).
+	r.child.Base().Offset = r.alignment.AlongOffset(ui.NewOffset(size.Width-cs.Width, size.Height-cs.Height))
 	return size
 }
 
