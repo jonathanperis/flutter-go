@@ -29,10 +29,10 @@ import (
 	"strings"
 	"testing"
 
+	ui "github.com/jonathanperis/flutter-go/engine/src/flutter/lib/ui/go"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/foundation"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/services"
 	flutter_test "github.com/jonathanperis/flutter-go/packages/flutter_test/lib/src"
-	ui "github.com/jonathanperis/flutter-go/engine/src/flutter/lib/ui/go"
 	"github.com/jonathanperis/flutter-go/src/async"
 	"github.com/jonathanperis/flutter-go/src/dart"
 )
@@ -251,12 +251,12 @@ func TestMethodChannelCanHandleMethodCallWithSuccessfulResult(t *testing.T) {
 func TestMethodChannelCanHandleMethodCallWithExpressiveErrorResult(t *testing.T) {
 	methodTest(t, func(channel *services.MethodChannel, _ *services.OptionalMethodChannel) {
 		channel.SetMethodCallHandler(asyncHandler(func(services.MethodCall) any {
-			panic(services.NewPlatformException("bad", services.PlatformExceptionOptions{Message: strp("sayHello failed")}))
+			panic(services.NewPlatformException("bad", services.PlatformExceptionOptions{Message: strp("sayHello failed"), Details: []any{1}}))
 		}))
 		envelope := handleOnCh7(services.NewMethodCall("sayHello", "hello"))
 		r := panicOf(func() { jsonMethod.DecodeEnvelope(envelope) })
 		e, ok := r.(*services.PlatformException)
-		expect(ok && e.Code == "bad" && *e.Message == "sayHello failed", "panic %v", r)
+		expect(ok && e.Code == "bad" && *e.Message == "sayHello failed" && reflect.DeepEqual(e.Details, []any{1}), "panic %v", r)
 	})
 }
 
@@ -407,7 +407,7 @@ func TestSetMethodCallHandlerThrowsAssertionErrorIffBindingIsNotYetInitialized(t
 	}
 	methodChannel := services.NewMethodChannel("mock")
 	r := panicOf(func() { methodChannel.SetMethodCallHandler(nil) })
-	if _, ok := r.(dart.AssertionFailure); !ok {
+	if e, ok := r.(dart.AssertionFailure); !ok || !strings.HasPrefix(dart.ToString(e.AssertionMessage()), "Cannot set the method call handler before the binary messenger has been initialized.") {
 		t.Fatalf("got %#v", r)
 	}
 	ensureInitialized()
@@ -562,6 +562,12 @@ func TestInitialLifecycleStateIsUsedToInitStatePaused(t *testing.T) {
 	if got := binding.PlatformDispatcher().InitialLifecycleState(); got != "AppLifecycleState.paused" {
 		t.Fatalf("got %q", got)
 	}
+	// A state already set wins over the initial one.
+	binding.HandleAppLifecycleStateChanged(ui.AppLifecycleStateHidden)
+	binding.ReadInitialLifecycleStateFromNativeWindow()
+	if got := binding.LifecycleState(); got.String() != "AppLifecycleState.hidden" {
+		t.Fatalf("got %v", got)
+	}
 }
 
 // ---- own tests of the binding
@@ -610,6 +616,8 @@ func TestLifecycleStateTransitions(t *testing.T) {
 		{&i, h, []ui.AppLifecycleState{h}},
 		{&p, d, []ui.AppLifecycleState{d}},
 		{&h, d, []ui.AppLifecycleState{p, d}},
+		{&d, d, nil},
+		{&p, p, nil},
 	}
 	runAsync(t, func() {
 		for _, c := range cases {
@@ -660,7 +668,7 @@ func TestSystemAndAccessibilityChannels(t *testing.T) {
 
 type menuClient struct{ log []string }
 
-func (c *menuClient) HandleSystemHide()                         { c.log = append(c.log, "hide") }
+func (c *menuClient) HandleSystemHide()                       { c.log = append(c.log, "hide") }
 func (c *menuClient) HandleCustomContextMenuAction(id string) { c.log = append(c.log, "action "+id) }
 
 func TestPlatformChannelHandler(t *testing.T) {

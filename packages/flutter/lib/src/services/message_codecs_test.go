@@ -476,8 +476,8 @@ func TestStandardMessageCodecErrors(t *testing.T) {
 		}
 	}
 	formatError([]byte{}, "FormatException: Message corrupted")
-	formatError([]byte{0, 0}, "FormatException: Message corrupted") // trailing data
-	formatError([]byte{15}, "FormatException: Message corrupted")   // unknown type
+	formatError([]byte{0, 0}, "FormatException: Message corrupted")  // trailing data
+	formatError([]byte{15}, "FormatException: Message corrupted")    // unknown type
 	formatError([]byte{12, 1}, "FormatException: Message corrupted") // missing element
 	formatError([]byte{7, 1, 0xff}, "FormatException: Invalid UTF-8 byte (at offset 0)")
 	// The large-int type is read as a string.

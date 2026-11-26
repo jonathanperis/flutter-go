@@ -20,6 +20,7 @@ every ported library follows them, and `cmd/apiparity` checks the result.
 | `dart:io` (the types Flutter's API mentions) | `src/io` |
 | `dart:core`, `dart:math` (the parts Flutter needs) | `src/dart` (`dart.Random`, `dart.Pow`, `dart.Sin`, `dart.ArgumentError`, `dart.DoubleToString`...) |
 | Third-party Dart packages Flutter re-exports (`package:listen`) | `src/pub/<package>` (package `<package>`), files named after the package's `lib/src` files |
+| `package:vector_math/vector_math_64.dart` (re-exported `Matrix4`) | `src/pub/vector_math` (package `vector_math`, partial) |
 
 Go files sit beside the Dart files they replace and keep their base name
 (`friction_simulation.dart` → `friction_simulation.go`), so the two trees
@@ -503,3 +504,130 @@ Each divergence is listed here when it is introduced.
 - curves: a curve that overrides `transform` itself (as `Split` does)
   defines `Transform` on its own type; `TransformInternal` overrides are
   reached through `self`.
+- animation: `Animation<T>` is an interface plus the embeddable
+  `AnimationBase[T]` (self pattern); the generic method `drive<U>` is the
+  function `animation.Drive[U](animation, child)`. The listener mixins
+  (`AnimationLazyListenerMixin`, `AnimationEagerListenerMixin`,
+  `AnimationLocalListenersMixin`, `AnimationLocalStatusListenersMixin`,
+  `AnimationWithParentMixin`) are embeddable structs with the Dart names
+  (their Dart names already end in Mixin); each calls the members it leaves
+  abstract through `SetSelf`. Local listener lists keep Dart's
+  HashedObserverList (value listeners: one call per notification however
+  often added) and ObserverList (status listeners: duplicates called
+  twice) semantics, comparing with `dart.FunctionsEqual`.
+- animation: `AnimationController` is a struct Flutter extends: a type
+  extending it calls `c.Construct(c, vsync, opts)` (or
+  `ConstructUnbounded`); `NewAnimationController(vsync, opts)` and
+  `NewAnimationControllerUnbounded` are the two constructors (vsync,
+  required, is positional). The setter `value=` is `SetValue`; nullable
+  `duration`/`reverseDuration` are `*time.Duration` fields; methods with
+  named parameters take `ForwardOptions`, `ReverseOptions`,
+  `ToggleOptions`, `AnimateToOptions`, `AnimateBackOptions`,
+  `RepeatOptions`, `FlingOptions`, `StopOptions` (nil `Canceled` is
+  Dart's default true). The mixins' @protected members (`NotifyListeners`,
+  `NotifyStatusListeners`, `ClearListeners`, `DidRegisterListener`...)
+  are exported. The controller's own algorithms
+  call its members directly (only `toString` and the Animation getters go
+  through self).
+- animation: `AnimationBehavior.normal` consults
+  `SemanticsBinding.instance.disableAnimations`; the semantics library is
+  not ported, so it reads the hook `animation.SemanticsDisableAnimations`
+  (false by default; tests set it where Flutter sets
+  `debugSemanticsDisableAnimations`).
+- animation: `Animatable<T>` is an interface plus `AnimatableBase[T]`;
+  `Animatable.fromCallback` is `NewAnimatableFromCallback`. `Tween<T>` is a
+  struct (Flutter extends it): `Begin`/`End` are `T`, so a nullable tween
+  has a pointer type argument (`ColorTween` is `Tween[*ui.Color]`; nil is
+  null), and a non-pointer `Tween[float64]` has no null ends. A type
+  extending Tween overrides `Lerp` and calls `SetSelf`.
+  `ReverseTween(parent)` takes the parent's embedded `*Tween[T]`
+  (`&intTween.Tween`, as `TickerProvider.CreateTicker` returns the
+  embedded `*Ticker`). `Tween.lerp`'s dynamic `begin + (end - begin) * t`
+  calls the types' `Add`/`Sub`/`Mul` operator methods by reflection
+  (float64 and int natively); a missing method or a result of the wrong
+  type is reported as Flutter reports Dart's NoSuchMethodError/TypeError
+  (the same FlutterError in debug builds).
+- animation: `AlwaysStoppedAnimation.value`, `CurvedAnimation.parent` and
+  `TrainHoppingAnimation.currentTrain` are methods (`Value()`, `Parent()`,
+  `CurrentTrain()`), since the Animation interfaces need them; the other
+  public fields (`Curve`, `ReverseCurve`, `IsDisposed`, `OnSwitchedTrain`,
+  `First`/`Next`, `ReverseAnimation.Parent`) are fields. `CompoundAnimation`
+  is embedded and set up with `Construct(self, first, next)`; `AnimationMax`
+  and `AnimationMin` take `T ~int | ~float64` (Dart's `num`) and use
+  dart:math's `max`/`min` rules (NaN, ±0). `kAlwaysCompleteAnimation` is
+  `KAlwaysCompleteAnimation`. `TweenSequenceItem`'s required named
+  parameters are positional in `NewTweenSequenceItem(tween, weight)`.
+- animation: `AnimationStyle` is used by pointer (it is Diagnosticable);
+  `==` is `Equal`, `copyWith` takes `CopyWithOptions`, `AnimationStyle.lerp`
+  and `AnimationStyle.noAnimation` are `AnimationStyleLerp` and
+  `AnimationStyleNoAnimation`. Curves compare by identity, except the
+  private `_LerpedCurve` (field-wise, as in Dart).
+- enums: a Go enum may have a `Name()` method (Dart's `.name`), in which
+  case its `String()` is Dart's whole `toString()` ("TextDirection.ltr");
+  foundation's `EnumProperty`/`describeEnum` use `Name()` and `dartToString`
+  uses `String()` as is. Enums without `Name()` (foundation's own) keep
+  returning the bare name from `String()`.
+- Stacking two binding mixins that each need the binding as `self`
+  (`BindingBase with SchedulerBinding, SemanticsBinding`): Go can't embed
+  both (their promoted `BindingBase` methods, including the unexported
+  `bindingBase()`, would be ambiguous), so the binding embeds the lower
+  mixin and keeps the upper one as a field whose `BindingBase` is the lower
+  mixin, forwards the upper mixin's interface methods to it, and calls the
+  upper mixin's `InitInstances` from its own (see the semantics tests'
+  `testBinding`). `semantics.SemanticsBinding` has no unexported method so
+  forwarding types implement it.
+- semantics: `Set`s and `Map`s whose iteration order is observable keep
+  Dart's insertion order: `SemanticsNode.Tags`, `controlsNodes` and
+  `tagsForChildren` are slices without duplicates (nil is null); a custom
+  action map is `[]dart.MapEntry[CustomSemanticsAction, func()]`
+  (`SetCustomSemanticsActions` replaces it; mutating the slice the getter
+  returns doesn't reach the configuration). A tag set shared by reference
+  and mutated later is not seen by the node (assign it again).
+- semantics: `SemanticsTag` and `SemanticsSortKey` compare by identity
+  (Dart's classes have no `==`): use them by pointer.
+  `CustomSemanticsAction` is a comparable value: `Label`/`Hint` `""` and the
+  zero `ui.SemanticsAction` stand for null (Dart asserts the strings are
+  not empty).
+- semantics: `AttributedString`'s `string` is the field `Text` (`String()`
+  is `toString`); `+` is `Add`; `==` is `Equal` (attributes by identity, as
+  Dart's `listEquals` on `StringAttribute`s). `Uri` is `*url.URL`
+  (compared by its `String()`). `SemanticsData`, `SemanticsProperties` and
+  `SemanticsHintOverrides` embed their `...Options` struct (the fields);
+  build them with `NewSemanticsData(SemanticsDataOptions{...})` etc.
+- semantics: `SemanticsNode.toStringDeep/toDiagnosticsNode/
+  debugDescribeChildren({childOrder})` keep the DiagnosticableTree
+  signatures (traversal order) and add `ToStringDeepInOrder`,
+  `ToDiagnosticsNodeInOrder`, `DebugDescribeChildrenInOrder` taking the
+  `DebugSemanticsDumpOrder`. `updateWith({config, childrenInInversePaintOrder})`
+  is `UpdateWith(SemanticsNodeUpdateWithOptions{...})`. A Dart list passed
+  again after being mutated in place (the "list was mutated" check) is a Go
+  slice sharing its backing array.
+- semantics: `SemanticsService` is a variable of static methods
+  (`SemanticsService.SendAnnouncement(view, ...)`); `SemanticsEvent` is an
+  interface plus the embeddable `SemanticsEventBase`; `toMap`/`getDataMap`
+  return ordered maps (`[]dart.MapEntry[string, any]`).
+- dart:ui semantics: `SemanticsAction`/`SemanticsFlag` are comparable
+  values (zero: none); `values` and `fromIndex` are
+  `SemanticsActionValues()`/`SemanticsActionFromIndex(i) *SemanticsAction`.
+  `SemanticsFlags` is a struct literal (every zero value is Dart's
+  default). `SemanticsUpdateBuilder.updateNode`'s named parameters are
+  `SemanticsUpdateBuilderUpdateNodeOptions`. ENGINE GAP: no accessibility
+  bridge consumes a built `SemanticsUpdate`; `ui.EngineSemanticsUpdateOf`
+  returns what was built, `ui.SemanticsTreeEnabled` the last
+  `setSemanticsTreeEnabled`, and an embedder's
+  `PlatformConfigurationClient` that also implements
+  `PlatformConfigurationSemanticsClient` receives both.
+- services (partial): `BasicMessageChannel` without a messenger uses
+  `services.DefaultBinaryMessenger`, the stand-in for
+  `ServicesBinding.instance.defaultBinaryMessenger` until ServicesBinding
+  is ported (nil: the channel's send fails as Flutter fails without a
+  binding). `StandardMessageCodec` decodes maps as
+  `[]dart.MapEntry[any, any]` (insertion order) and encodes those, string
+  keyed entries and Go maps (sorted by key); `services.MapLookup` reads any
+  of them. Subclassing the codec (overriding `writeValue`) is not
+  supported yet.
+- dart:core `List.sort` is `dart.ListSort` (the VM's insertion sort /
+  dual-pivot quicksort, whose tie order is observable);
+  `double.compareTo`, `String.compareTo` (UTF-16 code units) and
+  `double.tryParse` are `dart.CompareDoubles`, `dart.CompareStrings`,
+  `dart.DoubleTryParse`.

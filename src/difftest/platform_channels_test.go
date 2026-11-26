@@ -86,8 +86,8 @@ func TestPlatformChannelsMatchFlutter(t *testing.T) {
 			}
 			return "bytes:" + strings.Join(s, ",")
 		case *services.PlatformException:
-			return "PlatformException(" + x.Code + ", " + nullable(x.Message) + ", " + dart.ToString(x.Details) + ", " +
-				nullable(x.Stacktrace) + ")"
+			return "PlatformException(" + x.Code + ", " + codecNullable(x.Message) + ", " + dart.ToString(x.Details) + ", " +
+				codecNullable(x.Stacktrace) + ")"
 		}
 		return dart.ToString(v)
 	}
@@ -320,6 +320,48 @@ func TestPlatformChannelsMatchFlutter(t *testing.T) {
 		settle()
 		add("pending at end " + strconv.Itoa(messenger().PendingMessageCount()))
 		messenger().SetMockMessageHandler("diff/pending", nil)
+
+		// ---- A null mock reply (await null), before other microtasks.
+		add("scene await null")
+		messenger().SetMockMessageHandler("diff/optional", func([]byte) async.Future[[]byte] { return nil })
+		track("optional first", optional.InvokeMethod("x"))
+		ticks(4)
+		settle()
+		ticks(4)
+		track("optional second", optional.InvokeMethod("x"))
+		settle()
+		messenger().SetMockMessageHandler("diff/optional", nil)
+
+		// ---- An event stream closed by the platform.
+		add("scene events close")
+		messenger().SetMockMessageHandler("diff/events3", func([]byte) async.Future[[]byte] {
+			return async.Async(func() []byte { return jsonMethod.EncodeSuccessEnvelope(nil) })
+		})
+		events3 := services.NewEventChannel("diff/events3", services.MethodChannelOptions{Codec: jsonMethod})
+		events3.ReceiveBroadcastStream().Listen(func(e any) { add("event3 " + dart.ToString(e)) },
+			async.StreamListenOptions{OnDone: func() { add("event3 done") }})
+		settle()
+		ticks(8)
+		trackBytes("close", messenger().HandlePlatformMessage("diff/events3", nil, nil))
+		settle()
+		messenger().SetMockMessageHandler("diff/events3", nil)
+
+		// ---- Profiling.
+		add("scene profiling")
+		previousPrint := foundation.DebugPrint
+		foundation.DebugPrint = func(message string, _ ...foundation.DebugPrintOptions) { add("debugPrint " + message) }
+		services.DebugProfilePlatformChannels = true
+		profiled := services.NewMethodChannel("diff/profiled")
+		messenger().SetMockMethodCallHandler(profiled, func(call services.MethodCall) async.Future[any] {
+			return async.Async(func() any { return []any{call.Arguments} })
+		})
+		profiled.InvokeMethod("m", 1).Await()
+		profiled.InvokeMethod("m", "two").Await()
+		profiled.InvokeMethod("n").Await()
+		async.FutureDelayed(1100*time.Millisecond, func() any { return nil }).Await()
+		services.DebugProfilePlatformChannels = false
+		foundation.DebugPrint = previousPrint
+		messenger().SetMockMethodCallHandler(profiled, nil)
 	}
 
 	done := false

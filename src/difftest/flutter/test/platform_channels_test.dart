@@ -269,6 +269,44 @@ void main() {
     log.add('pending at end ${messenger.pendingMessageCount}');
     messenger.setMockMessageHandler('diff/pending', null);
 
+    // ---- A null mock reply (await null), before other microtasks.
+    log.add('scene await null');
+    messenger.setMockMessageHandler('diff/optional', (ByteData? message) => null);
+    track('optional first', optional.invokeMethod<Object?>('x'));
+    ticks(4);
+    await settle();
+    ticks(4);
+    track('optional second', optional.invokeMethod<Object?>('x'));
+    await settle();
+    messenger.setMockMessageHandler('diff/optional', null);
+
+    // ---- An event stream closed by the platform: when the close's reply
+    // completes, relative to the done event.
+    log.add('scene events close');
+    messenger.setMockMessageHandler('diff/events3', (ByteData? m) async => jsonMethod.encodeSuccessEnvelope(null));
+    const events3 = EventChannel('diff/events3', jsonMethod);
+    events3.receiveBroadcastStream().listen((dynamic e) => log.add('event3 $e'), onDone: () => log.add('event3 done'));
+    await settle();
+    ticks(8);
+    track('close', messenger.handlePlatformMessage('diff/events3', null, null));
+    await settle();
+    messenger.setMockMessageHandler('diff/events3', null);
+
+    // ---- Profiling.
+    log.add('scene profiling');
+    final DebugPrintCallback previousPrint = debugPrint;
+    debugPrint = (String? message, {int? wrapWidth}) => log.add('debugPrint $message');
+    debugProfilePlatformChannels = true;
+    const profiled = MethodChannel('diff/profiled');
+    messenger.setMockMethodCallHandler(profiled, (MethodCall call) async => <Object?>[call.arguments]);
+    await profiled.invokeMethod<Object?>('m', 1);
+    await profiled.invokeMethod<Object?>('m', 'two');
+    await profiled.invokeMethod<Object?>('n');
+    await Future<void>.delayed(const Duration(milliseconds: 1100));
+    debugProfilePlatformChannels = false;
+    debugPrint = previousPrint;
+    messenger.setMockMethodCallHandler(profiled, null);
+
     File('build/platform_channels.json')
       ..createSync(recursive: true)
       ..writeAsStringSync(const JsonEncoder.withIndent(' ').convert(<String, Object?>{'log': log}));

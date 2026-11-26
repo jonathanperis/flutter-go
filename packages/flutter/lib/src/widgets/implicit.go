@@ -28,21 +28,23 @@ type boxValues struct {
 
 type animatedBoxState struct {
 	StateOf[AnimatedBox]
-	ctrl       *animation.Controller
+	ctrl       *animation.AnimationController
 	begin, end boxValues
 }
 
 func targetOf(w AnimatedBox) boxValues { return boxValues{w.Width, w.Height, w.Color} }
 
 func (s *animatedBoxState) InitState() {
-	s.ctrl = animation.NewController(s.Context().Vsync(), s.Widget().Duration)
+	d := s.Widget().Duration
+	s.ctrl = animation.NewAnimationController(s.Context().Vsync(), animation.AnimationControllerOptions{Duration: &d})
 	s.ctrl.AddListener(func() { s.SetState(nil) })
 	s.begin, s.end = targetOf(s.Widget()), targetOf(s.Widget())
 }
 
 func (s *animatedBoxState) DidUpdateWidget(old Widget) {
 	w := s.Widget()
-	s.ctrl.Duration = w.Duration
+	d := w.Duration
+	s.ctrl.Duration = &d
 	if targetOf(w) != s.end {
 		s.begin, s.end = s.current(), targetOf(w)
 		s.ctrl.SetValue(0)
@@ -58,13 +60,17 @@ func (s *animatedBoxState) current() boxValues {
 	if c := s.Widget().Curve; c != nil {
 		t = c.Transform(t)
 	}
-	l := animation.LerpDouble
+	l := lerpDouble
 	return boxValues{
 		l(s.begin.w, s.end.w, t), l(s.begin.h, s.end.h, t),
 		r.Color{R: l(s.begin.c.R, s.end.c.R, t), G: l(s.begin.c.G, s.end.c.G, t),
 			B: l(s.begin.c.B, s.end.c.B, t), A: l(s.begin.c.A, s.end.c.A, t)},
 	}
 }
+
+// lerpDouble is dart:ui's lerpDouble on non-null values, a*(1-t) + b*t
+// (Flutter's form for sizes and colors).
+func lerpDouble(a, b, t float64) float64 { return float64(a*(1-t)) + float64(b*t) }
 
 func (s *animatedBoxState) Build(*Element) Widget {
 	v := s.current()

@@ -8,9 +8,9 @@ import (
 	"errors"
 	"testing"
 
+	ui "github.com/jonathanperis/flutter-go/engine/src/flutter/lib/ui/go"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/foundation"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/services"
-	ui "github.com/jonathanperis/flutter-go/engine/src/flutter/lib/ui/go"
 	"github.com/jonathanperis/flutter-go/src/async"
 	"github.com/jonathanperis/flutter-go/src/dart"
 )
@@ -100,7 +100,7 @@ func (m *TestDefaultBinaryMessenger) SetMessageHandler(channel string, handler s
 		delete(m.inboundHandlers, channel)
 		m.Delegate.SetMessageHandler(channel, nil)
 	} else {
-		m.inboundHandlers[channel] = handler // used to handle fake messages sent via handlePlatformMessage
+		m.inboundHandlers[channel] = handler           // used to handle fake messages sent via handlePlatformMessage
 		m.Delegate.SetMessageHandler(channel, handler) // used to handle real messages from the engine
 	}
 }

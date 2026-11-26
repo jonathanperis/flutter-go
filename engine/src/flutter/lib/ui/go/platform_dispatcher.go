@@ -54,12 +54,15 @@ type PlatformDispatcher struct {
 	onPlatformMessage             PlatformMessageCallback
 	initialLifecycleState         string
 	initialLifecycleStateAccessed bool
+	semantics                     platformDispatcherSemantics // platform_dispatcher_semantics.go
 }
 
 // platformConfiguration is _PlatformConfiguration (the fields ported so far)
 // with its defaults.
 type platformConfiguration struct {
-	platformBrightness Brightness
+	platformBrightness    Brightness
+	accessibilityFeatures AccessibilityFeatures
+	semanticsEnabled      bool
 }
 
 var platformDispatcherInstance = &PlatformDispatcher{

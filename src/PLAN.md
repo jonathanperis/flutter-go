@@ -1214,3 +1214,296 @@ The standing goal is now full API parity with Flutter 3.50.1's Dart layer
   inactive enabling frames, duplicate event-loop callbacks, banner
   microsecond padding, muting from inside a tick, orCancel first read after
   a cancel, the tester's clock epoch.
+### animation (P3): the rest of the library, and the ad-hoc Controller replaced
+- `packages/flutter/lib/src/animation` now ports all of 3.50.1's
+  animation library, one Go file per Dart file: animation.dart
+  (`Animation[T]` interface + `AnimationBase[T]`, `AnimationStatus` with
+  its predicates, `Animation.fromValueListenable`, `drive` as
+  `animation.Drive`), animation_controller.dart (`AnimationController`
+  with forward/reverse/toggle/animateTo/animateBack/repeat/fling/
+  animateWith/animateBackWith/stop/resync/reset/velocity/dispose,
+  `unbounded`, `AnimationBehavior`, `_InterpolationSimulation`,
+  `_RepeatingSimulation`), animations.dart (kAlwaysComplete/Dismissed,
+  AlwaysStoppedAnimation, AnimationWithParentMixin, ProxyAnimation,
+  ReverseAnimation, CurvedAnimation, TrainHoppingAnimation,
+  CompoundAnimation, AnimationMean/Max/Min with dart:math's max/min),
+  listener_helpers.dart (the four mixins, with Dart's HashedObserverList /
+  ObserverList semantics and the "animation library" error reports),
+  tween.dart (Animatable, Tween with Dart's dynamic `begin + (end - begin)
+  * t` through the operator methods, ReverseTween, Color/Size/Rect/Int/
+  Step/Constant/CurveTween, chain/animate/evaluate, fromCallback),
+  tween_sequence.dart and animation_style.dart (incl. `_LerpedCurve`).
+  Divergences are listed in API_MAPPING (self pattern, `Construct` for
+  subclasses, options structs, `Tween[*ui.Color]` for nullable tweens,
+  `ReverseTween(&x.Tween)`, the `SemanticsDisableAnimations` hook).
+- **Migration:** `animation.Controller`/`animate_with.go` are gone.
+  widgets' AnimatedBox uses `AnimationController` (`value = 0; forward()`,
+  as ImplicitlyAnimatedWidget), ScrollController's ballistic and driven
+  activities use `AnimationController.unbounded` + `animateWith` /
+  `animateTo`. Every existing difftest (animations, fling, bouncing,
+  drag_fling, lists, editing, repaint...) passes with unchanged
+  references.
+- **Found (behavior the old Controller got wrong, invisible to the old
+  difftests):** an interpolation is done only once `elapsed > duration`,
+  so a controller reaches its end value at `elapsed == duration` but
+  reports completed (and stops its ticker) on the next frame; the old
+  controller completed at `t == 1`. Flutter's `animateWith` doesn't notify
+  listeners when it starts (the old one did). The scroll difftests are
+  unaffected: the extra frame and the initial notification set the same
+  offsets. flutter-go's own old test of the reverse timing was corrected
+  accordingly.
+- **Found by fmacheck:** `_RepeatingSimulation._initialT`'s product was
+  stored unrounded and added later (`timeInSeconds + _initialT`); wrapped.
+  foundation's `dartToString` prints a `*time.Duration` with Go's format
+  ("1s"): AnimationStyle passes the dereferenced Duration to its
+  DiagnosticsProperty (Dart prints "0:00:01.000000"). A foundation fix
+  (deref nullable Durations) would help other ports.
+- Flutter's tests: animation_controller_test 48/48, animations_test
+  18/18, tween_test 15/18 (BorderTween, Matrix4Tween, BorderRadiusTween
+  skipped: painting/vector_math not ported), listener_helpers_test 2/2,
+  animation_controller_listener_test 1/1, animation_from_listener_test
+  3/3, iteration_patterns_test 4/4, futures_test 6/6 (asStream not
+  ported), animation_style_test 8/8; animation_sheet_test (3) and
+  live_binding_test (2) not ported (flutter_test goldens and
+  LiveTestWidgetsFlutterBinding). All share one plain SchedulerBinding per
+  process; setUp cancels the transient callbacks earlier tests leave (Dart
+  gives each file its own isolate). Own tests: listener-list semantics,
+  lazy start/stop, error report details, subclassing through `Construct`,
+  null transformer results, typedef signatures, compile-time conformance
+  of every type to Animation/Animatable/TweenSelf.
+- **Difftests**, compared line for line with doubles in Dart's shortest
+  round-trip form (so bit for bit), identical on the first run except the
+  harness's end-of-body microtask flush:
+  `difftest/animation_controller_test.go` + `flutter/test/
+  animation_controller_test.dart`, 12 scenes, 1,861 lines through
+  flutter_test's pump: forward/reverse/toggle with reverseDuration and
+  `from`, animateTo/animateBack with 8 curves (incl. elastic/bounce/
+  overshooting), already-at-target and zero durations, interruptions,
+  repeat (reverse, min/max, count, period, initial value mid-range, min ==
+  max, wider bounds), fling (default, negative, custom spring, wide
+  bounds, velocity 0), animateWith/animateBackWith (gravity, spring,
+  friction), unbounded controllers, stop(canceled: false), value
+  clamping, resync (incl. to a muted ticker: "silenced"), dispose,
+  timeDilation 3 and 0.37, AnimationBehavior normal vs preserve under
+  reduced motion (animateTo at 5%, fling at 200×, repeat), CurvedAnimation
+  with the reverse-curve direction lock and curve changes,
+  TrainHoppingAnimation (crossing trains, ties in both modes, equal
+  starts, status dedupe after a hop), ProxyAnimation parent switches,
+  ReverseAnimation, AnimationMean/Max/Min (incl. ±0.0/NaN for doubles,
+  ints), every toString form (hashes masked) and TickerFuture
+  completion/orCancel order. `difftest/tween_test.go` + `flutter/test/
+  tween_test.dart`, 2,441 lines: Tween<double> (incl. ∞), Tween<Offset>
+  and Tween<Size> through the dynamic operators, ColorTween (nulls, alpha,
+  Display P3 → sRGB), Size/RectTween with nulls, Int/StepTween rounding
+  (negative ranges, extrapolation), ReverseTween, ConstantTween,
+  CurveTween, chains, fromCallback, tween.animate/drive, TweenSequence
+  (uneven weights incl. 1e-3) and FlippedTweenSequence, a color
+  sequence, AnimationStyle.lerp (durations, lerped curves, nulls, equal
+  curves, lerps of lerps) and the lerp error messages.
+- Mutations: 128 valid on the new code, 127 caught, 1 equivalent
+  (dart:math min's `a == 0 && b.isNegative` clause: after the `a == 0.0`
+  return it is unreachable for doubles). Caught only after adding
+  difftest cases: Duration × fraction rounding (1000us × 2/3), the
+  unbounded controller's infinite range, repeat's `>=` exit tie, fling
+  with velocity 0, TrainHopping's `<=`/`>=` ties, its status dedupe after
+  a hop and its equal-values start, dart:math max/min on ±0, Animatable's
+  default toString, AnimationStyle.lerp of equal curves/durations and of
+  lerped curves (field-wise ==).
+- Parity: 265 → 302 of 2,889 exposed, 200 → 238 tested; animation
+  17 → 54 of 54 (all tested).
+### semantics (P2), with dart:ui's semantics.dart
+- `packages/flutter/lib/src/semantics` ports binding, debug, semantics
+  (in four files: semantics.go, semantics_node.go, semantics_owner.go,
+  semantics_configuration.go), semantics_event and semantics_service
+  (3.50.1): semantics 0 → 36 of 36. The debug role checks, merging
+  (getSemanticsData), the traversal sort (vertical groups, horizontal
+  groups, knots, sort-key groups), traversal grafting (traversal
+  parent/child identifiers and the traversal transform), dirty tracking
+  and sendSemanticsUpdate, action routing through merged nodes and by
+  position, the configuration absorb/compatibility rules and the debug
+  output (toStringDeep in both dump orders, SemanticsData.toString/toJson)
+  are all ported. Flutter's quirk that `onMoveCursorForwardByWord=` /
+  `onMoveCursorBackwardByWord=` store the handler in the *character*
+  getters is kept.
+- **dart:ui** `ui/go/semantics.go` ports semantics.dart in full
+  (SemanticsAction, SemanticsFlag(s), CheckedState, Tristate, roles,
+  input types, validation results, hit-test behavior, StringAttribute and
+  subclasses, SemanticsUpdateBuilder/SemanticsUpdate) with the engine's
+  `testing/dart/semantics_test.dart` (4/4). `platform_dispatcher_semantics.go`
+  adds Locale, SemanticsActionEvent, AccessibilityFeatures, a minimal
+  FlutterView (implicit view, id 0; updateSemantics), the dispatcher's
+  semantics/accessibility callbacks and the engine entry points
+  (`PlatformConfiguration.UpdateSemanticsEnabled/UpdateAccessibilityFeatures/
+  DispatchSemanticsAction`); `text.go` adds TextDirection, TextAffinity,
+  TextPosition, TextRange. **ENGINE GAP:** no accessibility bridge: the
+  native builder records every call and `ui.EngineSemanticsUpdateOf`
+  returns it; setSemanticsTreeEnabled/updateSemantics reach an embedder
+  client implementing `PlatformConfigurationSemanticsClient`, and are
+  recorded (`ui.SemanticsTreeEnabled`).
+- **Dependencies ported (partial, outside semantics):** package:vector_math
+  2.4.4 Matrix4/Vector3/Vector4 subset in `src/pub/vector_math` (pinned
+  2.4.3 is not in the pub cache; the code used is unchanged between them);
+  painting's MatrixUtils subset, debugDescribeTransform, TransformProperty;
+  services' TextSelection (full), StandardMessageCodec (full, maps as
+  ordered `[]dart.MapEntry`), BinaryMessenger, BasicMessageChannel and
+  `SystemChannels.Accessibility`. ServicesBinding is not ported: a channel
+  without a messenger uses `services.DefaultBinaryMessenger` (nil: the
+  send fails, as without a binding in Flutter). `src/dart` gains
+  `ListSort` (the VM's Sort.sort: insertion sort up to 33 elements,
+  dual-pivot quicksort above; its tie order decides traversal order),
+  `CompareDoubles`, `CompareStrings` (UTF-16), `DoubleTryParse`, checked
+  against Dart output.
+- **Shared fixes:** foundation's EnumProperty/describeEnum printed
+  `TextDirection.ltr` for dart:ui/scheduler-style enums (whose `String()`
+  is Dart's toString); enums with a `Name()` now print the name (and
+  `dartToString` no longer doubles the type). `DiagnosticsProperty.Level`
+  now calls an overriding `IsInteresting` through self
+  (AttributedStringProperty overrides it).
+- **Design notes:** order-observable Sets/Maps keep insertion order
+  (slices / ordered entries; see API_MAPPING). Stacking SchedulerBinding and
+  SemanticsBinding in one Go binding needs the forwarding pattern in
+  API_MAPPING (embedding both mixins makes the BindingBase methods
+  ambiguous): an open design question for RendererBinding/WidgetsBinding.
+- **Flutter's tests:** semantics_test 45/48 test cases ported (skipped:
+  the RenderProxyBox/pumpFrame one; memory events via
+  FlutterMemoryAllocations instead of leak_tracker; tags test uses a
+  local tag instead of RenderViewport's), custom_semantics_action_test
+  1/1, semantics_binding_test 3/6 (3 need widgets), both
+  set_semantics_tree_enabled tests, semantics_node_send_event_test 1/1,
+  semantics_service_test 1/1 (adapted to a mock messenger and the implicit
+  view). Skipped entirely (they pump widgets): semantics_owner_test (5),
+  semantics_update_test (5), traversal_order_test (1); their behaviors
+  (merged custom-action routing, traversal grafting, hit-test filtering)
+  are in the difftest. message_codecs_test's StandardMessageCodec group
+  4/4; matrix_utils_test getAsTranslation (adapted). Own tests for the
+  binding's action dispatch, accessibility features, events, Locale,
+  flags, the builder record, sort/compare/parse.
+- **Difftest** (`difftest/semantics_test.go` +
+  `flutter/test/semantics_test.dart`, ~300 log entries, ~1800 lines,
+  identical on the first run, hashes masked): attributed strings (UTF-16
+  offsets), Locale, TextSelection, custom action ids, flag/action/role
+  orders, label builder, every event's toMap and its StandardMessageCodec
+  bytes, codec edge values; grid/knot/rtl/sort-key/40-child quicksort
+  traversal orders, rotated/scaled children; a deep merge (labels across
+  text directions, tags, controlsNodes, validation, hint overrides, custom
+  actions, blocked actions) with toStringDeep at hidden, data and toJson;
+  configuration absorb, copy and 15 compatibility pairs; an owner sending
+  updates (every SemanticsUpdateBuilder.updateNode/updateCustomAction
+  argument logged through a spy builder the binding returns), dirty
+  propagation from merged leaves, detach/reattach; traversal grafting with
+  translated/scaled/rotated transforms; 41 debug role check cases; error
+  messages; action arguments routed through a merge boundary.
+- Mutations: 97 on the semantics, dart:ui, services, painting, vector_math
+  and src/dart ports (driver: each replaced once, go vet, the package tests
+  plus the semantics difftest). 94 caught, 3 equivalent: the
+  common-ancestor walk with `>` instead of `>=` (both sides still climb the
+  same nodes in the same order), the `attached` filter on grafted traversal
+  children (detached nodes are always removed from the traversal sets
+  first) and DoubleTryParse's empty-exponent check (strconv rejects "1e"
+  anyway). Caught only after adding cases: toStrings' isFocusable, flag
+  merging of one-sided booleans, Locale's '' vs null country (both ways),
+  SemanticsData == on rect, identity transforms stored as null, a knot edge
+  in (pi/2, 3pi/4), overlapping hit-test siblings, absorb with a
+  direction-less child label / heading levels / traversal identifiers, the
+  deprecated flags bitmask, the platform's single semantics handle, action
+  listeners removed mid-dispatch, the int32 codec boundary, a projective
+  matrix inverse, child reordering marking dirty.
+- Parity: 265 → 334 of 2889 exposed (tested 200 → 246): semantics 0 → 36
+  (24 tested), dart:ui 28 → 51, services 4 → 11, painting 0 → 3.
+### services, part 1: codecs, platform channels, binary messenger (P3)
+- Ported from 3.50.1 (`packages/flutter/lib/src/services`, beside the old
+  text-editing files): message_codec (MessageCodec, MethodCall,
+  MethodCodec, PlatformException, MissingPluginException), message_codecs
+  (Binary/String/JSONMessage/JSONMethod/StandardMessage/StandardMethod
+  codecs; StandardMessageCodec extensible through `self`), binary_messenger,
+  platform_channel (BasicMessageChannel, MethodChannel,
+  OptionalMethodChannel, EventChannel on a broadcast controller,
+  debugProfilePlatformChannels stats with Dart's stable sort and
+  toStringAsFixed), system_channels (all 24), debug, service_extensions,
+  binding (ServicesBinding **partial**: defaultBinaryMessenger /
+  createBinaryMessenger / _DefaultBinaryMessenger, channelBuffers,
+  rootIsolateToken, system/accessibility/lifecycle/platform handlers with
+  Dart's lifecycle transition generator and its debug check, app exit,
+  initializationComplete, the evict/profilePlatformChannels extensions,
+  SystemContextMenuClient; not: keyboard, restoration, TextInput, licenses
+  from the asset bundle, SystemChrome's hook, view focus) and
+  _background_isolate_binary_messenger_io (as
+  `background_isolate_binary_messenger_io.go`; ENGINE GAP: no isolates, send
+  panics). flutter_test: `test_default_binary_messenger.go`
+  (TestDefaultBinaryMessenger, AllMessagesHandler, the
+  TestDefaultBinaryMessengerBinding mixin, mock_event_channel's
+  MockStreamHandler, `AddTearDown` + `SetCurrentTest`).
+- dart:ui: ChannelBuffers in full (control channel decoding, the legacy
+  `resize\r` form with the VM's int.parse, overflow warnings through a
+  debug-only printDebug, `ChannelUpdateClient`), and platform messages
+  (`platform_message.go`: sendPlatformMessage, onPlatformMessage,
+  _dispatchPlatformMessage, response ids, RootIsolateToken,
+  initialLifecycleState, AppExitResponse/AppExitType, the engine's
+  PlatformMessage/PlatformMessageResponse and
+  `PlatformConfiguration.DispatchPlatformMessage`). ENGINE GAP: messages
+  reach a host only through an embedder implementing
+  `ui.PlatformMessageHandler`; otherwise (src/app, tests) they get the
+  default PlatformView's empty reply, posted to the sender's loop.
+- Support: `src/async` broadcast StreamController (async + sync variants;
+  16-scene difftest exact), `src/dart` UTF-8 and JSON (the VM's decoder
+  state machine, `_JsonUtf8Parser` and `json.decode` with every error
+  message/offset, JsonUtf8Encoder with lone surrogates; 63 encode + 167×2
+  decode + 76 UTF-8 cases, exact), `dart.FormatException`/`Exception`/
+  `TypeError`/`ToString`. **Found:** `dart.DoubleToString` printed exact
+  digits for integral doubles in [2^53, 1e21) (Dart prints the shortest
+  round-trip digits padded with zeros): fixed.
+- Decisions (API_MAPPING "Platform channel values"): Dart int ↔ Go int
+  (decoded 32- and 64-bit ints are both `int`; all Go integer kinds
+  encode); decoded maps are `map[any]any` / `map[string]any` (order lost);
+  Go maps encode in sorted key order, `[]dart.MapEntry` in its order.
+- **Found by the difftest:** a Dart map merges an int key with an equal
+  double key (and 0 / 0.0 / -0.0) keeping the first key, but only when
+  their hashCodes match too: the VM hashes an integral double as the int it
+  casts to, so 2^53+1 and 2^53.0 (==, different hashes) stay apart, and on
+  arm64 the cast saturates, so 2^63.0 merges with 2^63-1. Go's decoder
+  reproduces this (`dartMapKey`). Also: utf8.decode drops a leading BOM in
+  StandardMessageCodec strings; a success envelope ignores trailing bytes,
+  an error envelope with any nonzero flag is an error; `ChannelBuffers`
+  only drains in a microtask, so a binding constructed outside a running
+  loop must have its microtasks flushed (the test helpers do).
+- Merge with the semantics port (master b305082): its partial services
+  (StandardMessageCodec decoding maps to `[]MapEntry`, BasicMessageChannel,
+  SystemChannels.accessibility, `services.DefaultBinaryMessenger`) is
+  replaced by this port; StandardMessageCodec's methods take value
+  receivers so `services.StandardMessageCodec{}` still works; `MapLookup`
+  and its tests and the TextSelection tests are kept; the semantics service
+  tests install their mock on a replaced SystemChannels.Accessibility and
+  compare decoded maps in any order (as Flutter's `equals`).
+- Flutter's tests: message_codecs 14/14 (+ vm 4/4), platform_channel 20/20
+  (the two `invokeMethod<List/Map>` TypeError expectations dropped: Go's
+  InvokeMethod returns any), platform_messages 1/1,
+  default_binary_messenger 2/2, set_method_call_handler 1/1,
+  use_platform_channel_without_initialization 1/1, channel_buffers
+  (services) 1/1, binding_lifecycle 1/1, binding 2/7 (licenses, memory
+  pressure, textInput, keyboard, view focus need unported libraries),
+  lifecycle 3/3 (adapted: states sent on flutter/lifecycle; the initial
+  state through `PlatformConfiguration.UpdateInitialLifecycleState`), the
+  engine's channel_buffers_test 16/16; plus own tests (Go value mapping,
+  errors, extension by embedding, lifecycle transitions, system channels,
+  context menu, profiling, event close/cancel, platform message dispatch).
+- Difftests, exact: `message_codecs` (238 cases: every codec's bytes and
+  decoded values, hand-made and corrupt inputs, map key merging, error
+  texts, toString), `platform_channels` (≈150 log lines: invoke/handle/
+  basic/buffers/events/pending/profiling scenes timed against a microtask
+  chain; identical on the first run), `channel_buffers` (11 scenes),
+  `broadcast_stream`, `dart_convert`.
+- Mutations: services/flutter_test/ui platform messages ≈97 valid, 93
+  caught, 4 equivalent (`float64(i) == k` after the hash match;
+  `awaitOrNull`'s yield — every use is a coroutine's first await, where
+  `Async` already completes in a microtask; the response's double-complete
+  assert and the reply copy, both unreachable from Go callers); caught only
+  after adding cases: uint64 at MaxInt64, the 2^63 key, Go map int-key
+  order across a power of ten, PlatformException details in a handler's
+  envelope, the event channel's close await and cancel, the setMethodCall
+  assert's message, nil handler futures, profiling (clear, sort, postfix),
+  initializationComplete at construction, the initial-state guard, the
+  all-messages handler, the keyboard mock. ChannelBuffers 79/74/5,
+  broadcast streams 34/33/1, dart:convert 56/54/2 (equivalents in the
+  forks' reports).
+- Parity: 371 → 400 of 2889 exposed (tested 284 → 309); services 11 → 31,
+  dart:ui 51 → 60.

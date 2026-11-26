@@ -14,8 +14,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/foundation"
 	ui "github.com/jonathanperis/flutter-go/engine/src/flutter/lib/ui/go"
+	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/foundation"
 	"github.com/jonathanperis/flutter-go/src/async"
 	"github.com/jonathanperis/flutter-go/src/dart"
 	"github.com/jonathanperis/flutter-go/src/developer"
@@ -77,8 +77,8 @@ func (m *profiledBinaryMessenger) SetMessageHandler(channel string, handler Mess
 
 // platformChannelStats is _PlatformChannelStats.
 type platformChannelStats struct {
-	channel, codec, typ string
-	upCount, upBytes    int
+	channel, codec, typ  string
+	upCount, upBytes     int
 	downCount, downBytes int
 }
 

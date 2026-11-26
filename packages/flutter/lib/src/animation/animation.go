@@ -1,180 +1,216 @@
-// Package animation is flutter-go's animation layer: AnimationController
-// (Controller, not yet ported in full) and curves, driven by the scheduler
-// library's Tickers. Values match Flutter's frame by frame (see difftest).
+// Package animation is Flutter's animation library (Flutter 3.50.1):
+// Animation and AnimationStatus, AnimationController, the animation
+// combinators (ProxyAnimation, ReverseAnimation, CurvedAnimation,
+// TrainHoppingAnimation, CompoundAnimation...), Animatables and Tweens,
+// TweenSequence, AnimationStyle and the curves. Controllers are driven by
+// the scheduler library's Tickers; values match Flutter's frame by frame
+// (see the animation_controller and tween difftests).
 package animation
 
-import (
-	"math"
-	"time"
+// Port of packages/flutter/lib/src/animation/animation.dart.
+//
+// Animation is Dart's abstract class Animation<T> (which extends Listenable
+// and implements ValueListenable<T>): an interface, plus the embeddable
+// AnimationBase[T] holding the concrete members (isDismissed..., toString,
+// toStringDetails). As everywhere (API_MAPPING "Mixins and overridable
+// methods"), AnimationBase calls the overridable members (Status,
+// ToStringDetails...) through self: a type embedding it calls SetSelf once.
 
-	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/physics"
-	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/scheduler"
+import (
+	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/foundation"
 )
 
-// ---------------------------------------------------------------------------
-// AnimationController
-
-type Status int
+// AnimationStatus is the status of an animation.
+type AnimationStatus int
 
 const (
-	Dismissed Status = iota
-	Forward
-	Reverse
-	Completed
+	// AnimationStatusDismissed: the animation is stopped at the beginning.
+	AnimationStatusDismissed AnimationStatus = iota
+	// AnimationStatusForward: the animation is running from beginning to end.
+	AnimationStatusForward
+	// AnimationStatusReverse: the animation is running backwards, from end
+	// to beginning.
+	AnimationStatusReverse
+	// AnimationStatusCompleted: the animation is stopped at the end.
+	AnimationStatusCompleted
 )
 
-// Controller drives a value over time. Bounded controllers go from 0 to 1;
-// use NewUnboundedController for arbitrary values (e.g. scroll offsets).
-type Controller struct {
-	Duration  time.Duration
-	value     float64
-	lower     float64
-	upper     float64
-	ticker    *scheduler.Ticker
-	from, to  float64
-	simDur    time.Duration
-	curve     Curve
-	sim       physics.Simulation // set by AnimateWith; nil for interpolation
-	status    Status
-	listeners []func()
-	statusFns []func(Status)
-}
+var animationStatusNames = [...]string{"dismissed", "forward", "reverse", "completed"}
 
-// NewController creates a controller from 0 to 1 whose ticker comes from
-// vsync (Flutter's AnimationController(vsync:, duration:)).
-func NewController(vsync scheduler.TickerProvider, d time.Duration) *Controller {
-	c := &Controller{Duration: d, lower: 0, upper: 1}
-	c.ticker = vsync.CreateTicker(c.tick)
-	return c
-}
+// Name is the Dart enum value's name ("forward").
+func (s AnimationStatus) Name() string { return animationStatusNames[s] }
 
-// NewUnboundedController creates a controller without bounds starting at
-// value (Flutter's AnimationController.unbounded).
-func NewUnboundedController(vsync scheduler.TickerProvider, value float64) *Controller {
-	c := &Controller{value: value, lower: math.Inf(-1), upper: math.Inf(1)}
-	c.ticker = vsync.CreateTicker(c.tick)
-	return c
-}
+// String is Dart's toString ("AnimationStatus.forward").
+func (s AnimationStatus) String() string { return "AnimationStatus." + s.Name() }
 
-func (c *Controller) Value() float64       { return c.value }
-func (c *Controller) Status() Status       { return c.status }
-func (c *Controller) IsAnimating() bool    { return c.ticker.IsActive() }
-func (c *Controller) AddListener(f func()) { c.listeners = append(c.listeners, f) }
-func (c *Controller) AddStatusListener(f func(Status)) {
-	c.statusFns = append(c.statusFns, f)
-}
+// IsDismissed reports whether the animation is stopped at the beginning.
+func (s AnimationStatus) IsDismissed() bool { return s == AnimationStatusDismissed }
 
-// SetValue stops any animation and jumps to v.
-func (c *Controller) SetValue(v float64) {
-	c.stopTicker(true)
-	c.value = math.Max(c.lower, math.Min(c.upper, v))
-	c.notify()
-}
+// IsCompleted reports whether the animation is stopped at the end.
+func (s AnimationStatus) IsCompleted() bool { return s == AnimationStatusCompleted }
 
-func (c *Controller) Forward() { c.animate(c.upper, c.scaledDuration(c.upper), Curves.Linear, Forward) }
-func (c *Controller) Reverse() { c.animate(c.lower, c.scaledDuration(c.lower), Curves.Linear, Reverse) }
-
-// AnimateTo animates to target over d (not scaled) with curve.
-func (c *Controller) AnimateTo(target float64, d time.Duration, curve Curve) {
-	st := Forward
-	if target < c.value {
-		st = Reverse
+// IsAnimating reports whether the animation is running (forward or
+// reverse).
+func (s AnimationStatus) IsAnimating() bool {
+	switch s {
+	case AnimationStatusForward, AnimationStatusReverse:
+		return true
 	}
-	c.animate(target, d, curve, st)
+	return false
 }
 
-// scaledDuration is Flutter's: the full duration scaled by the fraction of
-// the range left to travel, rounded to whole microseconds.
-func (c *Controller) scaledDuration(target float64) time.Duration {
-	frac := math.Abs(target-c.value) / (c.upper - c.lower)
-	return time.Duration(math.Round(float64(c.Duration.Microseconds())*frac)) * time.Microsecond
-}
-
-func (c *Controller) animate(target float64, d time.Duration, curve Curve, st Status) {
-	c.stopTicker(true)
-	c.sim = nil
-	c.from, c.to, c.simDur, c.curve = c.value, target, d, curve
-	c.setStatus(st)
-	if d == 0 || c.from == c.to {
-		c.value = target
-		c.notify()
-		c.finish()
-		return
+// IsForwardOrCompleted reports whether the current aim of the animation is
+// toward completion (forward or completed).
+func (s AnimationStatus) IsForwardOrCompleted() bool {
+	switch s {
+	case AnimationStatusForward, AnimationStatusCompleted:
+		return true
 	}
-	c.ticker.Start()
+	return false
 }
 
-func (c *Controller) tick(elapsed time.Duration) {
-	if c.sim != nil {
-		secs := float64(elapsed.Microseconds()) / 1e6
-		c.value = math.Max(c.lower, math.Min(c.upper, c.sim.X(secs)))
-		done := c.sim.IsDone(secs)
-		if done {
-			c.stopTicker(false)
-			c.sim = nil
+// AnimationStatusListener is the signature of listeners that receive
+// AnimationStatus updates.
+type AnimationStatusListener = func(status AnimationStatus)
+
+// ValueListenableTransformer is the signature of a function that receives
+// a value of type T and returns a value of type T (see
+// NewAnimationFromValueListenable).
+type ValueListenableTransformer[T any] func(value T) T
+
+// Animation is a value which might change over time, moving forward or
+// backward, with a status. Implementations embed AnimationBase.
+type Animation[T any] interface {
+	foundation.ValueListenable[T]
+	// AddStatusListener calls listener every time the status changes.
+	AddStatusListener(listener AnimationStatusListener)
+	// RemoveStatusListener stops calling listener on status changes.
+	RemoveStatusListener(listener AnimationStatusListener)
+	// Status is the current status of the animation.
+	Status() AnimationStatus
+	// IsDismissed reports whether the animation is stopped at the beginning.
+	IsDismissed() bool
+	// IsCompleted reports whether the animation is stopped at the end.
+	IsCompleted() bool
+	// IsAnimating reports whether the animation is running.
+	IsAnimating() bool
+	// IsForwardOrCompleted reports whether the animation is aimed at
+	// completion.
+	IsForwardOrCompleted() bool
+	// ToStringDetails is the details of String (by default an arrow for the
+	// status).
+	ToStringDetails() string
+	String() string
+}
+
+// AnimationBase is the embeddable implementation of Animation's concrete
+// members. The embedding type implements Value, Status and the listener
+// methods, and calls SetSelf once when created.
+type AnimationBase[T any] struct{ self Animation[T] }
+
+// SetSelf points the base at the animation that embeds it.
+func (a *AnimationBase[T]) SetSelf(self Animation[T]) { a.self = self }
+
+func (a *AnimationBase[T]) outer() Animation[T] {
+	if a.self == nil {
+		panic("animation: AnimationBase used before SetSelf: build animations with their constructors, " +
+			"or call SetSelf(outer) once on a type that embeds it")
+	}
+	return a.self
+}
+
+// IsDismissed is Status().IsDismissed().
+func (a *AnimationBase[T]) IsDismissed() bool { return a.outer().Status().IsDismissed() }
+
+// IsCompleted is Status().IsCompleted().
+func (a *AnimationBase[T]) IsCompleted() bool { return a.outer().Status().IsCompleted() }
+
+// IsAnimating is Status().IsAnimating().
+func (a *AnimationBase[T]) IsAnimating() bool { return a.outer().Status().IsAnimating() }
+
+// IsForwardOrCompleted is Status().IsForwardOrCompleted().
+func (a *AnimationBase[T]) IsForwardOrCompleted() bool {
+	return a.outer().Status().IsForwardOrCompleted()
+}
+
+// String is "Type#hash(details)".
+func (a *AnimationBase[T]) String() string {
+	self := a.outer()
+	return foundation.DescribeIdentity(self) + "(" + self.ToStringDetails() + ")"
+}
+
+// ToStringDetails is an arrow for the status: ▶ forward, ◀ reverse,
+// ⏭ completed, ⏮ dismissed.
+func (a *AnimationBase[T]) ToStringDetails() string {
+	switch a.outer().Status() {
+	case AnimationStatusForward:
+		return "▶" // >
+	case AnimationStatusReverse:
+		return "◀" // <
+	case AnimationStatusCompleted:
+		return "⏭" // >>|
+	}
+	return "⏮" // |<<
+}
+
+// Drive chains a Tween (or CurveTween) to this animation: Dart's
+// animation.drive(child), which is child.animate(animation). (Go methods
+// can't take type parameters, so the generic method is a function.)
+func Drive[U any](animation Animation[float64], child Animatable[U]) Animation[U] {
+	return child.Animate(animation)
+}
+
+// AnimationFromValueListenableOptions are
+// NewAnimationFromValueListenable's named parameters.
+type AnimationFromValueListenableOptions[T any] struct {
+	// Transformer, when set, is applied to the listenable's value.
+	Transformer ValueListenableTransformer[T]
+}
+
+// NewAnimationFromValueListenable is Animation.fromValueListenable: an
+// animation that delegates to listenable, with a fixed status (forward).
+// The value is Transformer(listenable.Value()) when a transformer is given
+// (and its result is not null).
+func NewAnimationFromValueListenable[T any](listenable foundation.ValueListenable[T], opts ...AnimationFromValueListenableOptions[T]) Animation[T] {
+	a := &_ValueListenableDelegateAnimation[T]{listenable: listenable}
+	if len(opts) > 0 {
+		a.transformer = opts[0].Transformer
+	}
+	a.SetSelf(a)
+	return a
+}
+
+// _ValueListenableDelegateAnimation is an animation that delegates to a
+// value listenable, with a fixed direction.
+type _ValueListenableDelegateAnimation[T any] struct {
+	AnimationBase[T]
+	listenable  foundation.ValueListenable[T]
+	transformer ValueListenableTransformer[T]
+}
+
+func (a *_ValueListenableDelegateAnimation[T]) AddListener(listener func()) {
+	a.listenable.AddListener(listener)
+}
+
+func (a *_ValueListenableDelegateAnimation[T]) RemoveListener(listener func()) {
+	a.listenable.RemoveListener(listener)
+}
+
+// AddStatusListener does nothing: the status never changes.
+func (a *_ValueListenableDelegateAnimation[T]) AddStatusListener(AnimationStatusListener) {}
+
+// RemoveStatusListener does nothing: the status never changes.
+func (a *_ValueListenableDelegateAnimation[T]) RemoveStatusListener(AnimationStatusListener) {}
+
+func (a *_ValueListenableDelegateAnimation[T]) Status() AnimationStatus {
+	return AnimationStatusForward
+}
+
+func (a *_ValueListenableDelegateAnimation[T]) Value() T {
+	if a.transformer != nil {
+		if v := a.transformer(a.listenable.Value()); !isNull(v) {
+			return v
 		}
-		// Flutter notifies value listeners before the status change (and
-		// the TickerFuture completion that scroll activities wait for).
-		c.notify()
-		if done {
-			c.setStatus(Completed)
-		}
-		return
 	}
-	// Same arithmetic as Flutter's _InterpolationSimulation.
-	t := float64(elapsed.Microseconds()) / 1e6 / (float64(c.simDur.Microseconds()) / 1e6)
-	t = math.Max(0, math.Min(1, t))
-	switch t {
-	case 0:
-		c.value = c.from
-	case 1:
-		c.value = c.to
-	default:
-		c.value = c.from + float64((c.to-c.from)*c.curve.Transform(t))
-	}
-	c.notify()
-	if t == 1 {
-		c.stopTicker(false)
-		c.finish()
-	}
+	return a.listenable.Value()
 }
-
-func (c *Controller) finish() {
-	switch {
-	case c.value == c.upper:
-		c.setStatus(Completed)
-	case c.value == c.lower:
-		c.setStatus(Dismissed)
-	default:
-		c.setStatus(Completed)
-	}
-}
-
-func (c *Controller) setStatus(s Status) {
-	if s == c.status {
-		return
-	}
-	c.status = s
-	for _, f := range c.statusFns {
-		f(s)
-	}
-}
-
-func (c *Controller) notify() {
-	for _, f := range c.listeners {
-		f()
-	}
-}
-
-// stopTicker is AnimationController.stop(canceled:): a completed animation
-// stops with canceled false, an interrupted one with canceled true.
-func (c *Controller) stopTicker(canceled bool) {
-	c.ticker.Stop(scheduler.TickerStopOptions{Canceled: canceled})
-}
-
-// Dispose releases the ticker; the controller can't be used afterwards.
-func (c *Controller) Dispose() { c.ticker.Dispose(); c.listeners, c.statusFns = nil, nil }
-
-// LerpDouble is dart:ui's lerpDouble, a*(1-t) + b*t. Flutter uses this form
-// for sizes and colors; the rounding differs slightly from a + (b-a)*t.
-func LerpDouble(a, b, t float64) float64 { return float64(a*(1-t)) + float64(b*t) }

@@ -17,9 +17,9 @@ package services
 // handleViewFocusChanged.
 
 import (
+	ui "github.com/jonathanperis/flutter-go/engine/src/flutter/lib/ui/go"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/foundation"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/scheduler"
-	ui "github.com/jonathanperis/flutter-go/engine/src/flutter/lib/ui/go"
 	"github.com/jonathanperis/flutter-go/src/async"
 	"github.com/jonathanperis/flutter-go/src/dart"
 )
@@ -176,9 +176,13 @@ func (m *ServicesBindingMixin) DefaultBinaryMessenger() BinaryMessenger {
 // ui.RootIsolateTokenInstance).
 func ServicesBindingRootIsolateToken() *ui.RootIsolateToken { return ui.RootIsolateTokenInstance() }
 
-func (m *ServicesBindingMixin) ChannelBuffers() *ui.ChannelBuffers { return ui.ChannelBuffersInstance() }
+func (m *ServicesBindingMixin) ChannelBuffers() *ui.ChannelBuffers {
+	return ui.ChannelBuffersInstance()
+}
 
-func (m *ServicesBindingMixin) CreateBinaryMessenger() BinaryMessenger { return defaultBinaryMessenger{} }
+func (m *ServicesBindingMixin) CreateBinaryMessenger() BinaryMessenger {
+	return defaultBinaryMessenger{}
+}
 
 func (m *ServicesBindingMixin) HandleMemoryPressure() {
 	// rootBundle.clear(): the asset bundle is not ported yet.

@@ -199,7 +199,7 @@ func NewStandardMessageCodec() *StandardMessageCodec { return &StandardMessageCo
 // calls so overrides run.
 func (c *StandardMessageCodec) SetSelf(self StandardMessageCodecOverridable) { c.self = self }
 
-func (c *StandardMessageCodec) outer() StandardMessageCodecOverridable {
+func (c StandardMessageCodec) outer() StandardMessageCodecOverridable {
 	if c.self == nil {
 		return c
 	}
@@ -226,7 +226,7 @@ const (
 	valueFloat32List = 14
 )
 
-func (c *StandardMessageCodec) EncodeMessage(message any) []byte {
+func (c StandardMessageCodec) EncodeMessage(message any) []byte {
 	if isNull(message) {
 		return nil
 	}
@@ -235,7 +235,7 @@ func (c *StandardMessageCodec) EncodeMessage(message any) []byte {
 	return buffer.Done()
 }
 
-func (c *StandardMessageCodec) DecodeMessage(message []byte) any {
+func (c StandardMessageCodec) DecodeMessage(message []byte) any {
 	if message == nil {
 		return nil
 	}
@@ -263,7 +263,7 @@ func isNull(v any) bool {
 // double 6, String 7, Uint8List 8, Int32List 9, Int64List 10, Float64List
 // 11, List 12, Map 13, Float32List 14. It panics with a dart.ArgumentError
 // for a value it can't encode.
-func (c *StandardMessageCodec) WriteValue(buffer *foundation.WriteBuffer, value any) {
+func (c StandardMessageCodec) WriteValue(buffer *foundation.WriteBuffer, value any) {
 	self := c.outer()
 	switch v := value.(type) {
 	case nil:
@@ -435,7 +435,7 @@ func compareKeys(a, b any) int {
 
 // ReadValue reads a value from buffer as written by WriteValue (for types
 // overriding ReadValueOfType).
-func (c *StandardMessageCodec) ReadValue(buffer *foundation.ReadBuffer) any {
+func (c StandardMessageCodec) ReadValue(buffer *foundation.ReadBuffer) any {
 	if !buffer.HasRemaining() {
 		panic(dart.NewFormatException("Message corrupted"))
 	}
@@ -447,7 +447,7 @@ func (c *StandardMessageCodec) ReadValue(buffer *foundation.ReadBuffer) any {
 // extending the codec overrides it and calls this method for the types it
 // doesn't handle. It panics with a dart.FormatException for an unknown
 // type.
-func (c *StandardMessageCodec) ReadValueOfType(typ int, buffer *foundation.ReadBuffer) any {
+func (c StandardMessageCodec) ReadValueOfType(typ int, buffer *foundation.ReadBuffer) any {
 	self := c.outer()
 	switch typ {
 	case valueNull:
@@ -506,7 +506,7 @@ func (c *StandardMessageCodec) ReadValueOfType(typ int, buffer *foundation.ReadB
 // WriteSize writes a non-negative 32-bit integer to buffer in an expanding
 // 1-5 byte encoding that optimizes for small values (for types overriding
 // WriteValue).
-func (c *StandardMessageCodec) WriteSize(buffer *foundation.WriteBuffer, value int) {
+func (c StandardMessageCodec) WriteSize(buffer *foundation.WriteBuffer, value int) {
 	if !(0 <= value && value <= 0xffffffff) {
 		panic(dart.NewAssertionError(nil))
 	}
@@ -523,7 +523,7 @@ func (c *StandardMessageCodec) WriteSize(buffer *foundation.WriteBuffer, value i
 
 // ReadSize reads a non-negative int from buffer as written by WriteSize
 // (for types overriding ReadValueOfType).
-func (c *StandardMessageCodec) ReadSize(buffer *foundation.ReadBuffer) int {
+func (c StandardMessageCodec) ReadSize(buffer *foundation.ReadBuffer) int {
 	value := buffer.GetUint8()
 	switch value {
 	case 254:
@@ -688,4 +688,49 @@ func storedZeroKey(m map[any]any, key any) any {
 		}
 	}
 	return key
+}
+
+// MapLookup is a lookup in a decoded (or encodable) message map: a Go map
+// or an ordered []dart.MapEntry map. ok is false when the key is absent or
+// m is not a map. (A Go helper for reading Dart map messages, used by
+// semantics; not Flutter API.)
+func MapLookup(m any, key any) (value any, ok bool) {
+	switch x := m.(type) {
+	case []dart.MapEntry[any, any]:
+		for _, e := range x {
+			if comparableEqual(e.Key, key) {
+				return e.Value, true
+			}
+		}
+		return nil, false
+	case []dart.MapEntry[string, any]:
+		for _, e := range x {
+			if comparableEqual(e.Key, key) {
+				return e.Value, true
+			}
+		}
+		return nil, false
+	}
+	rv := reflect.ValueOf(m)
+	if rv.Kind() != reflect.Map {
+		return nil, false
+	}
+	kv := reflect.ValueOf(key)
+	if !kv.IsValid() || !kv.Type().AssignableTo(rv.Type().Key()) {
+		return nil, false
+	}
+	v := rv.MapIndex(kv)
+	if !v.IsValid() {
+		return nil, false
+	}
+	return v.Interface(), true
+}
+
+func comparableEqual(a, b any) (eq bool) {
+	defer func() {
+		if recover() != nil {
+			eq = false
+		}
+	}()
+	return a == b
 }

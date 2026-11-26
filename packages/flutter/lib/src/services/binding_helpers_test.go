@@ -2,6 +2,7 @@ package services_test
 
 import (
 	"fmt"
+	ui "github.com/jonathanperis/flutter-go/engine/src/flutter/lib/ui/go"
 	"os"
 	"os/exec"
 	"sync"
@@ -39,6 +40,8 @@ func ensureInitialized() *testBinding {
 			loop.FlushMicrotasks()
 			loop.RunPosted()
 		}()
+		// Record what the binding sends the engine while it initializes.
+		defer ui.SetPlatformConfiguration(ui.NewPlatformConfiguration(&recordingClient{}))()
 		b := &testBinding{}
 		base := &foundation.BindingBaseBase{}
 		sched := &scheduler.SchedulerBindingMixin{BindingBase: base}
@@ -111,6 +114,19 @@ func awaitError[T any](f async.Future[T]) (err error) {
 	f.Await()
 	return nil
 }
+
+// recordingClient is an embedder that records the platform messages it gets
+// (and answers none).
+type recordingClient struct{}
+
+func (*recordingClient) ScheduleFrame()             {}
+func (*recordingClient) EndWarmUpFrame()            {}
+func (*recordingClient) SetNeedsReportTimings(bool) {}
+func (*recordingClient) HandlePlatformMessage(m *ui.PlatformMessage) {
+	initMessages = append(initMessages, m)
+}
+
+var initMessages []*ui.PlatformMessage
 
 const isolatedEnv = "FLUTTER_GO_SERVICES_ISOLATED_TEST"
 

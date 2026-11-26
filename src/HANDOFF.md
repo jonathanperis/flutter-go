@@ -17,8 +17,8 @@ Start here when continuing flutter-go in a new session.
   divergence from Flutter's API gets listed there.
 - **Done:** P0 pin, layout (upstream tree at the root, Go beside the Dart
   it replaces) and `physics`; `src/async` (dart:async semantics);
-  dart:ui `math`, `lerp` and `geometry` (P1 started); animation's
-  `curves.dart` (with `dart.Random`, the VM's generator). Stages 0–10 and G1–G4
+  dart:ui `math`, `lerp` and `geometry` (P1 started); the `animation`
+  library in full (curves with `dart.Random`, the VM's generator). Stages 0–10 and G1–G4
   (see PLAN.md) are verified on 3.50.1. Parity: see src/docs/PARITY.md.
 - **Next, in order:**
   1. Done: `RSuperellipse.Contains` (engine C++ ported to Go).
@@ -51,12 +51,52 @@ Start here when continuing flutter-go in a new session.
      over `foundation.BindingBase`, Ticker, TickerFuture, Priority,
      timeDilation), with dart:ui's frame entry points (PlatformDispatcher
      onBeginFrame/onDrawFrame/scheduleFrame/onReportTimings and the engine's
-     `PlatformConfiguration.BeginFrame`, partial). `animation.Controller`,
-     widgets, the tester (`flutter_test.AutomatedTestWidgetsFlutterBinding`)
-     and the window runner (`src/app`) run on it. Next for it: port
-     AnimationController in full (it still is the ad-hoc `Controller`) and
+     `PlatformConfiguration.BeginFrame`, partial). Widgets, the tester
+     (`flutter_test.AutomatedTestWidgetsFlutterBinding`) and the window
+     runner (`src/app`) run on it. Next for it:
      TickerProviderStateMixin/TickerMode in widgets.
+  4b. Done: the animation library in full, 54/54 (AnimationController,
+     Animation/AnimationStatus, the combinators, listener mixins, tweens,
+     TweenSequence, AnimationStyle; curves were already done). The ad-hoc
+     `animation.Controller` is gone: AnimatedBox and ScrollController's
+     ballistic/driven activities use `AnimationController`. Still to do for
+     its users: `AnimationBehavior.normal` reads the hook
+     `animation.SemanticsDisableAnimations` until the semantics library
+     (SemanticsBinding.disableAnimations, debugSemanticsDisableAnimations)
+     is ported; ScrollController still ends its activities from a status
+     listener (Flutter: `TickerFuture.whenComplete`), and widgets'
+     AnimatedBox lerps the flutter-go `rendering.Color` by hand (move it to
+     `ColorTween`/`SizeTween` with ui.Color when rendering switches).
   5. Split `widgets` (gestures code) and `services` (text-editing model
+  5. Done: semantics, 36/36 (SemanticsNode/Owner/Configuration/Data,
+     SemanticsBinding, events, SemanticsService) with dart:ui's
+     semantics.dart in full (ENGINE GAP: no accessibility bridge; built
+     updates are inspectable). Partial dependencies it brought:
+     `src/pub/vector_math` (Matrix4 subset), painting's MatrixUtils subset
+     and TransformProperty, services' TextSelection, StandardMessageCodec,
+     BasicMessageChannel and SystemChannels.accessibility (no
+     ServicesBinding yet: `services.DefaultBinaryMessenger` stands in).
+     Next for it: port ServicesBinding (default messenger, channel
+     buffers), the rest of MatrixUtils/Matrix4, and the semantics tests
+     that pump widgets once rendering/widgets exist; decide the Go pattern
+     for bindings stacking several mixins (see API_MAPPING).
+  6. Done (P3, first part): services' messaging — message codecs (all
+     five, byte-exact), MethodChannel/OptionalMethodChannel/
+     BasicMessageChannel/EventChannel with profiling, BinaryMessenger,
+     SystemChannels (all), ServicesBinding (partial: messaging, system/
+     accessibility/lifecycle/platform handlers, app exit,
+     initializationComplete, service extensions), flutter_test's
+     TestDefaultBinaryMessenger(+Binding) and MockStreamHandler; dart:ui
+     ChannelBuffers (full) and platform messages; `src/async` broadcast
+     controllers; `src/dart` JSON/UTF-8. `services.DefaultBinaryMessenger`
+     is gone (channels use ServicesBinding.instance). Next for it: put
+     ServicesBinding + TestDefaultBinaryMessengerBinding into
+     `flutter_test.AutomatedTestWidgetsFlutterBinding` (flush the loop
+     after construction: ChannelBuffers drains in a microtask), route
+     src/app's platform messages to a host (ENGINE GAP), then the rest of
+     services (keyboard, text input, restoration, asset bundle, system
+     chrome...).
+  7. Split `widgets` (gestures code) and `services` (text-editing model
      under non-Flutter names) by library.
 
 ## Environment

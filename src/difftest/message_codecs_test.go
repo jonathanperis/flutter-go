@@ -100,7 +100,7 @@ func joinInts[T int32 | int64 | byte](x []T) string {
 	return strings.Join(s, ",")
 }
 
-func nullable(s *string) string {
+func codecNullable(s *string) string {
 	if s == nil {
 		return "null"
 	}
@@ -112,8 +112,8 @@ func codecErrorText(r any) string {
 	case dart.FormatException:
 		return "FormatException:" + e.Error()
 	case *services.PlatformException:
-		return "PlatformException:" + e.Code + "|" + nullable(e.Message) + "|" + codecDesc(e.Details) + "|" +
-			nullable(e.Stacktrace) + "|" + e.Error()
+		return "PlatformException:" + e.Code + "|" + codecNullable(e.Message) + "|" + codecDesc(e.Details) + "|" +
+			codecNullable(e.Stacktrace) + "|" + e.Error()
 	case *services.MissingPluginException:
 		return "MissingPluginException:" + e.Error()
 	case dart.ArgumentError:

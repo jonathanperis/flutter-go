@@ -7,7 +7,6 @@ package foundation
 // the self-dispatch pattern and the nullable-value convention.
 
 import (
-	"fmt"
 	"reflect"
 	"strconv"
 	"strings"
@@ -348,7 +347,8 @@ func (p *DiagnosticsProperty[T]) Level() DiagnosticLevel {
 	if p.outer().Value() == nil && p.MissingIfNull {
 		return DiagnosticLevelWarning
 	}
-	if !p.IsInteresting() {
+	// isInteresting is overridable (semantics' AttributedStringProperty).
+	if i, ok := p.outer().(interface{ IsInteresting() bool }); ok && !i.IsInteresting() || !ok && !p.IsInteresting() {
 		return DiagnosticLevelFine
 	}
 	return p.defaultLevel
@@ -906,7 +906,7 @@ func (p *EnumProperty[T]) ValueToString(...ValueToStringOptions) string {
 		return "null"
 	}
 	if isEnum(v) {
-		return v.(fmt.Stringer).String() // value.name
+		return enumName(v) // value.name
 	}
 	return dartToString(v)
 }
