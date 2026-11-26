@@ -14,7 +14,7 @@ import (
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/gestures"
 	r "github.com/jonathanperis/flutter-go/packages/flutter/lib/src/rendering"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/scheduler"
-	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/services"
+	"github.com/jonathanperis/flutter-go/src/textedit"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/widgets"
 	"github.com/jonathanperis/flutter-go/src/async"
 	"github.com/jonathanperis/flutter-go/src/platform/metal"
@@ -22,14 +22,14 @@ import (
 
 func init() { runtime.LockOSThread() } // Cocoa needs the main thread.
 
-var keyMap = map[glfw.Key]services.Key{
-	glfw.KeyBackspace: services.KeyBackspace, glfw.KeyDelete: services.KeyDelete,
-	glfw.KeyLeft: services.KeyLeft, glfw.KeyRight: services.KeyRight,
-	glfw.KeyUp: services.KeyUp, glfw.KeyDown: services.KeyDown,
-	glfw.KeyHome: services.KeyHome, glfw.KeyEnd: services.KeyEnd,
-	glfw.KeyEnter: services.KeyEnter, glfw.KeyKPEnter: services.KeyEnter,
-	glfw.KeyTab: services.KeyTab, glfw.KeyA: services.KeyA, glfw.KeyC: services.KeyC,
-	glfw.KeyV: services.KeyV, glfw.KeyX: services.KeyX,
+var keyMap = map[glfw.Key]textedit.Key{
+	glfw.KeyBackspace: textedit.KeyBackspace, glfw.KeyDelete: textedit.KeyDelete,
+	glfw.KeyLeft: textedit.KeyLeft, glfw.KeyRight: textedit.KeyRight,
+	glfw.KeyUp: textedit.KeyUp, glfw.KeyDown: textedit.KeyDown,
+	glfw.KeyHome: textedit.KeyHome, glfw.KeyEnd: textedit.KeyEnd,
+	glfw.KeyEnter: textedit.KeyEnter, glfw.KeyKPEnter: textedit.KeyEnter,
+	glfw.KeyTab: textedit.KeyTab, glfw.KeyA: textedit.KeyA, glfw.KeyC: textedit.KeyC,
+	glfw.KeyV: textedit.KeyV, glfw.KeyX: textedit.KeyX,
 }
 
 type glfwClipboard struct{ w *glfw.Window }
@@ -157,7 +157,7 @@ func Run(root widgets.Widget, o Options) error {
 	owner := &widgets.BuildOwner{OnNeedsFrame: b.EnsureVisualUpdate}
 	epoch := time.Now().Add(-loop.Elapsed()) // frame timestamps and the loop's clock are measured from here
 	router := widgets.NewPointerRouter(owner)
-	owner.Platform = services.MacOS
+	owner.Platform = foundation.TargetPlatformMacOS
 	owner.Clipboard = glfwClipboard{win}
 	// Committed text (typing, and IME text once composition finishes).
 	win.SetCharCallback(func(_ *glfw.Window, ch rune) { owner.DispatchText(string(ch)) })
@@ -166,7 +166,7 @@ func Run(root widgets.Widget, o Options) error {
 			return
 		}
 		if key, ok := keyMap[k]; ok {
-			owner.DispatchKey(services.KeyEvent{Key: key,
+			owner.DispatchKey(textedit.KeyEvent{Key: key,
 				Shift: m&glfw.ModShift != 0, Ctrl: m&glfw.ModControl != 0,
 				Alt: m&glfw.ModAlt != 0, Meta: m&glfw.ModSuper != 0})
 		}

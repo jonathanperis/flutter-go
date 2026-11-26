@@ -8,7 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/services"
+	"github.com/jonathanperis/flutter-go/src/textedit"
+	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/foundation"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/widgets"
 	"github.com/jonathanperis/flutter-go/packages/flutter_test/lib/src"
 )
@@ -19,15 +20,15 @@ type editOp struct {
 	Mods []string `json:"mods"`
 }
 
-var keyNames = map[string]services.Key{
-	"backspace": services.KeyBackspace, "delete": services.KeyDelete,
-	"arrowLeft": services.KeyLeft, "arrowRight": services.KeyRight,
-	"arrowUp": services.KeyUp, "arrowDown": services.KeyDown,
-	"home": services.KeyHome, "end": services.KeyEnd, "keyA": services.KeyA,
+var keyNames = map[string]textedit.Key{
+	"backspace": textedit.KeyBackspace, "delete": textedit.KeyDelete,
+	"arrowLeft": textedit.KeyLeft, "arrowRight": textedit.KeyRight,
+	"arrowUp": textedit.KeyUp, "arrowDown": textedit.KeyDown,
+	"home": textedit.KeyHome, "end": textedit.KeyEnd, "keyA": textedit.KeyA,
 }
 
-func (o editOp) event() services.KeyEvent {
-	ev := services.KeyEvent{Key: keyNames[o.Key]}
+func (o editOp) event() textedit.KeyEvent {
+	ev := textedit.KeyEvent{Key: keyNames[o.Key]}
 	for _, m := range o.Mods {
 		switch m {
 		case "shift":
@@ -64,7 +65,7 @@ func loadEditing(t *testing.T) (map[string][]editOp, map[string][][3]any) {
 }
 
 // compareEditing runs each scene through step and compares every state.
-func compareEditing(t *testing.T, step func(t *testing.T, scene string, op editOp) services.Value) {
+func compareEditing(t *testing.T, step func(t *testing.T, scene string, op editOp) textedit.Value) {
 	scenes, want := loadEditing(t)
 	names := make([]string, 0, len(scenes))
 	for n := range scenes {
@@ -91,22 +92,22 @@ func compareEditing(t *testing.T, step func(t *testing.T, scene string, op editO
 }
 
 // platformFor: scenes named mac_* use macOS shortcuts, like the Dart side.
-func platformFor(scene string) services.Platform {
+func platformFor(scene string) foundation.TargetPlatform {
 	if strings.HasPrefix(scene, "mac_") {
-		return services.MacOS
+		return foundation.TargetPlatformMacOS
 	}
-	return services.Android
+	return foundation.TargetPlatformAndroid
 }
 
 // TestEditingModelMatchesFlutter checks the textedit package on its own.
 func TestEditingModelMatchesFlutter(t *testing.T) {
-	values := map[string]services.Value{}
-	compareEditing(t, func(t *testing.T, scene string, op editOp) services.Value {
+	values := map[string]textedit.Value{}
+	compareEditing(t, func(t *testing.T, scene string, op editOp) textedit.Value {
 		v := values[scene]
 		if op.Type != nil {
-			v = services.InsertText(v, *op.Type)
+			v = textedit.InsertText(v, *op.Type)
 		} else {
-			v, _ = services.HandleKey(v, op.event(), platformFor(scene), nil)
+			v, _ = textedit.HandleKey(v, op.event(), platformFor(scene), nil)
 		}
 		values[scene] = v
 		return v
@@ -118,7 +119,7 @@ func TestEditingModelMatchesFlutter(t *testing.T) {
 func TestTextFieldMatchesFlutter(t *testing.T) {
 	fields := map[string]*flutter_test.Tester{}
 	ctrls := map[string]*widgets.TextEditingController{}
-	compareEditing(t, func(t *testing.T, scene string, op editOp) services.Value {
+	compareEditing(t, func(t *testing.T, scene string, op editOp) textedit.Value {
 		tester, ok := fields[scene]
 		if !ok {
 			tester = flutter_test.New(t)

@@ -6,7 +6,8 @@ import (
 	"time"
 
 	r "github.com/jonathanperis/flutter-go/packages/flutter/lib/src/rendering"
-	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/services"
+	"github.com/jonathanperis/flutter-go/src/textedit"
+	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/foundation"
 	. "github.com/jonathanperis/flutter-go/packages/flutter/lib/src/widgets"
 	"github.com/jonathanperis/flutter-go/packages/flutter_test/lib/src"
 )
@@ -56,7 +57,7 @@ func TestTapPlacesCaret(t *testing.T) {
 	// Test font: 14px per glyph. x=45 is nearest the boundary after "hel" (42).
 	tester.TapAt(45, 5)
 	tester.Pump()
-	if got := c.Value().Selection; got != services.Collapsed(3) {
+	if got := c.Value().Selection; got != textedit.Collapsed(3) {
 		t.Fatalf("selection = %+v, want caret at 3", got)
 	}
 }
@@ -67,14 +68,14 @@ func TestClipboardAndSubmit(t *testing.T) {
 	tester := flutter_test.New(t)
 	tester.PumpWidget(TextField{Controller: c, Autofocus: true, OnSubmitted: func(s string) { submitted = s }})
 	tester.EnterText("copy me")
-	tester.SendKey(services.KeyEvent{Key: services.KeyA, Ctrl: true})
-	tester.SendKey(services.KeyEvent{Key: services.KeyX, Ctrl: true})
+	tester.SendKey(textedit.KeyEvent{Key: textedit.KeyA, Ctrl: true})
+	tester.SendKey(textedit.KeyEvent{Key: textedit.KeyX, Ctrl: true})
 	if c.Text() != "" || tester.Owner.Clipboard.Get() != "copy me" {
 		t.Fatalf("cut: text %q clipboard %q", c.Text(), tester.Owner.Clipboard.Get())
 	}
-	tester.SendKey(services.KeyEvent{Key: services.KeyV, Ctrl: true})
-	tester.SendKey(services.KeyEvent{Key: services.KeyV, Ctrl: true})
-	tester.SendKey(services.KeyEvent{Key: services.KeyEnter})
+	tester.SendKey(textedit.KeyEvent{Key: textedit.KeyV, Ctrl: true})
+	tester.SendKey(textedit.KeyEvent{Key: textedit.KeyV, Ctrl: true})
+	tester.SendKey(textedit.KeyEvent{Key: textedit.KeyEnter})
 	if submitted != "copy mecopy me" {
 		t.Fatalf("submitted %q", submitted)
 	}
@@ -99,19 +100,19 @@ func TestFocusMovesBetweenFields(t *testing.T) {
 func TestMacOSShortcuts(t *testing.T) {
 	c := NewTextEditingController("")
 	tester := flutter_test.New(t)
-	tester.Owner.Platform = services.MacOS
+	tester.Owner.Platform = foundation.TargetPlatformMacOS
 	tester.PumpWidget(TextField{Controller: c, Autofocus: true})
 	tester.EnterText("hello brave world")
-	tester.SendKey(services.KeyEvent{Key: services.KeyLeft, Alt: true}) // word left on macOS
-	if c.Value().Selection != services.Collapsed(12) {
+	tester.SendKey(textedit.KeyEvent{Key: textedit.KeyLeft, Alt: true}) // word left on macOS
+	if c.Value().Selection != textedit.Collapsed(12) {
 		t.Fatalf("alt+left: %+v", c.Value().Selection)
 	}
-	tester.SendKey(services.KeyEvent{Key: services.KeyLeft, Meta: true}) // line start on macOS
-	if c.Value().Selection != services.Collapsed(0) {
+	tester.SendKey(textedit.KeyEvent{Key: textedit.KeyLeft, Meta: true}) // line start on macOS
+	if c.Value().Selection != textedit.Collapsed(0) {
 		t.Fatalf("cmd+left: %+v", c.Value().Selection)
 	}
-	tester.SendKey(services.KeyEvent{Key: services.KeyEnd}) // scrolls on macOS; caret stays
-	if c.Value().Selection != services.Collapsed(0) {
+	tester.SendKey(textedit.KeyEvent{Key: textedit.KeyEnd}) // scrolls on macOS; caret stays
+	if c.Value().Selection != textedit.Collapsed(0) {
 		t.Fatalf("end moved the caret on macOS: %+v", c.Value().Selection)
 	}
 }

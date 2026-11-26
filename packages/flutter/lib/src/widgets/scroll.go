@@ -9,7 +9,7 @@ import (
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/physics"
 	r "github.com/jonathanperis/flutter-go/packages/flutter/lib/src/rendering"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/scheduler"
-	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/services"
+	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/foundation"
 )
 
 // ScrollPhysics selects how a list responds at its edges and after a drag.
@@ -48,7 +48,7 @@ type ScrollController struct {
 	DevicePixelRatio float64
 	// Physics overrides the platform's default.
 	Physics  ScrollPhysics
-	platform services.Platform
+	platform foundation.TargetPlatform
 
 	// drag state (ScrollDragController)
 	offsetSinceLastStop *float64
@@ -88,9 +88,9 @@ func (c *ScrollController) physics() ScrollPhysics {
 		return c.Physics
 	}
 	switch c.platform {
-	case services.MacOS:
+	case foundation.TargetPlatformMacOS:
 		return BouncingFastPhysics
-	case services.IOS:
+	case foundation.TargetPlatformIOS:
 		return BouncingPhysics
 	}
 	return ClampingPhysics

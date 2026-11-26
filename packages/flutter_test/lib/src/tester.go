@@ -10,7 +10,7 @@ import (
 
 	ui "github.com/jonathanperis/flutter-go/engine/src/flutter/lib/ui/go"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/foundation"
-	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/services"
+	"github.com/jonathanperis/flutter-go/src/textedit"
 	"github.com/jonathanperis/flutter-go/src/async"
 
 	r "github.com/jonathanperis/flutter-go/packages/flutter/lib/src/rendering"
@@ -225,7 +225,7 @@ func (c *MemoryClipboard) Get() string  { return c.Text }
 func (c *MemoryClipboard) Set(s string) { c.Text = s }
 
 // SendKey sends a key to the focused widget and pumps a frame.
-func (t *Tester) SendKey(ev services.KeyEvent) {
+func (t *Tester) SendKey(ev textedit.KeyEvent) {
 	t.Owner.DispatchKey(ev)
 	t.Pump()
 }

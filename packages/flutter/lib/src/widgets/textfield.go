@@ -6,7 +6,7 @@ import (
 	"github.com/jonathanperis/flutter-go/src/async"
 
 	r "github.com/jonathanperis/flutter-go/packages/flutter/lib/src/rendering"
-	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/services"
+	"github.com/jonathanperis/flutter-go/src/textedit"
 )
 
 // CursorBlinkHalfPeriod is Flutter's cursor blink interval.
@@ -14,7 +14,7 @@ const CursorBlinkHalfPeriod = 500 * time.Millisecond
 
 // KeyTarget receives keyboard input while focused.
 type KeyTarget interface {
-	HandleKey(ev services.KeyEvent) bool
+	HandleKey(ev textedit.KeyEvent) bool
 	InsertText(s string)
 	focusChanged(focused bool)
 }
@@ -37,7 +37,7 @@ func (o *BuildOwner) RequestFocus(t KeyTarget) {
 }
 
 // DispatchKey sends a key to the focused target.
-func (o *BuildOwner) DispatchKey(ev services.KeyEvent) bool {
+func (o *BuildOwner) DispatchKey(ev textedit.KeyEvent) bool {
 	if o.focus == nil {
 		return false
 	}
@@ -53,20 +53,20 @@ func (o *BuildOwner) DispatchText(s string) {
 
 // TextEditingController holds the value of a TextField.
 type TextEditingController struct {
-	value     services.Value
+	value     textedit.Value
 	listeners []func()
 }
 
 func NewTextEditingController(text string) *TextEditingController {
-	n := services.Len16(text)
-	return &TextEditingController{value: services.Value{Text: text, Selection: services.Collapsed(n), Composing: services.Selection{Base: -1, Extent: -1}}}
+	n := textedit.Len16(text)
+	return &TextEditingController{value: textedit.Value{Text: text, Selection: textedit.Collapsed(n), Composing: textedit.Selection{Base: -1, Extent: -1}}}
 }
 
-func (c *TextEditingController) Value() services.Value { return c.value }
+func (c *TextEditingController) Value() textedit.Value { return c.value }
 func (c *TextEditingController) Text() string          { return c.value.Text }
 func (c *TextEditingController) AddListener(f func())  { c.listeners = append(c.listeners, f) }
 
-func (c *TextEditingController) SetValue(v services.Value) {
+func (c *TextEditingController) SetValue(v textedit.Value) {
 	if v == c.value {
 		return
 	}
@@ -78,7 +78,7 @@ func (c *TextEditingController) SetValue(v services.Value) {
 
 // SetText replaces the text and puts the caret at the end.
 func (c *TextEditingController) SetText(s string) {
-	c.SetValue(services.Value{Text: s, Selection: services.Collapsed(services.Len16(s)), Composing: services.Selection{Base: -1, Extent: -1}})
+	c.SetValue(textedit.Value{Text: s, Selection: textedit.Collapsed(textedit.Len16(s)), Composing: textedit.Selection{Base: -1, Extent: -1}})
 }
 
 // TextField is a single-line text input.
@@ -140,7 +140,7 @@ func (s *textFieldState) focusChanged(focused bool) {
 	if focused {
 		c := s.controller()
 		if c.value.Selection.Base < 0 { // like Flutter: focusing puts the caret at the end
-			c.value.Selection = services.Collapsed(c.value.Len())
+			c.value.Selection = textedit.Collapsed(c.value.Len())
 		}
 		s.restartBlink()
 	} else {
@@ -149,15 +149,15 @@ func (s *textFieldState) focusChanged(focused bool) {
 	s.SetState(nil)
 }
 
-func (s *textFieldState) HandleKey(ev services.KeyEvent) bool {
+func (s *textFieldState) HandleKey(ev textedit.KeyEvent) bool {
 	o := s.Context().owner
-	if ev.Key == services.KeyEnter {
+	if ev.Key == textedit.KeyEnter {
 		if f := s.Widget().OnSubmitted; f != nil {
 			f(s.controller().Text())
 		}
 		return true
 	}
-	v, ok := services.HandleKey(s.controller().Value(), ev, o.Platform, o.Clipboard)
+	v, ok := textedit.HandleKey(s.controller().Value(), ev, o.Platform, o.Clipboard)
 	if ok {
 		s.setValue(v)
 	}
@@ -165,10 +165,10 @@ func (s *textFieldState) HandleKey(ev services.KeyEvent) bool {
 }
 
 func (s *textFieldState) InsertText(text string) {
-	s.setValue(services.InsertText(s.controller().Value(), text))
+	s.setValue(textedit.InsertText(s.controller().Value(), text))
 }
 
-func (s *textFieldState) setValue(v services.Value) {
+func (s *textFieldState) setValue(v textedit.Value) {
 	c := s.controller()
 	changed := v.Text != c.value.Text
 	c.SetValue(v)
@@ -214,7 +214,7 @@ func (s *textFieldState) tapAt(global r.Offset) {
 	if s.render != nil {
 		local := global.Sub(r.GlobalOffset(s.render))
 		v := s.controller().Value()
-		v.Selection = services.Collapsed(s.render.OffsetAt(local))
+		v.Selection = textedit.Collapsed(s.render.OffsetAt(local))
 		s.controller().SetValue(v)
 	}
 }
@@ -231,7 +231,7 @@ func (s *textFieldState) Build(*Element) Widget {
 }
 
 type editable struct {
-	value                 services.Value
+	value                 textedit.Value
 	style                 r.TextStyle
 	focused, caretVisible bool
 	onCreate              func(*r.RenderEditable)

@@ -1,4 +1,6 @@
-package services
+package textedit
+
+import "github.com/jonathanperis/flutter-go/packages/flutter/lib/src/foundation"
 
 // Key identifies a non-character key (typed characters arrive as text).
 type Key int
@@ -26,15 +28,8 @@ type KeyEvent struct {
 	Shift, Ctrl, Alt, Meta bool
 }
 
-// Platform selects the shortcut map, as Flutter's DefaultTextEditingShortcuts
-// does. flutter_test defaults to Android.
-type Platform int
-
-const (
-	Android Platform = iota // also Linux, Windows, Fuchsia
-	MacOS
-	IOS
-)
+// The platform selects the shortcut map, as Flutter's DefaultTextEditingShortcuts
+// does (flutter_test defaults to Android).
 
 // Clipboard is the system clipboard.
 type Clipboard interface {
@@ -43,10 +38,10 @@ type Clipboard interface {
 }
 
 // HandleKey applies the default text-editing shortcut for ev, if any.
-func HandleKey(v Value, ev KeyEvent, p Platform, clip Clipboard) (Value, bool) {
+func HandleKey(v Value, ev KeyEvent, p foundation.TargetPlatform, clip Clipboard) (Value, bool) {
 	word, line := ev.Ctrl, false // modifier for word moves / line moves
 	command := ev.Ctrl           // select all, copy, paste...
-	if p == MacOS || p == IOS {
+	if p == foundation.TargetPlatformMacOS || p == foundation.TargetPlatformIOS {
 		word, line, command = ev.Alt, ev.Meta, ev.Meta
 	}
 	extend := ev.Shift
@@ -72,7 +67,7 @@ func HandleKey(v Value, ev KeyEvent, p Platform, clip Clipboard) (Value, bool) {
 	case KeyUp, KeyDown:
 		return MoveVertically(v, ev.Key == KeyDown, !extend), true
 	case KeyHome, KeyEnd:
-		if p == MacOS || p == IOS {
+		if p == foundation.TargetPlatformMacOS || p == foundation.TargetPlatformIOS {
 			return v, false // on Apple platforms Home/End scroll; they don't move the caret
 		}
 		return Move(v, ev.Key == KeyEnd, ByLine, !extend), true
