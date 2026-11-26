@@ -40,6 +40,8 @@ type AutomatedTestWidgetsFlutterBinding struct {
 	TestDefaultBinaryMessengerBindingMixin
 
 	tester *Tester // the test in progress (flutter_test: inTest)
+
+	testTextInput *TestTextInput
 }
 
 var automatedTestBinding *AutomatedTestWidgetsFlutterBinding
@@ -74,7 +76,8 @@ func AutomatedTestWidgetsFlutterBindingEnsureInitialized() *AutomatedTestWidgets
 // (RendererBinding's _handlePersistentFrameCallback).
 func (b *AutomatedTestWidgetsFlutterBinding) InitInstances() {
 	b.TestDefaultBinaryMessengerBindingMixin.InitInstances()
-	scheduler.SetTimeDilation(1.0) // just in case the developer has artificially changed it for development
+	b.testTextInput = NewTestTextInput() // onCleared: _resetFocusedEditable (no EditableText yet)
+	scheduler.SetTimeDilation(1.0)       // just in case the developer has artificially changed it for development
 	b.AddPersistentFrameCallback(b.handlePersistentFrameCallback)
 }
 
@@ -205,6 +208,10 @@ func (b *AutomatedTestWidgetsFlutterBinding) startTest(t *Tester) {
 	}
 	b.tester = t
 	t.restoreLoop = async.SetCurrent(t.loop)
+	// registerTestTextInput is true: the text input mock is reset and
+	// registered for each test.
+	b.testTextInput.Reset()
+	b.testTextInput.Register()
 	t.lastSize = t.Size
 	t.previousOnError = foundation.FlutterErrorOnError
 	foundation.FlutterErrorOnError = func(details *foundation.FlutterErrorDetails) {
@@ -221,6 +228,7 @@ func (b *AutomatedTestWidgetsFlutterBinding) startTest(t *Tester) {
 func (b *AutomatedTestWidgetsFlutterBinding) postTest(t *Tester) {
 	defer func() {
 		b.tester = nil
+		b.testTextInput.Unregister()
 		b.ResetGestureBinding()
 		t.restoreLoop()
 		foundation.FlutterErrorOnError = t.previousOnError
@@ -251,3 +259,7 @@ func (b *AutomatedTestWidgetsFlutterBinding) postTest(t *Tester) {
 		t.t.Errorf("The timeDilation was changed and not reset by the test.")
 	}
 }
+
+// TestTextInput is the binding's mock of the platform's text input
+// (testTextInput): reset and registered for every test.
+func (b *AutomatedTestWidgetsFlutterBinding) TestTextInput() *TestTextInput { return b.testTextInput }
