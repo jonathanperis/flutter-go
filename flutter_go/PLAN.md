@@ -776,3 +776,12 @@ The standing goal is now full API parity with Flutter 3.50.1's Dart layer
   throttle's stopwatch, and StackFrame equality fields.
 - Not ported: web-only and release/profile branches are ported but
   untested (debug build only); `Uri.parse`'s errors (Go parses leniently).
+
+### Upstream's AI-agent configuration removed (at the user's request)
+- The root mirrors upstream byte for byte **except** Flutter's AI-agent
+  configuration and skills: `.agents/`, `.claude/`, `.gemini/`,
+  `agent-artifacts/`, `CONTRIBUTING.ai.md` and the nested
+  `AGENTS.md`/`GEMINI.md` files (50 files). They configured agents working
+  here as if this were flutter/flutter (its skills appeared in sessions).
+  `sync_upstream.sh` keeps them out (`EXCLUDED`), and `--check` verifies
+  everything else as before.

@@ -16,6 +16,10 @@ REPO="$(cd "$ROOT/.." && pwd)"
 SRC="${FLUTTER_SRC:-$HOME/Projetos/jonathanperis/flutter}"
 TAG="$(cat "$ROOT/FLUTTER_TAG")"
 OURS='^(go\.mod|go\.sum|flutter_go/.*|.*\.go|\.github/README\.md)$'
+# Upstream files deliberately left out: Flutter's AI-agent configuration
+# and skills (they would configure agents working on flutter-go as if it
+# were flutter/flutter).
+EXCLUDED='^(\.agents/|\.claude/|\.gemini/|agent-artifacts/|CONTRIBUTING\.ai\.md$)|(^|/)(AGENTS|GEMINI|CLAUDE)\.md$'
 
 PIN="$(git -C "$SRC" rev-parse -q --verify "refs/tags/$TAG^{commit}")" || {
   echo "Tag $TAG is not in $SRC; run: git -C $SRC fetch origin tag $TAG" >&2; exit 1; }
@@ -28,7 +32,7 @@ fi
 # "mode hash<TAB>path" for every non-Dart file of the tag (paths may contain
 # spaces, so the path is only ever split off at the tab).
 theirs() {
-  git -C "$SRC" ls-tree -r "$PIN" | awk -F'\t' '{split($1, m, " "); if (m[1] != "160000" && $2 !~ /\.dart$/) print m[1] " " m[3] "\t" $2}' | LC_ALL=C sort -t$'\t' -k2
+  git -C "$SRC" ls-tree -r "$PIN" | awk -F'\t' '{split($1, m, " "); if (m[1] != "160000" && $2 !~ /\.dart$/) print m[1] " " m[3] "\t" $2}' | awk -F'\t' -v re="$EXCLUDED" '$2 !~ re' | LC_ALL=C sort -t$'\t' -k2
 }
 # The same for what this repository's index holds outside flutter-go's paths.
 ours_view() {
@@ -60,7 +64,10 @@ cd "$REPO"
 git ls-files -z | tr '\0' '\n' | grep -Ev "$OURS" | tr '\n' '\0' | xargs -0 git rm -q --cached --ignore-unmatch --
 git -C "$SRC" ls-tree -r --name-only "$PIN" | grep -v '\.dart$' | while IFS= read -r f; do rm -f -- "$f"; done
 git -C "$SRC" archive --format=tar "$PIN" | tar -x -C "$REPO" --exclude='*.dart'
-git -C "$SRC" ls-tree -r --name-only -z "$PIN" | tr '\0' '\n' | grep -v '\.dart$' | tr '\n' '\0' | xargs -0 git add -f --
+# Drop the deliberately excluded files again (tracked or not, they stay out).
+git -C "$SRC" ls-tree -r --name-only "$PIN" | grep -E "$EXCLUDED" | while IFS= read -r f; do rm -f -- "$f"; done
+for d in .agents .claude .gemini agent-artifacts; do find "$d" -type l -delete 2>/dev/null; find "$d" -type d -empty -delete 2>/dev/null; done
+theirs | cut -f2 | tr '\n' '\0' | xargs -0 git add -f --
 
 # git add normalizes line endings under upstream's own `* text=auto`; a few
 # upstream files are committed with CRLF anyway. Stage upstream's exact blob

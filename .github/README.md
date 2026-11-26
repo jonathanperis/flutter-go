@@ -5,7 +5,9 @@
 with exactly one difference: the Dart is gone, and Go does its job.
 
 - Every non-Dart file of the release (engine C++, Impeller, embedders,
-  shaders, fonts, tools, CI, docs) is here at its upstream path, unchanged.
+  shaders, fonts, tools, CI, docs) is here at its upstream path, unchanged,
+  except Flutter's AI-agent configuration (`.agents/`, `.claude/`,
+  `.gemini/` and similar), which is left out.
   `flutter_go/scripts/sync_upstream.sh --check` proves it blob for blob.
 - Each Go file sits beside the Dart file it replaces:
   `packages/flutter/lib/src/physics/friction_simulation.go` is the port of
