@@ -6,7 +6,6 @@ package services_test
 
 import (
 	"errors"
-	"reflect"
 	"testing"
 
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/services"
@@ -33,8 +32,11 @@ func (m *mockClipboard) handleMethodCall(methodCall services.MethodCall) async.F
 			if m.hasStringsThrows {
 				panic(services.NewPlatformException("clipboard error"))
 			}
-			data, _ := m.clipboardData.(map[string]any)
-			text, _ := data["text"].(string)
+			data, _ := m.clipboardData.(*dart.LinkedMap)
+			var text string
+			if data != nil {
+				text, _ = data.Lookup("text").(string)
+			}
 			return map[string]any{"value": text != ""}
 		case "Clipboard.setData":
 			m.clipboardData = methodCall.Arguments
@@ -80,7 +82,7 @@ func TestClipboardGetDataThrowsIfTextIsMissingOrNull(t *testing.T) {
 func TestClipboardSetDataSetsText(t *testing.T) {
 	clipboardTest(t, func(mock *mockClipboard) {
 		services.Clipboard.SetData(services.NewClipboardData("Hello world")).Await()
-		expect(reflect.DeepEqual(mock.clipboardData, map[string]any{"text": "Hello world"}), "%v", mock.clipboardData)
+		expect(decodedEqual(mock.clipboardData, map[string]any{"text": "Hello world"}), "%v", mock.clipboardData)
 		// Own: hasStrings.
 		expect(services.Clipboard.HasStrings().Await(), "no strings")
 	})

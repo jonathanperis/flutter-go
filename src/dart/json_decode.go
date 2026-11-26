@@ -7,8 +7,9 @@ package dart
 // single-chunk conversions (convert), so the partial-value states only
 // matter at the end of the input.
 //
-// Values: a JSON object is a map[string]any (Go maps don't keep Dart's
-// insertion order; with duplicate keys the last value wins, as in Dart),
+// Values: a JSON object is a *LinkedMap with string keys in the source's
+// order (Dart's LinkedHashMap; a duplicate key keeps its first place and
+// its last value, as in Dart),
 // an array []any, an integer literal an int (Dart's 64-bit int; literals
 // out of its range are doubles, as in Dart), other numbers float64,
 // strings string (a lone surrogate from a \u escape becomes U+FFFD: Go
@@ -185,9 +186,9 @@ func (p *jsonParser) propertyValue() {
 func (p *jsonParser) endObject() {
 	p.popContainer()
 	pairs := p.value.([]any)
-	m := make(map[string]any, len(pairs)/2)
+	m := &LinkedMap{}
 	for i := 0; i < len(pairs); i += 2 {
-		m[pairs[i].(string)] = pairs[i+1]
+		m.Set(pairs[i].(string), pairs[i+1])
 	}
 	p.value = m
 }

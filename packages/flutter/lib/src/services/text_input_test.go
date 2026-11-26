@@ -281,8 +281,8 @@ func TestTextInputConfigurationSetsExpectedDefaults(t *testing.T) {
 
 func jsonValue(t *testing.T, m []dart.MapEntry[string, any], key string) any {
 	t.Helper()
-	decoded := jsonMessage.DecodeMessage(jsonMessage.EncodeMessage(m)).(map[string]any)
-	return decoded[key]
+	decoded := jsonMessage.DecodeMessage(jsonMessage.EncodeMessage(m)).(*dart.LinkedMap)
+	return decoded.Lookup(key)
 }
 
 func TestTextInputConfigurationSerializesToJSON(t *testing.T) {
@@ -291,7 +291,7 @@ func TestTextInputConfigurationSerializesToJSON(t *testing.T) {
 		ReadOnly: true, ObscureText: true, Autocorrect: ptr(false), ActionLabel: &label,
 	})
 	json := c.ToJSON()
-	if got := jsonValue(t, json, "inputType"); !reflect.DeepEqual(got, map[string]any{"name": "TextInputType.text", "signed": nil, "decimal": nil, "password": nil}) {
+	if got := jsonValue(t, json, "inputType"); !decodedEqual(got, map[string]any{"name": "TextInputType.text", "signed": nil, "decimal": nil, "password": nil}) {
 		t.Fatalf("inputType %v", got)
 	}
 	if jsonValue(t, json, "readOnly") != true || jsonValue(t, json, "obscureText") != true ||
@@ -310,7 +310,7 @@ func TestTextInputConfigurationSerializesToJSON(t *testing.T) {
 	number := services.NewTextInputTypeNumberWithOptions(services.TextInputTypeNumberWithOptionsOptions{Decimal: true})
 	c = services.NewTextInputConfiguration(services.TextInputConfigurationOptions{InputType: &number, ObscureText: true, Autocorrect: ptr(false), ActionLabel: &label})
 	json = c.ToJSON()
-	if got := jsonValue(t, json, "inputType"); !reflect.DeepEqual(got, map[string]any{"name": "TextInputType.number", "signed": false, "decimal": true, "password": false}) {
+	if got := jsonValue(t, json, "inputType"); !decodedEqual(got, map[string]any{"name": "TextInputType.number", "signed": false, "decimal": true, "password": false}) {
 		t.Fatalf("inputType %v", got)
 	}
 	if jsonValue(t, json, "readOnly") != false || jsonValue(t, json, "obscureText") != true ||
@@ -319,7 +319,7 @@ func TestTextInputConfigurationSerializesToJSON(t *testing.T) {
 	}
 	password := services.NewTextInputTypeNumberWithOptions(services.TextInputTypeNumberWithOptionsOptions{Password: true})
 	json = services.NewTextInputConfiguration(services.TextInputConfigurationOptions{InputType: &password}).ToJSON()
-	if got := jsonValue(t, json, "inputType"); !reflect.DeepEqual(got, map[string]any{"name": "TextInputType.number", "signed": false, "decimal": false, "password": true}) {
+	if got := jsonValue(t, json, "inputType"); !decodedEqual(got, map[string]any{"name": "TextInputType.number", "signed": false, "decimal": false, "password": true}) {
 		t.Fatalf("inputType %v", got)
 	}
 	// Own: the whole default encoding, byte for byte.
@@ -471,7 +471,7 @@ func TestTextInputClientPerformPrivateCommandIsCalled(t *testing.T) {
 func TestTextInputClientPerformPrivateCommandWithNoData(t *testing.T) {
 	clientCallTest(t, []any{1, jsonDecode(`{"action": "actionCommand"}`)}, "TextInputClient.performPrivateCommand",
 		"performPrivateCommand", func(c *fakeTextInputClient) {
-			expect(c.latestPrivateCommandData != nil && len(c.latestPrivateCommandData) == 0, "%v", c.latestPrivateCommandData)
+			expect(c.latestPrivateCommandData != nil && c.latestPrivateCommandData.IsEmpty(), "%v", c.latestPrivateCommandData)
 		})
 }
 

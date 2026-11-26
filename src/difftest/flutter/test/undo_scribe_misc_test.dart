@@ -175,12 +175,15 @@ void main() {
     replies['ProcessText.queryTextActions'] = <Object?>[
       <String, String>{'com.a.Translate': 'Translate'},
       <String, String>{'com.a.Define': 'Define', 'com.b.Search': 'Search', 'com.c.Upper': 'UPPER'},
+      // The platform's order, not sorted: Dart lists the actions in it.
+      <String, String>{'com.z.Zap': 'Zap', 'com.a.Alpha': 'Alpha', 'com.m.Mid': 'Mid', 'com.b.Beta': 'Beta'},
+      <Object?, Object?>{'com.y.Second': 'Second', 'com.x.First': 'First'},
       null,
       PlatformException(code: 'busy', message: 'pending'),
       <Object?>['not', 'a', 'map'],
       const _NoReply(),
     ];
-    for (var i = 0; i < 6; i++) {
+    for (var i = 0; i < 8; i++) {
       ticks(8);
       track('queryTextActions', service.queryTextActions());
       await settle();

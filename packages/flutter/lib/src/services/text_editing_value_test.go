@@ -27,13 +27,13 @@ func expectAssert(t *testing.T, want string, f func()) {
 
 func TestTextEditingValueRangeAssertions(t *testing.T) {
 	expectAssert(t, "Range end 5 is out of text of length 3", func() {
-		services.NewTextEditingValueFromJSON(map[string]any{"text": "abc", "composingBase": 1, "composingExtent": 5})
+		services.NewTextEditingValueFromJSON(linkedOf(map[string]any{"text": "abc", "composingBase": 1, "composingExtent": 5}))
 	})
 	expectAssert(t, "Range start 4 is out of text of length 3", func() {
-		services.NewTextEditingValueFromJSON(map[string]any{"text": "abc", "selectionBase": 5, "selectionExtent": 4})
+		services.NewTextEditingValueFromJSON(linkedOf(map[string]any{"text": "abc", "selectionBase": 5, "selectionExtent": 4}))
 	})
 	// (-1, -1) is "no range" and passes.
-	v := services.NewTextEditingValueFromJSON(map[string]any{"text": "abc"})
+	v := services.NewTextEditingValueFromJSON(linkedOf(map[string]any{"text": "abc"}))
 	if v.Selection.IsValid() || v.Composing.IsValid() {
 		t.Fatal(v)
 	}

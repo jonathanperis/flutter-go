@@ -22,6 +22,7 @@ import (
 
 	ui "github.com/jonathanperis/flutter-go/engine/src/flutter/lib/ui/go"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/services"
+	"github.com/jonathanperis/flutter-go/src/dart"
 )
 
 type sentKeyEvent struct {
@@ -268,8 +269,8 @@ func TestEmbedderSynchronizeCapsLockStateOnNormalKey(t *testing.T) {
 
 func TestChannelResponderMessages(t *testing.T) {
 	var messages []map[string]any
-	var replies []func(map[string]any)
-	r := &channelKeyResponder{send: func(m map[string]any, cb func(map[string]any)) {
+	var replies []func(*dart.LinkedMap)
+	r := &channelKeyResponder{send: func(m map[string]any, cb func(*dart.LinkedMap)) {
 		messages = append(messages, m)
 		replies = append(replies, cb)
 	}}
@@ -279,7 +280,7 @@ func TestChannelResponderMessages(t *testing.T) {
 	if m["type"] != "keydown" || m["keymap"] != "macos" || m["keyCode"] != 0 || m["modifiers"] != 0 || m["characters"] != "a" {
 		t.Errorf("%v", m)
 	}
-	replies[0](map[string]any{"handled": true})
+	replies[0](dart.NewLinkedMapOf("handled", true))
 	if !handled {
 		t.Error("reply")
 	}
@@ -357,7 +358,7 @@ func TestEmbedderLatin1AndFunctionKeys(t *testing.T) {
 		services.LogicalKeyboardKeyArrowLeft.KeyID, nil, false)
 }
 
-func nullReplyCheck(t *testing.T, r *channelKeyResponder, replies *[]func(map[string]any)) {
+func nullReplyCheck(t *testing.T, r *channelKeyResponder, replies *[]func(*dart.LinkedMap)) {
 	handled := false
 	r.handleEvent(ev(nsEventTypeKeyUp, 0, "a", "a", false, kKeyCodeKeyA), func(h bool) { handled = h })
 	(*replies)[len(*replies)-1](nil)

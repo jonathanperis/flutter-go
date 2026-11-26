@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strconv"
 	"unicode/utf16"
+	"unsafe"
 )
 
 // JSONEncode is dart:convert's json.encode (jsonEncode): see JSONUTF8Encode
@@ -18,11 +19,12 @@ func JSONEncode(v any) string { return string(JSONUTF8Encode(v)) }
 // are unsupported), slices and arrays (typed lists such as []byte are
 // lists of numbers, as Dart's Uint8List is a List<int>), maps whose keys
 // are all strings at run time (an empty map is "{}" whatever its key
-// type), []MapEntry[K, V] as an ordered map, a pointer (nil is null,
+// type), *LinkedMap (Dart's Map, written in its order) and []MapEntry[K, V]
+// as ordered maps, a pointer (nil is null,
 // otherwise its target), and objects with a `ToJson() any` method (Dart's
 // default toEncodable calls toJson). A Go map has no order, so its keys are
-// written sorted (Dart writes a map in insertion order; use []MapEntry when
-// the order matters). Anything else panics with
+// written sorted (Dart writes a map in insertion order; use a *LinkedMap
+// or []MapEntry when the order matters). Anything else panics with
 // JSONUnsupportedObjectError; a container that contains itself panics with
 // JSONCyclicError. Strings are read as WTF-8 (see utf8.go): a lone
 // surrogate is written as a \udXXX escape, as Dart does.
@@ -50,6 +52,9 @@ func (e JSONUnsupportedObjectError) Error() string {
 // jsonSafeToString is Error.safeToString as the VM prints the objects the
 // encoder rejects: a map (a Go map or a []MapEntry) is "_Map len:N".
 func jsonSafeToString(object any) string {
+	if m, ok := object.(*LinkedMap); ok && m != nil {
+		return "_Map len:" + strconv.Itoa(m.Len())
+	}
 	if object != nil {
 		rv := reflect.ValueOf(object)
 		if rv.Kind() == reflect.Map || rv.Kind() == reflect.Slice && isMapEntryType(rv.Type().Elem()) {
@@ -125,6 +130,15 @@ func (e *jsonEncoder) writeJSONValue(object any) bool {
 		return e.writeDouble(x)
 	case float32:
 		return e.writeDouble(float64(x))
+	case *LinkedMap:
+		if x == nil {
+			e.buf = append(e.buf, "null"...)
+			return true
+		}
+		e.checkCycle(object, uintptr(unsafe.Pointer(x)))
+		ok := e.writeLinkedMap(x)
+		e.removeSeen()
+		return ok
 	}
 	rv := reflect.ValueOf(object)
 	switch rv.Kind() {
@@ -236,6 +250,34 @@ func (e *jsonEncoder) writeMap(rv reflect.Value) bool {
 		e.writeStringContent(en.key)
 		e.buf = append(e.buf, '"', ':')
 		e.writeObject(en.value)
+	}
+	e.buf = append(e.buf, '}')
+	return true
+}
+
+// writeLinkedMap writes a *LinkedMap in its order (_JsonStringifier's
+// writeMap: every key must be a string).
+func (e *jsonEncoder) writeLinkedMap(m *LinkedMap) bool {
+	if m.IsEmpty() {
+		e.buf = append(e.buf, "{}"...)
+		return true
+	}
+	for k := range m.Keys() {
+		if _, ok := k.(string); !ok {
+			return false
+		}
+	}
+	e.buf = append(e.buf, '{')
+	i := 0
+	for k, v := range m.Entries() {
+		if i > 0 {
+			e.buf = append(e.buf, ',')
+		}
+		i++
+		e.buf = append(e.buf, '"')
+		e.writeStringContent(k.(string))
+		e.buf = append(e.buf, '"', ':')
+		e.writeObject(v)
 	}
 	e.buf = append(e.buf, '}')
 	return true

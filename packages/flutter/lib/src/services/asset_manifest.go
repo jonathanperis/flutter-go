@@ -47,7 +47,7 @@ type assetManifestBin struct {
 }
 
 func assetManifestBinFromStandardMessageCodecMessage(message []byte) AssetManifest {
-	data := newOrderedStandardMessageCodec().DecodeMessage(message)
+	data := NewStandardMessageCodec().DecodeMessage(message)
 	entries, ok := data.(*dart.LinkedMap)
 	if !ok {
 		panic(dart.TypeError{Message: "type '" + foundation.ObjectRuntimeType(data, "Null") +
@@ -119,7 +119,7 @@ func (m *assetManifestBin) GetAssetVariants(key string) []AssetMetadata {
 
 func (m *assetManifestBin) ListAssets() []string {
 	out := make([]string, 0, m.data.Len()+len(m.typeCastedOrd))
-	for _, k := range m.data.Keys() {
+	for k := range m.data.Keys() {
 		out = append(out, castElement[string](k))
 	}
 	return append(out, m.typeCastedOrd...)

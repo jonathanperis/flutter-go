@@ -138,8 +138,8 @@ func (m *PaintingBindingMixin) HandleSystemMessage(systemMessage any) async.Futu
 		foundation.BindingSuper[interface {
 			HandleSystemMessage(any) async.Future[async.Void]
 		}](m.outer(), m).HandleSystemMessage(systemMessage).Await()
-		message := systemMessage.(map[string]any)
-		typ := message["type"].(string)
+		message := systemMessage.(*dart.LinkedMap)
+		typ := message.Lookup("type").(string)
 		switch typ {
 		case "fontsChange":
 			m.systemFonts.notifyListeners()

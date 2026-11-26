@@ -87,7 +87,7 @@ func TestEditingActionsMatchFlutter(t *testing.T) {
 				return async.Async(func() any {
 					switch call.Method {
 					case "Clipboard.setData":
-						s := call.Arguments.(map[string]any)["text"].(string)
+						s := call.Arguments.(*dart.LinkedMap).Lookup("text").(string)
 						clipboard = &s
 					case "Clipboard.getData":
 						if clipboard != nil {

@@ -42,7 +42,7 @@ type PredictiveBackEvent struct {
 }
 
 // NewPredictiveBackEventFromMap is PredictiveBackEvent.fromMap (m is a
-// decoded message map: a Go map or a []dart.MapEntry).
+// decoded message map, a *dart.LinkedMap, or a Go map or []dart.MapEntry).
 func NewPredictiveBackEventFromMap(m any) PredictiveBackEvent {
 	var touchOffset *ui.Offset
 	if raw, _ := MapLookup(m, "touchOffset"); raw != nil {

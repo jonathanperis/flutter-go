@@ -7,20 +7,20 @@ package services_test
 // EditableText; widgets are not ported).
 
 import (
-	"reflect"
 	"testing"
 
 	ui "github.com/jonathanperis/flutter-go/engine/src/flutter/lib/ui/go"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/foundation"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/services"
 	"github.com/jonathanperis/flutter-go/src/async"
+	"github.com/jonathanperis/flutter-go/src/dart"
 )
 
 // systemContextMenuItemDataFromJSON is system_context_menu_utils.dart's
 // systemContextMenuItemDataFromJson.
-func systemContextMenuItemDataFromJSON(json map[string]any) services.IOSSystemContextMenuItemData {
-	title, _ := json["title"].(string)
-	switch json["type"] {
+func systemContextMenuItemDataFromJSON(json *dart.LinkedMap) services.IOSSystemContextMenuItemData {
+	title, _ := json.Lookup("title").(string)
+	switch json.Lookup("type") {
 	case "copy":
 		return services.IOSSystemContextMenuItemDataCopy{}
 	case "cut":
@@ -62,18 +62,18 @@ func contextMenuTest(t *testing.T, body func()) {
 
 // recordMenuCalls installs a platform mock recording the target rects
 // shown, the items shown and the hides.
-func recordMenuCalls() (rects *[]map[string]any, items *[][]services.IOSSystemContextMenuItemData, hideCount *int) {
-	rects, items, hideCount = &[]map[string]any{}, &[][]services.IOSSystemContextMenuItemData{}, new(int)
+func recordMenuCalls() (rects *[]*dart.LinkedMap, items *[][]services.IOSSystemContextMenuItemData, hideCount *int) {
+	rects, items, hideCount = &[]*dart.LinkedMap{}, &[][]services.IOSSystemContextMenuItemData{}, new(int)
 	messenger().SetMockMethodCallHandler(services.SystemChannels.Platform, func(call services.MethodCall) async.Future[any] {
 		return async.Async(func() any {
 			switch call.Method {
 			case "ContextMenu.showSystemContextMenu":
-				arguments := call.Arguments.(map[string]any)
-				*rects = append(*rects, arguments["targetRect"].(map[string]any))
-				if raw, ok := arguments["items"].([]any); ok {
+				arguments := call.Arguments.(*dart.LinkedMap)
+				*rects = append(*rects, arguments.Lookup("targetRect").(*dart.LinkedMap))
+				if raw, ok := arguments.Lookup("items").([]any); ok {
 					var list []services.IOSSystemContextMenuItemData
 					for _, v := range raw {
-						list = append(list, systemContextMenuItemDataFromJSON(v.(map[string]any)))
+						list = append(list, systemContextMenuItemDataFromJSON(v.(*dart.LinkedMap)))
 					}
 					*items = append(*items, list)
 				}
@@ -86,8 +86,8 @@ func recordMenuCalls() (rects *[]map[string]any, items *[][]services.IOSSystemCo
 	return
 }
 
-func rectIs(r map[string]any, rect ui.Rect) bool {
-	return reflect.DeepEqual(r, map[string]any{"x": rect.Left, "y": rect.Top, "width": rect.Width(), "height": rect.Height()})
+func rectIs(r *dart.LinkedMap, rect ui.Rect) bool {
+	return decodedEqual(r, map[string]any{"x": rect.Left, "y": rect.Top, "width": rect.Width(), "height": rect.Height()})
 }
 
 func mustPanicAssertion(f func()) {
@@ -184,7 +184,7 @@ func TestShowingAndHidingTwoControllers(t *testing.T) {
 		expect(!controller1.IsVisible() && len(*rects) == 0 && *hideCount == 0, "initial")
 		rect1 := ui.NewRectFromLTWH(0, 0, 100, 100)
 		controller1.ShowWithItems(rect1, copyItems)
-		expect(controller1.IsVisible() && len(*rects) == 1 && (*rects)[0]["x"] == rect1.Left, "%v", *rects)
+		expect(controller1.IsVisible() && len(*rects) == 1 && (*rects)[0].Lookup("x") == rect1.Left, "%v", *rects)
 		controller1.Hide()
 		expect(!controller1.IsVisible() && *hideCount == 1, "hide")
 

@@ -435,7 +435,7 @@ type modifierCheck struct {
 }
 
 func fromMessage(m map[string]any) services.RawKeyEventData {
-	return services.RawKeyEventFromMessage(m).Data()
+	return services.RawKeyEventFromMessage(linkedOf(m)).Data()
 }
 
 // checkModifiersIndividually is the groups' "modifier keys are recognized
@@ -612,20 +612,20 @@ func TestRawKeyEventDataAndroid(t *testing.T) {
 		keyTest(t, noVariant, func() {
 			expectKeysPressed()
 			data := keyData(services.LogicalKeyboardKeyKeyA, "android")
-			var message map[string]any
+			var message *dart.LinkedMap
 			send := func() {
 				channel := services.SystemChannels.KeyEvent
 				messenger().HandlePlatformMessage(channel.Name, channel.Codec.EncodeMessage(*data), func(reply []byte) {
-					message, _ = channel.Codec.DecodeMessage(reply).(map[string]any)
+					message, _ = channel.Codec.DecodeMessage(reply).(*dart.LinkedMap)
 				}).Await()
 			}
 			send()
-			expect(message["handled"] == false && len(message) == 1, "message %v", message)
+			expect(message != nil && message.Lookup("handled") == false && message.Len() == 1, "message %v", message)
 			message = nil
 			// A focused Focus whose onKey handles all events.
 			ensureInitialized().KeyEventManager().KeyMessageHandler = func(*services.KeyMessage) bool { return true }
 			send()
-			expect(message["handled"] == true && len(message) == 1, "message %v", message)
+			expect(message != nil && message.Lookup("handled") == true && message.Len() == 1, "message %v", message)
 		})
 	})
 	m := android(map[string]any{"keyCode": 29, "plainCodePoint": 97, "codePoint": 65, "character": "A", "scanCode": 30,
@@ -882,7 +882,7 @@ func TestRawKeyEventDataWindows(t *testing.T) {
 					e("scanCode", scanCode), e("modifiers", 0)}
 				channel := services.SystemChannels.KeyEvent
 				messenger().HandlePlatformMessage(channel.Name, channel.Codec.EncodeMessage(data), func(reply []byte) {
-					lastHandled = channel.Codec.DecodeMessage(reply).(map[string]any)["handled"].(bool)
+					lastHandled = channel.Codec.DecodeMessage(reply).(*dart.LinkedMap).Lookup("handled").(bool)
 				}).Await()
 			}
 			simulate("keydown", 229, 30)

@@ -11,7 +11,6 @@ import (
 	"net/url"
 	"os"
 	"regexp"
-	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -245,12 +244,11 @@ func customEntry(label string, f func()) dart.MapEntry[semantics.CustomSemantics
 // dartMapString is Dart's Map/List toString of a decoded message.
 func dartMapString(v any) string {
 	switch x := v.(type) {
-	case map[any]any: // the standard codec's decoded maps (unordered in Go: sorted by key text)
-		parts := make([]string, 0, len(x))
-		for k, e := range x {
+	case *dart.LinkedMap: // the standard codec's decoded maps, in the message's order
+		parts := make([]string, 0, x.Len())
+		for k, e := range x.Entries() {
 			parts = append(parts, dartMapString(k)+": "+dartMapString(e))
 		}
-		slices.Sort(parts)
 		return "{" + strings.Join(parts, ", ") + "}"
 	case []dart.MapEntry[any, any]:
 		parts := make([]string, len(x))

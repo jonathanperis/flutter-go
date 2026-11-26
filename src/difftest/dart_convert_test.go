@@ -51,12 +51,11 @@ func describeDart(v any) string {
 			parts[i] = describeDart(e)
 		}
 		return "[" + strings.Join(parts, ",") + "]"
-	case map[string]any:
+	case *dart.LinkedMap:
 		var parts []string
-		for k, e := range x {
+		for k, e := range x.Entries() {
 			parts = append(parts, describeDart(k)+"="+describeDart(e))
 		}
-		slices.Sort(parts)
 		return "{" + strings.Join(parts, ",") + "}"
 	}
 	return fmt.Sprintf("other:%T", v)

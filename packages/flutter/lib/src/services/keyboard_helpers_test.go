@@ -2,6 +2,7 @@ package services_test
 
 import (
 	"fmt"
+	"maps"
 	"slices"
 	"testing"
 
@@ -108,12 +109,22 @@ func getEntry(d *[]dart.MapEntry[string, any], k string) any {
 }
 
 // asMap is the message as the JSON codec decodes it on the other side.
-func asMap(d *[]dart.MapEntry[string, any]) map[string]any {
-	m := map[string]any{}
+func asMap(d *[]dart.MapEntry[string, any]) *dart.LinkedMap {
+	m := &dart.LinkedMap{}
 	for _, e := range *d {
-		m[e.Key] = e.Value
+		m.Set(e.Key, e.Value)
 	}
 	return m
+}
+
+// linkedOf is a *dart.LinkedMap of a Go map's entries in key order (for
+// messages whose order doesn't matter to the code reading them).
+func linkedOf(m map[string]any) *dart.LinkedMap {
+	out := &dart.LinkedMap{}
+	for _, k := range slices.Sorted(maps.Keys(m)) {
+		out.Set(k, m[k])
+	}
+	return out
 }
 
 // sendRawMessage delivers a raw key message on flutter/keyevent, as the

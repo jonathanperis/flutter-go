@@ -404,7 +404,7 @@ func (r *embedderKeyResponder) handleFlagEvent(event keyEvent, guard *keyCallbac
 // a raw key message (the "keymap: macos" map) with send, whose callback
 // gets the framework's reply.
 type channelKeyResponder struct {
-	send                   func(message map[string]any, callback func(reply map[string]any))
+	send                   func(message map[string]any, callback func(reply *dart.LinkedMap))
 	previouslyPressedFlags int
 }
 
@@ -433,12 +433,12 @@ func (r *channelKeyResponder) handleEvent(event keyEvent, callback func(handled 
 		message["characters"] = event.Characters
 		message["charactersIgnoringModifiers"] = event.CharactersIgnoringModifiers
 	}
-	r.send(message, func(reply map[string]any) {
+	r.send(message, func(reply *dart.LinkedMap) {
 		if reply == nil {
 			callback(true)
 			return
 		}
-		handled, _ := reply["handled"].(bool)
+		handled, _ := reply.Lookup("handled").(bool)
 		callback(handled)
 	})
 }

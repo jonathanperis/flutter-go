@@ -15,7 +15,7 @@ import (
 
 func deltaFromJSON(t *testing.T, json string) services.TextEditingDelta {
 	t.Helper()
-	return services.NewTextEditingDeltaFromJSON(jsonDecode(json).(map[string]any))
+	return services.NewTextEditingDeltaFromJSON(jsonDecode(json).(*dart.LinkedMap))
 }
 
 func deltaJSON(oldText, deltaText string, start, end, selection int, composingBase, composingExtent int) string {

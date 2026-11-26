@@ -244,8 +244,8 @@ func (m *ServicesBindingMixin) HandleMemoryPressure() {
 
 func (m *ServicesBindingMixin) HandleSystemMessage(systemMessage any) async.Future[async.Void] {
 	return async.AsyncVoid(func() {
-		message := systemMessage.(map[string]any)
-		typ := message["type"].(string)
+		message := systemMessage.(*dart.LinkedMap)
+		typ := message.Lookup("type").(string)
 		switch typ {
 		case "memoryPressure":
 			m.outer().HandleMemoryPressure()
@@ -456,11 +456,11 @@ func (m *ServicesBindingMixin) AccessibilityFocus() *foundation.ValueNotifier[*i
 
 func (m *ServicesBindingMixin) handleAccessibilityMessage(accessibilityMessage any) async.Future[async.Void] {
 	return async.AsyncVoid(func() {
-		message := accessibilityMessage.(map[any]any)
-		typ := message["type"].(string)
+		message := accessibilityMessage.(*dart.LinkedMap)
+		typ := message.Lookup("type").(string)
 		switch typ {
 		case "didGainFocus":
-			nodeID := message["nodeId"].(int)
+			nodeID := message.Lookup("nodeId").(int)
 			m.accessibilityFocus.SetValue(&nodeID)
 		}
 	})
@@ -535,7 +535,7 @@ func (m *ServicesBindingMixin) ExitApplication(exitType ui.AppExitType, exitCode
 		if result == nil {
 			return ui.AppExitResponseCancel
 		}
-		switch castElement[map[string]any](result)["response"] {
+		switch castElement[*dart.LinkedMap](result).Lookup("response") {
 		case "cancel":
 			return ui.AppExitResponseCancel
 		default:

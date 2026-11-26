@@ -16,14 +16,16 @@ package services
 //   - Uint8List, Int32List, Int64List, Float32List and Float64List are
 //     []byte, []int32, []int64, []float32 and []float64;
 //   - List is any other slice or array; decoded lists are []any;
-//   - Map is a Go map or a []dart.MapEntry[K, V] (an ordered map, written in
-//     its order). A Go map has no order, so its entries are written sorted
-//     by key (nil, then false and true, then numbers in numeric order,
-//     then strings in byte order, then other keys by their Dart toString).
-//     Decoded maps are map[any]any for the standard codec and
-//     map[string]any for JSON: their insertion order is lost, and a key Go
-//     can't hash (a list, typed data or a map) makes the standard codec
-//     panic with an UnsupportedError.
+//   - Map is a *dart.LinkedMap (Dart's LinkedHashMap): decoded maps are
+//     *dart.LinkedMap for both the standard and the JSON codecs, in the
+//     order the message lists them (a repeated key keeps its first place
+//     and its last value, keys compare as Dart's map compares them: see
+//     dart.LinkedMap), and a *dart.LinkedMap is written in its order. A
+//     []dart.MapEntry[K, V] is also written as a map in its order, and, for
+//     convenience, a Go map: it has no order, so its entries are written
+//     sorted by key (nil, then false and true, then numbers in numeric
+//     order, then strings in byte order, then other keys by their Dart
+//     toString).
 
 import (
 	"cmp"
@@ -72,8 +74,8 @@ func (StringCodec) EncodeMessage(message *string) []byte {
 
 // JSONMessageCodec is a MessageCodec with UTF-8 encoded JSON messages:
 // acyclic values made of nil, bools, numbers, strings, lists and maps with
-// string keys. Decoded objects are map[string]any, arrays []any, integers
-// int and other numbers float64.
+// string keys. Decoded objects are *dart.LinkedMap (string keys, in the
+// message's order), arrays []any, integers int and other numbers float64.
 type JSONMessageCodec struct{}
 
 // EncodeMessage encodes message as UTF-8 JSON (dart:convert's
@@ -111,12 +113,12 @@ func (JSONMethodCodec) EncodeMethodCall(methodCall MethodCall) []byte {
 
 func (JSONMethodCodec) DecodeMethodCall(methodCall []byte) MethodCall {
 	decoded := JSONMessageCodec{}.DecodeMessage(methodCall)
-	m, ok := decoded.(map[string]any)
+	m, ok := decoded.(*dart.LinkedMap)
 	if !ok {
 		panic(dart.NewFormatException("Expected method call Map, got " + dart.ToString(decoded)))
 	}
-	if method, ok := m["method"].(string); ok {
-		return MethodCall{Method: method, Arguments: m["args"]}
+	if method, ok := m.Lookup("method").(string); ok {
+		return MethodCall{Method: method, Arguments: m.Lookup("args")}
 	}
 	panic(dart.NewFormatException("Invalid method call: " + dart.ToString(decoded)))
 }
@@ -315,6 +317,18 @@ func (c StandardMessageCodec) WriteValue(buffer *foundation.WriteBuffer, value a
 		self.WriteSize(buffer, len(v))
 		buffer.PutFloat64List(v)
 		return
+	case *dart.LinkedMap:
+		if v == nil {
+			self.WriteValue(buffer, nil)
+			return
+		}
+		buffer.PutUint8(valueMap)
+		self.WriteSize(buffer, v.Len())
+		for key, value := range v.Entries() {
+			self.WriteValue(buffer, key)
+			self.WriteValue(buffer, value)
+		}
+		return
 	}
 	rv := reflect.ValueOf(value)
 	switch rv.Kind() {
@@ -467,36 +481,32 @@ func (c StandardMessageCodec) ReadValueOfType(typ int, buffer *foundation.ReadBu
 		return dart.UTF8Decode(buffer.GetUint8List(length))
 	case valueUint8List:
 		length := self.ReadSize(buffer)
-		return buffer.GetUint8List(length)
+		return distinctEmpty(buffer.GetUint8List(length))
 	case valueInt32List:
 		length := self.ReadSize(buffer)
-		return buffer.GetInt32List(length)
+		return distinctEmpty(buffer.GetInt32List(length))
 	case valueInt64List:
 		length := self.ReadSize(buffer)
-		return buffer.GetInt64List(length)
+		return distinctEmpty(buffer.GetInt64List(length))
 	case valueFloat32List:
 		length := self.ReadSize(buffer)
-		return buffer.GetFloat32List(length)
+		return distinctEmpty(buffer.GetFloat32List(length))
 	case valueFloat64List:
 		length := self.ReadSize(buffer)
-		return buffer.GetFloat64List(length)
+		return distinctEmpty(buffer.GetFloat64List(length))
 	case valueList:
 		length := self.ReadSize(buffer)
-		result := make([]any, length)
+		result := distinctEmpty(make([]any, length))
 		for i := range length {
 			result[i] = self.ReadValue(buffer)
 		}
 		return result
 	case valueMap:
 		length := self.ReadSize(buffer)
-		result := make(map[any]any, length)
+		result := &dart.LinkedMap{}
 		for range length {
 			key := self.ReadValue(buffer)
-			if key != nil && !reflect.TypeOf(key).Comparable() {
-				panic(dart.UnsupportedError{Message: "a map key of type " + reflect.TypeOf(key).String() +
-					" can't be a Go map key"})
-			}
-			result[dartMapKey(result, key)] = self.ReadValue(buffer)
+			result.Set(key, self.ReadValue(buffer))
 		}
 		return result
 	}
@@ -630,72 +640,28 @@ func (m StandardMethodCodec) DecodeEnvelope(envelope []byte) any {
 	panic(dart.NewFormatException("Invalid envelope"))
 }
 
-// dartMapKey is the key under which a Dart LinkedHashMap stores key: an
-// existing key that Dart's map considers the same is kept (only its value
-// is replaced). Dart's map matches keys whose hashCodes are equal and that
-// are ==: an int and a double are == when the int converted to a double
-// equals the double, and an integral double hashes as the int it converts
-// to (the VM's C++ cast, which saturates on arm64, so 2^63 hashes as
-// 2^63-1), so they match when that int is the int key; 0.0 and -0.0 match.
-// Go's map would keep 1 and 1.0 apart and replace a stored -0.0 by 0.0, so
-// the stored key is looked up first.
-func dartMapKey(m map[any]any, key any) any {
-	switch k := key.(type) {
-	case int:
-		if k == 0 {
-			return storedZeroKey(m, key)
-		}
-		if f := float64(k); doubleHashInt(f) == k {
-			if _, ok := m[f]; ok {
-				return f
-			}
-		}
-	case float64:
-		if k == 0 {
-			return storedZeroKey(m, key)
-		}
-		if k == math.Trunc(k) && k >= -0x1p63 && k <= 0x1p63 {
-			i := doubleHashInt(k)
-			if _, ok := m[i]; ok && float64(i) == k {
-				return i
-			}
-		}
+// distinctEmpty gives an empty decoded list its own backing array: Dart's
+// lists are distinct objects, and a decoded list used as a map key is
+// compared by identity (see dart.LinkedMap), which Go's zero-size
+// allocations, all at one address, would lose.
+func distinctEmpty[E any](list []E) []E {
+	if len(list) == 0 {
+		return make([]E, 0, 1)
 	}
-	return key
+	return list
 }
 
-// doubleHashInt is the int an integral double in [-2^63, 2^63] hashes as
-// (static_cast<int64_t> on arm64: 2^63 saturates to 2^63-1).
-func doubleHashInt(f float64) int {
-	if f >= 0x1p63 {
-		return math.MaxInt64
-	}
-	return int(f)
-}
-
-// storedZeroKey finds the zero key (0, 0.0 or -0.0) m already holds, if
-// any.
-func storedZeroKey(m map[any]any, key any) any {
-	if _, ok := m[0]; ok {
-		return 0
-	}
-	if _, ok := m[0.0]; !ok { // 0.0 and -0.0 are equal Go keys
-		return key
-	}
-	for k := range m {
-		if f, ok := k.(float64); ok && f == 0 {
-			return f
-		}
-	}
-	return key
-}
-
-// MapLookup is a lookup in a decoded (or encodable) message map: a Go map
-// or an ordered []dart.MapEntry map. ok is false when the key is absent or
-// m is not a map. (A Go helper for reading Dart map messages, used by
-// semantics; not Flutter API.)
+// MapLookup is a lookup in a decoded (or encodable) message map: a
+// *dart.LinkedMap, a Go map or an ordered []dart.MapEntry map. ok is false
+// when the key is absent or m is not a map. (A Go helper for reading Dart
+// map messages; not Flutter API.)
 func MapLookup(m any, key any) (value any, ok bool) {
 	switch x := m.(type) {
+	case *dart.LinkedMap:
+		if x == nil {
+			return nil, false
+		}
+		return x.Get(key)
 	case []dart.MapEntry[any, any]:
 		for _, e := range x {
 			if comparableEqual(e.Key, key) {

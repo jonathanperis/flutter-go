@@ -115,7 +115,7 @@ func describeRawData(lines *[]string, tag string, data, previous services.RawKey
 		parts = append(parts, fmt.Sprintf("eqPrev=%v eqSelf=%v", eq.Equal(previous), eq.Equal(data)))
 	}
 	parts = append(parts, "msg="+keyGuard(func() any {
-		event := services.RawKeyEventFromMessage(message)
+		event := services.RawKeyEventFromMessage(linkedOf(message))
 		character := "null"
 		if c := event.Character(); c != nil {
 			character = dart.JSONEncode(*c)
@@ -344,10 +344,10 @@ func rawKeyEventDataLines() []string {
 		previous = data
 	}
 	lines = append(lines, "unknown keymap "+keyGuard(func() any {
-		return services.RawKeyEventFromMessage(map[string]any{"type": "keydown", "keymap": "beos"})
+		return services.RawKeyEventFromMessage(linkedOf(map[string]any{"type": "keydown", "keymap": "beos"}))
 	}))
 	lines = append(lines, "unknown type "+keyGuard(func() any {
-		return services.RawKeyEventFromMessage(map[string]any{"type": "keypress", "keymap": "android"})
+		return services.RawKeyEventFromMessage(linkedOf(map[string]any{"type": "keypress", "keymap": "android"}))
 	}))
 	// The known keys.
 	for _, key := range knownLogical {

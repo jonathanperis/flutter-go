@@ -147,6 +147,9 @@ func undoScribeMiscScenes(l *channelLog) {
 		[]dart.MapEntry[string, string]{{Key: "com.a.Translate", Value: "Translate"}},
 		[]dart.MapEntry[string, string]{{Key: "com.a.Define", Value: "Define"}, {Key: "com.b.Search", Value: "Search"},
 			{Key: "com.c.Upper", Value: "UPPER"}},
+		// The platform's order, not sorted: Dart lists the actions in it.
+		dart.NewLinkedMapOf("com.z.Zap", "Zap", "com.a.Alpha", "Alpha", "com.m.Mid", "Mid", "com.b.Beta", "Beta"),
+		[]dart.MapEntry[any, any]{{Key: "com.y.Second", Value: "Second"}, {Key: "com.x.First", Value: "First"}},
 		nil,
 		services.NewPlatformException("busy", services.PlatformExceptionOptions{Message: &pending}),
 		[]any{"not", "a", "map"},
@@ -159,7 +162,7 @@ func undoScribeMiscScenes(l *channelLog) {
 		}
 		return strings.Join(parts, ";")
 	}
-	for range 6 {
+	for range 8 {
 		l.ticks(8)
 		trackFuture(l, "queryTextActions", service.QueryTextActions(), showActions)
 		settle()

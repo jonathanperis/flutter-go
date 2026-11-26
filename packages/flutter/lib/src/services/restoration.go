@@ -4,9 +4,10 @@ package services
 //
 // Restoration data is a tree of Dart maps whose insertion order reaches the
 // engine (the StandardMessageCodec writes a map in its order), so the raw
-// data is *dart.LinkedMap (Dart's LinkedHashMap): the data decoded from the
-// engine, the buckets' "v"/"c" maps, and every map value restored from the
-// engine. Values written by the app are kept as given.
+// data is *dart.LinkedMap (Dart's LinkedHashMap), as the codec decodes it:
+// the data decoded from the engine, the buckets' "v"/"c" maps, and every
+// map value restored from the engine. Values written by the app are kept as
+// given.
 
 import (
 	"reflect"
@@ -17,46 +18,6 @@ import (
 	"github.com/jonathanperis/flutter-go/src/async"
 	"github.com/jonathanperis/flutter-go/src/dart"
 )
-
-// orderedStandardMessageCodec is the StandardMessageCodec reading maps as
-// Dart's do: *dart.LinkedMap in the encoded order (a key equal to an
-// earlier one replaces its value and keeps its place); it writes a
-// *dart.LinkedMap as a map in its order.
-type orderedStandardMessageCodec struct {
-	StandardMessageCodec
-}
-
-func newOrderedStandardMessageCodec() *orderedStandardMessageCodec {
-	c := &orderedStandardMessageCodec{}
-	c.SetSelf(c)
-	return c
-}
-
-func (c *orderedStandardMessageCodec) WriteValue(buffer *foundation.WriteBuffer, value any) {
-	if m, ok := value.(*dart.LinkedMap); ok && m != nil {
-		buffer.PutUint8(valueMap)
-		c.WriteSize(buffer, m.Len())
-		for _, e := range m.Entries() {
-			c.WriteValue(buffer, e.Key)
-			c.WriteValue(buffer, e.Value)
-		}
-		return
-	}
-	c.StandardMessageCodec.WriteValue(buffer, value)
-}
-
-func (c *orderedStandardMessageCodec) ReadValueOfType(typ int, buffer *foundation.ReadBuffer) any {
-	if typ == valueMap {
-		length := c.ReadSize(buffer)
-		result := &dart.LinkedMap{}
-		for range length {
-			key := c.ReadValue(buffer)
-			result.Set(key, c.ReadValue(buffer))
-		}
-		return result
-	}
-	return c.StandardMessageCodec.ReadValueOfType(typ, buffer)
-}
 
 // RestorationManagerOverridable is what a type extending
 // RestorationManager may override (it calls Construct with itself).
@@ -249,7 +210,7 @@ func (m *RestorationManager) decodeRestorationData(data []byte) *dart.LinkedMap 
 	if data == nil {
 		return nil
 	}
-	decoded := newOrderedStandardMessageCodec().DecodeMessage(data)
+	decoded := NewStandardMessageCodec().DecodeMessage(data)
 	if decoded == nil {
 		return nil
 	}
@@ -262,7 +223,7 @@ func (m *RestorationManager) decodeRestorationData(data []byte) *dart.LinkedMap 
 }
 
 func encodeRestorationData(data *dart.LinkedMap) []byte {
-	return newOrderedStandardMessageCodec().EncodeMessage(data)
+	return NewStandardMessageCodec().EncodeMessage(data)
 }
 
 // ScheduleSerializationFor is called by a RestorationBucket to request
@@ -825,7 +786,7 @@ func DebugIsSerializableForRestoration(object any) (result bool) {
 			result = false
 		}
 	}()
-	newOrderedStandardMessageCodec().EncodeMessage(object)
+	NewStandardMessageCodec().EncodeMessage(object)
 	return true
 }
 

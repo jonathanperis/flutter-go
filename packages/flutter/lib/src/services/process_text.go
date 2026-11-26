@@ -4,8 +4,6 @@ package services
 // 3.50.1).
 
 import (
-	"sort"
-
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/foundation"
 	"github.com/jonathanperis/flutter-go/src/async"
 	"github.com/jonathanperis/flutter-go/src/dart"
@@ -55,12 +53,11 @@ func (s *DefaultProcessTextService) SetChannel(newChannel *MethodChannel) {
 }
 
 // QueryTextActions asks the platform for its text processing actions (an
-// empty list if it returns null or fails). Divergence: Dart lists the
-// actions in the order of the platform's map; Go's decoded map has no
-// order, so they are sorted by id.
+// empty list if it returns null or fails), in the order of the platform's
+// map.
 func (s *DefaultProcessTextService) QueryTextActions() async.Future[[]ProcessTextAction] {
 	return async.Async(func() []ProcessTextAction {
-		rawResults, ok := func() (raw map[any]any, ok bool) {
+		rawResults, ok := func() (raw *dart.LinkedMap, ok bool) {
 			defer func() {
 				if recover() != nil {
 					raw, ok = nil, false
@@ -70,19 +67,14 @@ func (s *DefaultProcessTextService) QueryTextActions() async.Future[[]ProcessTex
 			if result == nil {
 				return nil, false
 			}
-			return result.(map[any]any), true
+			return result.(*dart.LinkedMap), true
 		}()
 		if !ok {
 			return []ProcessTextAction{}
 		}
-		ids := make([]string, 0, len(rawResults))
-		for id := range rawResults {
-			ids = append(ids, id.(string))
-		}
-		sort.Slice(ids, func(i, j int) bool { return dart.CompareStrings(ids[i], ids[j]) < 0 })
-		actions := make([]ProcessTextAction, 0, len(ids))
-		for _, id := range ids {
-			actions = append(actions, ProcessTextAction{ID: id, Label: rawResults[id].(string)})
+		actions := make([]ProcessTextAction, 0, rawResults.Len())
+		for id, label := range rawResults.Entries() {
+			actions = append(actions, ProcessTextAction{ID: id.(string), Label: label.(string)})
 		}
 		return actions
 	})

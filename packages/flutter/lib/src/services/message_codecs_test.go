@@ -9,8 +9,11 @@ package services_test
 //     separate offset; ported as decoding a sub-slice.
 //   - JSON "should preserve UTF-8 encoding and ByteData bounds across
 //     encoder chunks": ported with a sub-slice for the padded view.
-//   - "should encode and decode composite message" decodes Dart's map
-//     {'a': 'nested', null: {}} into a Go map[any]any (nil is a valid key).
+//
+// Maps: Dart's map literals are *dart.LinkedMap (dart.NewLinkedMapOf), the
+// type the codecs decode maps to; deepEquals compares maps as
+// message_codecs_testing.dart's deepEqualsMap does (by key, in any order).
+// The insertion-order tests at the end are own tests.
 
 import (
 	"errors"
@@ -116,35 +119,37 @@ func deepEquals(a, b any) bool {
 		return x == rb.Float() && math.Signbit(x) == math.Signbit(rb.Float())
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		return rb.CanInt() && ra.Int() == rb.Int()
-	case reflect.Slice, reflect.Array:
-		if ra.Kind() == reflect.Slice && ra.Type().Elem().Kind() == reflect.Struct { // []MapEntry
-			m := map[any]any{}
-			for i := range ra.Len() {
-				m[ra.Index(i).Field(0).Interface()] = ra.Index(i).Field(1).Interface()
-			}
-			return deepEquals(m, b)
+	}
+	if ea, ok := mapEntriesOf(a); ok {
+		eb, ok := mapEntriesOf(b)
+		if !ok || len(ea) != len(eb) {
+			return false
 		}
+		for _, e := range ea {
+			var w any
+			found := false
+			if mb, isLinked := b.(*dart.LinkedMap); isLinked {
+				w, found = mb.Get(e.Key)
+			} else {
+				for _, f := range eb {
+					if deepEquals(e.Key, f.Key) {
+						w, found = f.Value, true
+					}
+				}
+			}
+			if !found || !deepEquals(e.Value, w) {
+				return false
+			}
+		}
+		return true
+	}
+	switch ra.Kind() {
+	case reflect.Slice, reflect.Array:
 		if rb.Kind() != reflect.Slice || ra.Len() != rb.Len() {
 			return false
 		}
 		for i := range ra.Len() {
 			if !deepEquals(ra.Index(i).Interface(), rb.Index(i).Interface()) {
-				return false
-			}
-		}
-		return true
-	case reflect.Map:
-		if rb.Kind() != reflect.Map || ra.Len() != rb.Len() {
-			return false
-		}
-		for _, k := range ra.MapKeys() {
-			var vb reflect.Value
-			for _, kb := range rb.MapKeys() {
-				if deepEquals(k.Interface(), kb.Interface()) {
-					vb = rb.MapIndex(kb)
-				}
-			}
-			if !vb.IsValid() || !deepEquals(ra.MapIndex(k).Interface(), vb.Interface()) {
 				return false
 			}
 		}
@@ -187,8 +192,8 @@ func TestStringCodecByteDataWithOffset(t *testing.T) {
 
 func TestStandardMethodCodecShouldEncodeAndDecodeObjectsProducedFromCodec(t *testing.T) {
 	messageCodec := services.NewStandardMessageCodec()
-	data := messageCodec.EncodeMessage(map[any]any{"foo": true, 3: "fizz"})
-	if got := messageCodec.DecodeMessage(data); !deepEquals(got, map[any]any{"foo": true, 3: "fizz"}) {
+	data := messageCodec.EncodeMessage(dart.NewLinkedMapOf("foo", true, 3, "fizz"))
+	if got := messageCodec.DecodeMessage(data); !deepEquals(got, dart.NewLinkedMapOf("foo", true, 3, "fizz")) {
 		t.Fatalf("got %v", got)
 	}
 }
@@ -269,7 +274,7 @@ func TestJSONMessageCodecShouldEncodeAndDecodeSimpleMessages(t *testing.T) {
 func TestJSONMessageCodecShouldEncodeAndDecodeCompositeMessage(t *testing.T) {
 	message := []any{nil, true, false, -707, -7000000007, -3.14, "", "hello",
 		[]any{"nested", []any{}},
-		map[string]any{"a": "nested", "b": map[string]any{}},
+		dart.NewLinkedMapOf("a", "nested", "b", &dart.LinkedMap{}),
 		"world",
 	}
 	checkEncodeDecode[any](t, services.JSONMessageCodec{}, message)
@@ -330,7 +335,7 @@ func TestStandardMessageCodecShouldEncodeAndDecodeCompositeMessage(t *testing.T)
 		special,
 		special32,
 		[]any{"nested", []any{}},
-		map[any]any{"a": "nested", nil: map[any]any{}},
+		dart.NewLinkedMapOf("a", "nested", nil, &dart.LinkedMap{}),
 		"world",
 	}
 	checkEncodeDecode[any](t, services.NewStandardMessageCodec(), message)
@@ -454,7 +459,7 @@ func TestStandardMessageCodecDecodedTypes(t *testing.T) {
 	decoded := standard.DecodeMessage(standard.EncodeMessage([]any{int8(1), int64(1) << 40, float32(1.5), []byte{1},
 		[]int32{1}, []int64{1}, []float32{1}, []float64{1}, map[string]int{"a": 1}, []string{"x"}}))
 	want := []string{"[]interface {}", "int", "int", "float64", "[]uint8", "[]int32", "[]int64", "[]float32",
-		"[]float64", "map[interface {}]interface {}", "[]interface {}"}
+		"[]float64", "*dart.LinkedMap", "[]interface {}"}
 	if got := reflect.TypeOf(decoded).String(); got != want[0] {
 		t.Fatalf("got %s", got)
 	}
@@ -491,10 +496,10 @@ func TestStandardMessageCodecErrors(t *testing.T) {
 	if got := standard.DecodeMessage(append([]byte{8, 255, 2, 0, 0, 0}, make([]byte, 2)...)); len(got.([]byte)) != 2 {
 		t.Errorf("got %v", got)
 	}
-	// A key Go can't hash.
-	r := panicOf(func() { standard.DecodeMessage([]byte{13, 1, 12, 0, 0}) })
-	if _, ok := r.(dart.UnsupportedError); !ok {
-		t.Errorf("got %#v", r)
+	// A list key: Dart compares lists by identity, so two equal lists are
+	// two keys.
+	if got := standard.DecodeMessage([]byte{13, 2, 12, 0, 1, 12, 0, 2}); dart.ToString(got) != "{[]: true, []: false}" {
+		t.Errorf("got %v", got)
 	}
 	// writeSize's assert.
 	if r := panicOf(func() { standard.WriteSize(foundation.NewWriteBuffer(), -1) }); r == nil {
@@ -545,7 +550,7 @@ func TestStandardMessageCodecSubclass(t *testing.T) {
 	if !reflect.DeepEqual(encoded, []byte{12, 2, 128, 3, 1, 0, 0, 0, 3, 2, 0, 0, 0, 13, 1, 7, 1, 'p', 128, 3, 3, 0, 0, 0, 3, 4, 0, 0, 0}) {
 		t.Fatalf("got % x", encoded)
 	}
-	if got := c.DecodeMessage(encoded); !reflect.DeepEqual(got, []any{point{1, 2}, map[any]any{"p": point{3, 4}}}) {
+	if got := c.DecodeMessage(encoded); !deepEquals(got, []any{point{1, 2}, map[any]any{"p": point{3, 4}}}) {
 		t.Fatalf("got %v", got)
 	}
 	// Through a method codec.

@@ -7,7 +7,6 @@ package services
 import (
 	"fmt"
 	"iter"
-	"maps"
 	"runtime"
 	"slices"
 	"strconv"
@@ -78,21 +77,21 @@ func NewTextEditingValue(opts ...TextEditingValueOptions) TextEditingValue {
 var TextEditingValueEmpty = NewTextEditingValue()
 
 // NewTextEditingValueFromJSON is TextEditingValue.fromJSON.
-func NewTextEditingValueFromJSON(encoded map[string]any) TextEditingValue {
-	text := encoded["text"].(string)
+func NewTextEditingValueFromJSON(encoded *dart.LinkedMap) TextEditingValue {
+	text := encoded.Lookup("text").(string)
 	intOr := func(key string) int {
-		if v, ok := encoded[key].(int); ok {
+		if v, ok := encoded.Lookup(key).(int); ok {
 			return v
 		}
 		return -1
 	}
 	affinity := ui.TextAffinityDownstream
-	if s, ok := encoded["selectionAffinity"].(string); ok {
+	if s, ok := encoded.Lookup("selectionAffinity").(string); ok {
 		if a := toTextAffinity(&s); a != nil {
 			affinity = *a
 		}
 	}
-	directional, _ := encoded["selectionIsDirectional"].(bool)
+	directional, _ := encoded.Lookup("selectionIsDirectional").(bool)
 	selection := NewTextSelection(intOr("selectionBase"), intOr("selectionExtent"),
 		TextSelectionOptions{Affinity: &affinity, IsDirectional: directional})
 	composing := ui.NewTextRange(intOr("composingBase"), intOr("composingExtent"))
@@ -903,7 +902,7 @@ type TextInputClient interface {
 	UpdateEditingValue(value TextEditingValue)
 	PerformAction(action TextInputAction)
 	InsertContent(content KeyboardInsertedContent)
-	PerformPrivateCommand(action string, data map[string]any)
+	PerformPrivateCommand(action string, data *dart.LinkedMap)
 	UpdateFloatingCursor(point RawFloatingCursorPoint)
 	ShowAutocorrectionPromptRect(start, end int)
 	OnFocusReceived() bool
@@ -1288,16 +1287,16 @@ func numToDouble(v any) float64 {
 	panic(dart.TypeError{Message: fmt.Sprintf("type '%T' is not a subtype of type 'num' in type cast", v)})
 }
 
-func toTextPoint(state FloatingCursorDragState, encoded map[string]any) RawFloatingCursorPoint {
-	if encoded["X"] == nil {
+func toTextPoint(state FloatingCursorDragState, encoded *dart.LinkedMap) RawFloatingCursorPoint {
+	if encoded.Lookup("X") == nil {
 		panic(dart.NewAssertionError("You must provide a value for the horizontal location of the floating cursor."))
 	}
-	if encoded["Y"] == nil {
+	if encoded.Lookup("Y") == nil {
 		panic(dart.NewAssertionError("You must provide a value for the vertical location of the floating cursor."))
 	}
 	offset := ui.OffsetZero
 	if state == FloatingCursorDragStateUpdate {
-		offset = ui.NewOffset(numToDouble(encoded["X"]), numToDouble(encoded["Y"]))
+		offset = ui.NewOffset(numToDouble(encoded.Lookup("X")), numToDouble(encoded.Lookup("Y")))
 	}
 	return NewRawFloatingCursorPoint(state, RawFloatingCursorPointOptions{Offset: &offset})
 }
@@ -1553,11 +1552,10 @@ func (t *TextInput) handleTextInputInvocation(methodCall MethodCall) any {
 	if method == "TextInputClient.updateEditingStateWithTag" {
 		client := t.currentConnection.client
 		scope := client.CurrentAutofillScope()
-		editingValue := args[1].(map[string]any)
-		// Decoded JSON maps lose their key order: the tags are visited in
-		// sorted order.
-		for _, tag := range slices.Sorted(maps.Keys(editingValue)) {
-			textEditingValue := NewTextEditingValueFromJSON(editingValue[tag].(map[string]any))
+		editingValue := args[1].(*dart.LinkedMap)
+		for rawTag, value := range editingValue.Entries() {
+			tag := rawTag.(string)
+			textEditingValue := NewTextEditingValueFromJSON(value.(*dart.LinkedMap))
 			if scope == nil {
 				continue
 			}
@@ -1581,22 +1579,22 @@ func (t *TextInput) handleTextInputInvocation(methodCall MethodCall) any {
 
 	switch method {
 	case "TextInputClient.updateEditingState":
-		value := NewTextEditingValueFromJSON(args[1].(map[string]any))
+		value := NewTextEditingValueFromJSON(args[1].(*dart.LinkedMap))
 		t.updateEditingValue(value, platformTextInputControlInstance)
 	case "TextInputClient.updateEditingStateWithDeltas":
 		deltaClient, ok := t.currentConnection.client.(DeltaTextInputClient)
 		if !ok {
 			panic(dart.NewAssertionError("You must be using a DeltaTextInputClient if TextInputConfiguration.enableDeltaModel is set to true"))
 		}
-		encoded := args[1].(map[string]any)
+		encoded := args[1].(*dart.LinkedMap)
 		deltas := []TextEditingDelta{}
-		for _, encodedDelta := range encoded["deltas"].([]any) {
-			deltas = append(deltas, NewTextEditingDeltaFromJSON(encodedDelta.(map[string]any)))
+		for _, encodedDelta := range encoded.Lookup("deltas").([]any) {
+			deltas = append(deltas, NewTextEditingDeltaFromJSON(encodedDelta.(*dart.LinkedMap)))
 		}
 		deltaClient.UpdateEditingValueWithDeltas(deltas)
 	case "TextInputClient.performAction":
 		if args[1].(string) == "TextInputAction.commitContent" {
-			content := NewKeyboardInsertedContentFromJSON(args[2].(map[string]any))
+			content := NewKeyboardInsertedContentFromJSON(args[2].(*dart.LinkedMap))
 			t.currentConnection.client.InsertContent(content)
 		} else {
 			t.currentConnection.client.PerformAction(toTextInputAction(args[1].(string)))
@@ -1611,15 +1609,15 @@ func (t *TextInput) handleTextInputInvocation(methodCall MethodCall) any {
 			t.currentConnection.client.PerformSelector(selector)
 		}
 	case "TextInputClient.performPrivateCommand":
-		firstArg := args[1].(map[string]any)
-		data := map[string]any{}
-		if firstArg["data"] != nil {
-			data = firstArg["data"].(map[string]any)
+		firstArg := args[1].(*dart.LinkedMap)
+		data := &dart.LinkedMap{}
+		if firstArg.Lookup("data") != nil {
+			data = firstArg.Lookup("data").(*dart.LinkedMap)
 		}
-		t.currentConnection.client.PerformPrivateCommand(firstArg["action"].(string), data)
+		t.currentConnection.client.PerformPrivateCommand(firstArg.Lookup("action").(string), data)
 	case "TextInputClient.updateFloatingCursor":
 		t.currentConnection.client.UpdateFloatingCursor(
-			toTextPoint(toTextCursorAction(args[1].(string)), args[2].(map[string]any)))
+			toTextPoint(toTextCursorAction(args[1].(string)), args[2].(*dart.LinkedMap)))
 	case "TextInputClient.onConnectionClosed":
 		t.currentConnection.client.ConnectionClosed()
 	case "TextInputClient.showAutocorrectionPromptRect":

@@ -22,8 +22,8 @@ class WithToJson {
 
 String hex(int b) => b.toRadixString(16).padLeft(2, '0');
 
-// A canonical text of a decoded value: maps sorted by key text (Go maps
-// have no order), strings as UTF-16 code units, doubles by toString.
+// A canonical text of a decoded value: maps in their iteration order,
+// strings as UTF-16 code units, doubles by toString.
 String describe(Object? v) {
   if (v == null) {
     return 'null';
@@ -46,7 +46,7 @@ String describe(Object? v) {
   if (v is Map) {
     final List<String> entries = <String>[
       for (final MapEntry<Object?, Object?> e in v.entries) '${describe(e.key)}=${describe(e.value)}',
-    ]..sort();
+    ];
     return '{${entries.join(',')}}';
   }
   return 'other:${v.runtimeType}';

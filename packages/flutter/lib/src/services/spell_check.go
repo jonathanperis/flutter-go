@@ -9,6 +9,7 @@ import (
 
 	ui "github.com/jonathanperis/flutter-go/engine/src/flutter/lib/ui/go"
 	"github.com/jonathanperis/flutter-go/src/async"
+	"github.com/jonathanperis/flutter-go/src/dart"
 )
 
 // SuggestionSpan is a range of misspelled text and the spell check
@@ -146,14 +147,14 @@ func (s *DefaultSpellCheckService) FetchSpellCheckSuggestions(locale ui.Locale, 
 		}
 		suggestionSpans := []SuggestionSpan{}
 		for _, raw := range rawResults {
-			resultMap := raw.(map[any]any)
-			rawSuggestions := resultMap["suggestions"].([]any)
+			resultMap := raw.(*dart.LinkedMap)
+			rawSuggestions := resultMap.Lookup("suggestions").([]any)
 			suggestions := make([]string, len(rawSuggestions))
 			for i, v := range rawSuggestions {
 				suggestions[i] = v.(string)
 			}
 			suggestionSpans = append(suggestionSpans, SuggestionSpan{
-				Range:       ui.NewTextRange(resultMap["startIndex"].(int), resultMap["endIndex"].(int)),
+				Range:       ui.NewTextRange(resultMap.Lookup("startIndex").(int), resultMap.Lookup("endIndex").(int)),
 				Suggestions: suggestions,
 			})
 		}

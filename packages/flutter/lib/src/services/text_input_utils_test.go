@@ -10,6 +10,7 @@ import (
 	ui "github.com/jonathanperis/flutter-go/engine/src/flutter/lib/ui/go"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/services"
 	"github.com/jonathanperis/flutter-go/src/async"
+	"github.com/jonathanperis/flutter-go/src/dart"
 	"github.com/jonathanperis/flutter-go/src/pub/vector_math"
 )
 
@@ -86,7 +87,7 @@ type fakeTextInputClient struct {
 	services.TextInputClientMixin
 	latestMethodCall          string
 	performedSelectors        []string
-	latestPrivateCommandData  map[string]any
+	latestPrivateCommandData  *dart.LinkedMap
 	currentTextEditingValue   services.TextEditingValue
 	latestFloatingCursorPoint *services.RawFloatingCursorPoint
 }
@@ -102,7 +103,7 @@ func (c *fakeTextInputClient) CurrentAutofillScope() services.AutofillScope { re
 func (c *fakeTextInputClient) PerformAction(services.TextInputAction) {
 	c.latestMethodCall = "performAction"
 }
-func (c *fakeTextInputClient) PerformPrivateCommand(action string, data map[string]any) {
+func (c *fakeTextInputClient) PerformPrivateCommand(action string, data *dart.LinkedMap) {
 	c.latestMethodCall = "performPrivateCommand"
 	c.latestPrivateCommandData = data
 }

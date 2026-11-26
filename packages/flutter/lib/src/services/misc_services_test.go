@@ -117,7 +117,7 @@ func TestUndoManagerSetUndoStateMessage(t *testing.T) {
 		defer messenger().SetMockMethodCallHandler(services.SystemChannels.UndoManager, nil)
 		services.UndoManager.SetUndoState(services.UndoManagerSetUndoStateOptions{CanRedo: true})
 		async.FutureDelayed[any](0, nil).Await()
-		expect(len(log) == 1 && fmt.Sprint(log[0].Arguments) == "map[canRedo:true canUndo:false]", "log %v", log)
+		expect(len(log) == 1 && fmt.Sprint(log[0].Arguments) == "{canUndo: false, canRedo: true}", "log %v", log)
 	})
 }
 
@@ -388,10 +388,10 @@ func TestMouseCursorManager(t *testing.T) {
 		expect(m.DebugDeviceActiveCursor(2) == services.MouseCursor(c.Grab), "device 2 %v", m.DebugDeviceActiveCursor(2))
 		async.FutureDelayed[any](0, nil).Await()
 		expect(slices.Equal(log, []string{
-			"activateSystemCursor map[device:1 kind:click]",
-			"activateSystemCursor map[device:1 kind:basic]",
-			"activateSystemCursor map[device:2 kind:grab]",
-			"activateSystemCursor map[device:1 kind:basic]",
+			"activateSystemCursor {device: 1, kind: click}",
+			"activateSystemCursor {device: 1, kind: basic}",
+			"activateSystemCursor {device: 2, kind: grab}",
+			"activateSystemCursor {device: 1, kind: basic}",
 		}), "log %q", log)
 	})
 }
