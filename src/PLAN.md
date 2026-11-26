@@ -1214,3 +1214,100 @@ The standing goal is now full API parity with Flutter 3.50.1's Dart layer
   inactive enabling frames, duplicate event-loop callbacks, banner
   microsecond padding, muting from inside a tick, orCancel first read after
   a cancel, the tester's clock epoch.
+### animation (P3): the rest of the library, and the ad-hoc Controller replaced
+- `packages/flutter/lib/src/animation` now ports all of 3.50.1's
+  animation library, one Go file per Dart file: animation.dart
+  (`Animation[T]` interface + `AnimationBase[T]`, `AnimationStatus` with
+  its predicates, `Animation.fromValueListenable`, `drive` as
+  `animation.Drive`), animation_controller.dart (`AnimationController`
+  with forward/reverse/toggle/animateTo/animateBack/repeat/fling/
+  animateWith/animateBackWith/stop/resync/reset/velocity/dispose,
+  `unbounded`, `AnimationBehavior`, `_InterpolationSimulation`,
+  `_RepeatingSimulation`), animations.dart (kAlwaysComplete/Dismissed,
+  AlwaysStoppedAnimation, AnimationWithParentMixin, ProxyAnimation,
+  ReverseAnimation, CurvedAnimation, TrainHoppingAnimation,
+  CompoundAnimation, AnimationMean/Max/Min with dart:math's max/min),
+  listener_helpers.dart (the four mixins, with Dart's HashedObserverList /
+  ObserverList semantics and the "animation library" error reports),
+  tween.dart (Animatable, Tween with Dart's dynamic `begin + (end - begin)
+  * t` through the operator methods, ReverseTween, Color/Size/Rect/Int/
+  Step/Constant/CurveTween, chain/animate/evaluate, fromCallback),
+  tween_sequence.dart and animation_style.dart (incl. `_LerpedCurve`).
+  Divergences are listed in API_MAPPING (self pattern, `Construct` for
+  subclasses, options structs, `Tween[*ui.Color]` for nullable tweens,
+  `ReverseTween(&x.Tween)`, the `SemanticsDisableAnimations` hook).
+- **Migration:** `animation.Controller`/`animate_with.go` are gone.
+  widgets' AnimatedBox uses `AnimationController` (`value = 0; forward()`,
+  as ImplicitlyAnimatedWidget), ScrollController's ballistic and driven
+  activities use `AnimationController.unbounded` + `animateWith` /
+  `animateTo`. Every existing difftest (animations, fling, bouncing,
+  drag_fling, lists, editing, repaint...) passes with unchanged
+  references.
+- **Found (behavior the old Controller got wrong, invisible to the old
+  difftests):** an interpolation is done only once `elapsed > duration`,
+  so a controller reaches its end value at `elapsed == duration` but
+  reports completed (and stops its ticker) on the next frame; the old
+  controller completed at `t == 1`. Flutter's `animateWith` doesn't notify
+  listeners when it starts (the old one did). The scroll difftests are
+  unaffected: the extra frame and the initial notification set the same
+  offsets. flutter-go's own old test of the reverse timing was corrected
+  accordingly.
+- **Found by fmacheck:** `_RepeatingSimulation._initialT`'s product was
+  stored unrounded and added later (`timeInSeconds + _initialT`); wrapped.
+  foundation's `dartToString` prints a `*time.Duration` with Go's format
+  ("1s"): AnimationStyle passes the dereferenced Duration to its
+  DiagnosticsProperty (Dart prints "0:00:01.000000"). A foundation fix
+  (deref nullable Durations) would help other ports.
+- Flutter's tests: animation_controller_test 48/48, animations_test
+  18/18, tween_test 15/18 (BorderTween, Matrix4Tween, BorderRadiusTween
+  skipped: painting/vector_math not ported), listener_helpers_test 2/2,
+  animation_controller_listener_test 1/1, animation_from_listener_test
+  3/3, iteration_patterns_test 4/4, futures_test 6/6 (asStream not
+  ported), animation_style_test 8/8; animation_sheet_test (3) and
+  live_binding_test (2) not ported (flutter_test goldens and
+  LiveTestWidgetsFlutterBinding). All share one plain SchedulerBinding per
+  process; setUp cancels the transient callbacks earlier tests leave (Dart
+  gives each file its own isolate). Own tests: listener-list semantics,
+  lazy start/stop, error report details, subclassing through `Construct`,
+  null transformer results, typedef signatures, compile-time conformance
+  of every type to Animation/Animatable/TweenSelf.
+- **Difftests**, compared line for line with doubles in Dart's shortest
+  round-trip form (so bit for bit), identical on the first run except the
+  harness's end-of-body microtask flush:
+  `difftest/animation_controller_test.go` + `flutter/test/
+  animation_controller_test.dart`, 12 scenes, 1,861 lines through
+  flutter_test's pump: forward/reverse/toggle with reverseDuration and
+  `from`, animateTo/animateBack with 8 curves (incl. elastic/bounce/
+  overshooting), already-at-target and zero durations, interruptions,
+  repeat (reverse, min/max, count, period, initial value mid-range, min ==
+  max, wider bounds), fling (default, negative, custom spring, wide
+  bounds, velocity 0), animateWith/animateBackWith (gravity, spring,
+  friction), unbounded controllers, stop(canceled: false), value
+  clamping, resync (incl. to a muted ticker: "silenced"), dispose,
+  timeDilation 3 and 0.37, AnimationBehavior normal vs preserve under
+  reduced motion (animateTo at 5%, fling at 200×, repeat), CurvedAnimation
+  with the reverse-curve direction lock and curve changes,
+  TrainHoppingAnimation (crossing trains, ties in both modes, equal
+  starts, status dedupe after a hop), ProxyAnimation parent switches,
+  ReverseAnimation, AnimationMean/Max/Min (incl. ±0.0/NaN for doubles,
+  ints), every toString form (hashes masked) and TickerFuture
+  completion/orCancel order. `difftest/tween_test.go` + `flutter/test/
+  tween_test.dart`, 2,441 lines: Tween<double> (incl. ∞), Tween<Offset>
+  and Tween<Size> through the dynamic operators, ColorTween (nulls, alpha,
+  Display P3 → sRGB), Size/RectTween with nulls, Int/StepTween rounding
+  (negative ranges, extrapolation), ReverseTween, ConstantTween,
+  CurveTween, chains, fromCallback, tween.animate/drive, TweenSequence
+  (uneven weights incl. 1e-3) and FlippedTweenSequence, a color
+  sequence, AnimationStyle.lerp (durations, lerped curves, nulls, equal
+  curves, lerps of lerps) and the lerp error messages.
+- Mutations: 128 valid on the new code, 127 caught, 1 equivalent
+  (dart:math min's `a == 0 && b.isNegative` clause: after the `a == 0.0`
+  return it is unreachable for doubles). Caught only after adding
+  difftest cases: Duration × fraction rounding (1000us × 2/3), the
+  unbounded controller's infinite range, repeat's `>=` exit tie, fling
+  with velocity 0, TrainHopping's `<=`/`>=` ties, its status dedupe after
+  a hop and its equal-values start, dart:math max/min on ±0, Animatable's
+  default toString, AnimationStyle.lerp of equal curves/durations and of
+  lerped curves (field-wise ==).
+- Parity: 265 → 302 of 2,889 exposed, 200 → 238 tested; animation
+  17 → 54 of 54 (all tested).

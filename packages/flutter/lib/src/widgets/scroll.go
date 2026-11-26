@@ -42,7 +42,7 @@ type ScrollController struct {
 	list    *r.RenderFixedExtentList
 	initial float64
 	vsync   scheduler.TickerProvider // set when attached
-	anim    *animation.Controller
+	anim    *animation.AnimationController
 	// DevicePixelRatio sets physics tolerances (Flutter's toleranceFor).
 	// flutter_test uses 3; 0 means 1.
 	DevicePixelRatio float64
@@ -259,7 +259,7 @@ func (c *ScrollController) goBallistic(v float64) {
 	if sim == nil {
 		return
 	}
-	a := animation.NewUnboundedController(c.vsync, c.list.ScrollOffset())
+	a := animation.NewAnimationControllerUnbounded(c.vsync, animation.AnimationControllerUnboundedOptions{Value: c.list.ScrollOffset()})
 	c.anim = a
 	a.AddListener(func() {
 		// BallisticScrollActivity.applyMoveTo: stop if the physics refuse.
@@ -267,8 +267,8 @@ func (c *ScrollController) goBallistic(v float64) {
 			c.goIdle()
 		}
 	})
-	a.AddStatusListener(func(s animation.Status) {
-		if s == animation.Completed && c.anim == a {
+	a.AddStatusListener(func(s animation.AnimationStatus) {
+		if s == animation.AnimationStatusCompleted && c.anim == a {
 			c.goBallistic(0) // _end: settle (e.g. spring back into range)
 		}
 	})
@@ -299,19 +299,19 @@ func (c *ScrollController) AnimateTo(offset float64, d time.Duration, curve anim
 		return
 	}
 	c.goIdle()
-	a := animation.NewUnboundedController(c.vsync, c.list.ScrollOffset())
+	a := animation.NewAnimationControllerUnbounded(c.vsync, animation.AnimationControllerUnboundedOptions{Value: c.list.ScrollOffset()})
 	c.anim = a
 	a.AddListener(func() {
 		if c.setPixels(a.Value()) != 0 {
 			c.goIdle()
 		}
 	})
-	a.AddStatusListener(func(s animation.Status) {
-		if s == animation.Completed && c.anim == a {
+	a.AddStatusListener(func(s animation.AnimationStatus) {
+		if s == animation.AnimationStatusCompleted && c.anim == a {
 			c.goBallistic(0)
 		}
 	})
-	a.AnimateTo(offset, d, curve)
+	a.AnimateTo(offset, animation.AnimateToOptions{Duration: &d, Curve: curve})
 }
 
 // ---------------------------------------------------------------------------

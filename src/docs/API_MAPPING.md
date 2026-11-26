@@ -443,3 +443,61 @@ Each divergence is listed here when it is introduced.
 - curves: a curve that overrides `transform` itself (as `Split` does)
   defines `Transform` on its own type; `TransformInternal` overrides are
   reached through `self`.
+- animation: `Animation<T>` is an interface plus the embeddable
+  `AnimationBase[T]` (self pattern); the generic method `drive<U>` is the
+  function `animation.Drive[U](animation, child)`. The listener mixins
+  (`AnimationLazyListenerMixin`, `AnimationEagerListenerMixin`,
+  `AnimationLocalListenersMixin`, `AnimationLocalStatusListenersMixin`,
+  `AnimationWithParentMixin`) are embeddable structs with the Dart names
+  (their Dart names already end in Mixin); each calls the members it leaves
+  abstract through `SetSelf`. Local listener lists keep Dart's
+  HashedObserverList (value listeners: one call per notification however
+  often added) and ObserverList (status listeners: duplicates called
+  twice) semantics, comparing with `dart.FunctionsEqual`.
+- animation: `AnimationController` is a struct Flutter extends: a type
+  extending it calls `c.Construct(c, vsync, opts)` (or
+  `ConstructUnbounded`); `NewAnimationController(vsync, opts)` and
+  `NewAnimationControllerUnbounded` are the two constructors (vsync,
+  required, is positional). The setter `value=` is `SetValue`; nullable
+  `duration`/`reverseDuration` are `*time.Duration` fields; methods with
+  named parameters take `ForwardOptions`, `ReverseOptions`,
+  `ToggleOptions`, `AnimateToOptions`, `AnimateBackOptions`,
+  `RepeatOptions`, `FlingOptions`, `StopOptions` (nil `Canceled` is
+  Dart's default true). The mixins' @protected members (`NotifyListeners`,
+  `NotifyStatusListeners`, `ClearListeners`, `DidRegisterListener`...)
+  are exported. The controller's own algorithms
+  call its members directly (only `toString` and the Animation getters go
+  through self).
+- animation: `AnimationBehavior.normal` consults
+  `SemanticsBinding.instance.disableAnimations`; the semantics library is
+  not ported, so it reads the hook `animation.SemanticsDisableAnimations`
+  (false by default; tests set it where Flutter sets
+  `debugSemanticsDisableAnimations`).
+- animation: `Animatable<T>` is an interface plus `AnimatableBase[T]`;
+  `Animatable.fromCallback` is `NewAnimatableFromCallback`. `Tween<T>` is a
+  struct (Flutter extends it): `Begin`/`End` are `T`, so a nullable tween
+  has a pointer type argument (`ColorTween` is `Tween[*ui.Color]`; nil is
+  null), and a non-pointer `Tween[float64]` has no null ends. A type
+  extending Tween overrides `Lerp` and calls `SetSelf`.
+  `ReverseTween(parent)` takes the parent's embedded `*Tween[T]`
+  (`&intTween.Tween`, as `TickerProvider.CreateTicker` returns the
+  embedded `*Ticker`). `Tween.lerp`'s dynamic `begin + (end - begin) * t`
+  calls the types' `Add`/`Sub`/`Mul` operator methods by reflection
+  (float64 and int natively); a missing method or a result of the wrong
+  type is reported as Flutter reports Dart's NoSuchMethodError/TypeError
+  (the same FlutterError in debug builds).
+- animation: `AlwaysStoppedAnimation.value`, `CurvedAnimation.parent` and
+  `TrainHoppingAnimation.currentTrain` are methods (`Value()`, `Parent()`,
+  `CurrentTrain()`), since the Animation interfaces need them; the other
+  public fields (`Curve`, `ReverseCurve`, `IsDisposed`, `OnSwitchedTrain`,
+  `First`/`Next`, `ReverseAnimation.Parent`) are fields. `CompoundAnimation`
+  is embedded and set up with `Construct(self, first, next)`; `AnimationMax`
+  and `AnimationMin` take `T ~int | ~float64` (Dart's `num`) and use
+  dart:math's `max`/`min` rules (NaN, ±0). `kAlwaysCompleteAnimation` is
+  `KAlwaysCompleteAnimation`. `TweenSequenceItem`'s required named
+  parameters are positional in `NewTweenSequenceItem(tween, weight)`.
+- animation: `AnimationStyle` is used by pointer (it is Diagnosticable);
+  `==` is `Equal`, `copyWith` takes `CopyWithOptions`, `AnimationStyle.lerp`
+  and `AnimationStyle.noAnimation` are `AnimationStyleLerp` and
+  `AnimationStyleNoAnimation`. Curves compare by identity, except the
+  private `_LerpedCurve` (field-wise, as in Dart).

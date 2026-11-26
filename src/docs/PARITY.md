@@ -9,16 +9,16 @@ the same name declares them. Members and parameters are not counted yet, so
 the name. Names a library re-exports from a third-party package
 (foundation's package:listen) count for that library.
 
-**Total: 265 / 2889 exposed (9.2%), 200 tested.**
+**Total: 302 / 2889 exposed (10.5%), 238 tested.**
 
 | Flutter library | Go package directory | Declarations | Exposed | Tested |
 |---|---|---:|---:|---:|
 | `dart:ui` | `engine/src/flutter/lib/ui/go` | 195 | 28 (14%) | 19 |
 | `foundation` | `packages/flutter/lib/src/foundation` | 141 | 141 (100%) | 114 |
 | `physics` | `packages/flutter/lib/src/physics` | 12 | 12 (100%) | 11 |
-| `scheduler` | `packages/flutter/lib/src/scheduler` | 16 | 16 (100%) | 10 |
+| `scheduler` | `packages/flutter/lib/src/scheduler` | 16 | 16 (100%) | 11 |
 | `semantics` | `packages/flutter/lib/src/semantics` | 36 | 0 (0%) | 0 |
-| `animation` | `packages/flutter/lib/src/animation` | 54 | 17 (31%) | 17 |
+| `animation` | `packages/flutter/lib/src/animation` | 54 | 54 (100%) | 54 |
 | `services` | `packages/flutter/lib/src/services` | 211 | 4 (2%) | 1 |
 | `gestures` | `packages/flutter/lib/src/gestures` | 188 | 0 (0%) | 0 |
 | `painting` | `packages/flutter/lib/src/painting` | 134 | 0 (0%) | 0 |
@@ -49,7 +49,7 @@ the name. Names a library re-exports from a third-party package
 
 ## `scheduler`
 
-**Exposed (16):** `FrameCallback` (untested), `PerformanceModeRequestHandle`, `Priority`, `SchedulerBinding`, `SchedulerPhase`, `SchedulerServiceExtensions` (untested), `SchedulingStrategy` (untested), `TaskCallback` (untested), `Ticker`, `TickerCallback` (untested), `TickerCanceled`, `TickerFuture`, `TickerProvider` (untested), `debugAssertAllSchedulerVarsUnset`, `defaultSchedulingStrategy`, `timeDilation`
+**Exposed (16):** `FrameCallback` (untested), `PerformanceModeRequestHandle`, `Priority`, `SchedulerBinding`, `SchedulerPhase`, `SchedulerServiceExtensions` (untested), `SchedulingStrategy` (untested), `TaskCallback` (untested), `Ticker`, `TickerCallback`, `TickerCanceled`, `TickerFuture`, `TickerProvider` (untested), `debugAssertAllSchedulerVarsUnset`, `defaultSchedulingStrategy`, `timeDilation`
 
 **Missing (0):** none
 
@@ -61,9 +61,9 @@ the name. Names a library re-exports from a third-party package
 
 ## `animation`
 
-**Exposed (17):** `CatmullRomCurve`, `CatmullRomSpline`, `Cubic`, `Curve`, `Curve2D`, `Curve2DSample`, `Curves`, `ElasticInCurve`, `ElasticInOutCurve`, `ElasticOutCurve`, `FlippedCurve`, `Interval`, `ParametricCurve`, `SawTooth`, `Split`, `ThreePointCubic`, `Threshold`
+**Exposed (54):** `AlwaysStoppedAnimation`, `Animatable`, `AnimatableCallback`, `Animation`, `AnimationBehavior`, `AnimationController`, `AnimationEagerListenerMixin`, `AnimationLazyListenerMixin`, `AnimationLocalListenersMixin`, `AnimationLocalStatusListenersMixin`, `AnimationMax`, `AnimationMean`, `AnimationMin`, `AnimationStatus`, `AnimationStatusListener`, `AnimationStyle`, `AnimationWithParentMixin`, `CatmullRomCurve`, `CatmullRomSpline`, `ColorTween`, `CompoundAnimation`, `ConstantTween`, `Cubic`, `Curve`, `Curve2D`, `Curve2DSample`, `CurveTween`, `CurvedAnimation`, `Curves`, `ElasticInCurve`, `ElasticInOutCurve`, `ElasticOutCurve`, `FlippedCurve`, `FlippedTweenSequence`, `IntTween`, `Interval`, `ParametricCurve`, `ProxyAnimation`, `RectTween`, `ReverseAnimation`, `ReverseTween`, `SawTooth`, `SizeTween`, `Split`, `StepTween`, `ThreePointCubic`, `Threshold`, `TrainHoppingAnimation`, `Tween`, `TweenSequence`, `TweenSequenceItem`, `ValueListenableTransformer`, `kAlwaysCompleteAnimation`, `kAlwaysDismissedAnimation`
 
-**Missing (37):** `AlwaysStoppedAnimation`, `Animatable`, `AnimatableCallback`, `Animation`, `AnimationBehavior`, `AnimationController`, `AnimationEagerListenerMixin`, `AnimationLazyListenerMixin`, `AnimationLocalListenersMixin`, `AnimationLocalStatusListenersMixin`, `AnimationMax`, `AnimationMean`, `AnimationMin`, `AnimationStatus`, `AnimationStatusListener`, `AnimationStyle`, `AnimationWithParentMixin`, `ColorTween`, `CompoundAnimation`, `ConstantTween`, `CurveTween`, `CurvedAnimation`, `FlippedTweenSequence`, `IntTween`, `ProxyAnimation`, `RectTween`, `ReverseAnimation`, `ReverseTween`, `SizeTween`, `StepTween`, `TrainHoppingAnimation`, `Tween`, `TweenSequence`, `TweenSequenceItem`, `ValueListenableTransformer`, `kAlwaysCompleteAnimation`, `kAlwaysDismissedAnimation`
+**Missing (0):** none
 
 ## `services`
 
