@@ -583,15 +583,15 @@ func (c *stringCharacters) TakeLastWhile(test func(string) bool) Characters {
 	return c
 }
 
-// ToLowerCase is toLowerCase (Go's strings.ToLower: Unicode simple case
-// mapping, see the package's API notes).
+// ToLowerCase is toLowerCase (String.toLowerCase as the Dart VM maps it:
+// dart.StringToLowerCase).
 func (c *stringCharacters) ToLowerCase() Characters {
-	return newStringCharacters(strings.ToLower(c.string))
+	return newStringCharacters(dart.StringToLowerCase(c.string))
 }
 
-// ToUpperCase is toUpperCase (Go's strings.ToUpper).
+// ToUpperCase is toUpperCase (dart.StringToUpperCase).
 func (c *stringCharacters) ToUpperCase() Characters {
-	return newStringCharacters(strings.ToUpper(c.string))
+	return newStringCharacters(dart.StringToUpperCase(c.string))
 }
 
 func (c *stringCharacters) Equal(other Characters) bool {

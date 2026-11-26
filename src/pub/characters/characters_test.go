@@ -6,7 +6,7 @@ package characters
 // Skipped: nothing. Adapted: `Iterable` results are compared through
 // All(); the random walk uses a seeded Go generator (the Dart test seeds
 // dart:math's Random from Random()); toUpperCase/toLowerCase compare with
-// Go's strings.ToUpper/ToLower, which the port uses (see characters.go).
+// dart.StringToUpperCase/ToLowerCase (the VM.s mapping), which the port uses (see characters.go).
 
 import (
 	"fmt"
@@ -299,8 +299,8 @@ func expectGC(t *testing.T, random *rand.Rand, actual Characters, expected []str
 	check(t, !it.MoveBack(), "moveBack at start")
 	check(t, it.IsEmpty(), "it.isEmpty at start")
 
-	eqS(t, actual.ToUpperCase().String(), strings.ToUpper(text))
-	eqS(t, actual.ToLowerCase().String(), strings.ToLower(text))
+	eqS(t, actual.ToUpperCase().String(), dart.StringToUpperCase(text))
+	eqS(t, actual.ToLowerCase().String(), dart.StringToLowerCase(text))
 	eqS(t, actual.String(), text)
 
 	check(t, actual.ContainsAll(gc("")), "containsAll ''")
