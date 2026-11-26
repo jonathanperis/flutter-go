@@ -2219,7 +2219,7 @@ The standing goal is now full API parity with Flutter 3.50.1's Dart layer
   package file: it imports painting). WidgetSpan is stood in for by test
   placeholder spans built as WidgetSpan builds.
 - **Difftests (exact):** painting_text_painter — 51 scenes of
-  `difftest/painting_text_painter_scenes.json` (shared with Dart), 95
+  `difftest/painting_text_painter_scenes.json` (shared with Dart), 96
   layouts of one painter per scene at successive widths (so
   `_resizeToFit` and the adjusted-max-width relayout are exercised):
   size, intrinsics, baselines, preferredLineHeight, line metrics,
