@@ -522,4 +522,22 @@ func TestRestorationBucketDispatchesMemoryEvents(t *testing.T) {
 	}
 }
 
+func TestRestorationDisposeDropsPendingChildren(t *testing.T) {
+	ensureInitialized()
+	manager := newMockRestorationManager()
+	root := services.NewRestorationBucketRoot(&manager.RestorationManager, createRawDataSet())
+	parent := root.ClaimChild("p", "parent")
+	parent.ClaimChild("x", "first")
+	pending := parent.ClaimChild("x", "second") // waits for "x" to be given up
+	parent.Dispose()
+	manager.doSerialization()
+	// The pending child was dropped too: it has no manager any more.
+	pending.Write("v", 1)
+	check(t, !manager.updateScheduled, "a dropped pending child still schedules serialization")
+	// Adopting it back gives it the manager again.
+	root.AdoptChild(pending)
+	check(t, manager.updateScheduled, "adopted child not scheduled")
+	manager.doSerialization()
+}
+
 var _ = dart.NewLinkedMap

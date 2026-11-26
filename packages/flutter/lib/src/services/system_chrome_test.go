@@ -323,3 +323,20 @@ func TestSystemChromeReportsSetSystemUIOverlayStyleErrors(t *testing.T) {
 		expect(strings.Contains(errs[0].Context.String(), "while setting the system UI overlay style"), "context %v", errs[0].Context)
 	})
 }
+
+func TestSystemChromeOverlayStyleBackToLatestSendsNothing(t *testing.T) {
+	ensureInitialized()
+	log, done := logMethodCalls(services.SystemChannels.Platform)
+	defer done()
+	runAsync(t, func() {
+		services.SystemChrome.SetSystemUIOverlayStyle(services.SystemUiOverlayStyleLight)
+		idle()
+		*log = nil
+		// A different style queues a microtask; going back to the style
+		// already sent before it runs sends nothing.
+		services.SystemChrome.SetSystemUIOverlayStyle(services.SystemUiOverlayStyleDark)
+		services.SystemChrome.SetSystemUIOverlayStyle(services.SystemUiOverlayStyleLight)
+		idle()
+		expect(len(*log) == 0, "log %v", *log)
+	})
+}

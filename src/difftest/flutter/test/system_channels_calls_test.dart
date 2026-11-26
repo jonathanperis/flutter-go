@@ -156,6 +156,10 @@ void main() {
     SystemChrome.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle());
     await Future<void>.delayed(Duration.zero);
+    log.add('back to latest');
+    SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.dark);
+    SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle());
+    await Future<void>.delayed(Duration.zero);
 
     log.add('scene navigator');
     await step('pop', () => SystemNavigator.pop());

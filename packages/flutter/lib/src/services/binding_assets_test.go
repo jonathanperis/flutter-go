@@ -50,6 +50,9 @@ func TestBindingAddsRootBundleLicenses(t *testing.T) {
 		expect(slices.Equal(texts(licenses[0]), []string{"L1Paragraph1", "L1Paragraph2", "L1Paragraph3"}), "paragraphs 0 %q", texts(licenses[0]))
 		expect(slices.Equal(slices.Collect(licenses[1].Packages()), []string{"L2Package1", "L2Package2", "L2Package3"}), "packages 1")
 		expect(slices.Equal(texts(licenses[1]), []string{"L2Paragraph1", "L2Paragraph2", "L2Paragraph3"}), "paragraphs 1 %q", texts(licenses[1]))
+		// The text after the packages' paragraph, as _parseLicenses splits it.
+		raw, ok := licenses[0].(*foundation.LicenseEntryWithLineBreaks)
+		expect(ok && raw.Text == "L1Paragraph1\n\nL1Paragraph2\n\nL1Paragraph3", "text %q", raw.Text)
 	})
 }
 
@@ -78,5 +81,46 @@ func TestBindingMemoryPressureClearsAssetCaches(t *testing.T) {
 		load("test_asset2", 4)
 		load("test_asset", 4)
 		load("test_asset2", 4)
+	})
+}
+
+func TestBindingEvictRemovesCachedAsset(t *testing.T) {
+	ensureInitialized()
+	calls := 0
+	messenger().SetMockMessageHandler("flutter/assets", func(message []byte) async.Future[[]byte] {
+		return async.Async(func() []byte {
+			calls++
+			return []byte("data")
+		})
+	})
+	defer messenger().SetMockMessageHandler("flutter/assets", nil)
+	runAsync(t, func() {
+		services.RootBundle.LoadString("evicted").Await()
+		services.RootBundle.LoadString("evicted").Await()
+		expect(calls == 1, "cached: %d calls", calls)
+		ensureInitialized().Evict("evicted") // ext.flutter.evict
+		services.RootBundle.LoadString("evicted").Await()
+		expect(calls == 2, "evicted: %d calls", calls)
+	})
+}
+
+func TestBindingLifecycleNotifiesSystemChrome(t *testing.T) {
+	ensureInitialized()
+	_, done := logMethodCalls(services.SystemChannels.Platform)
+	defer done()
+	runAsync(t, func() {
+		services.SystemChrome.SetSystemUIOverlayStyle(services.SystemUiOverlayStyleDark)
+		idle()
+		expect(services.SystemChrome.LatestStyle() != nil, "no latest style")
+		// The engine reports the app detached: SystemChrome forgets the
+		// style it sent.
+		for _, state := range []string{"AppLifecycleState.resumed", "AppLifecycleState.detached"} {
+			messenger().HandlePlatformMessage("flutter/lifecycle", services.StringCodec{}.EncodeMessage(&state), func([]byte) {}).Await()
+		}
+		idle()
+		expect(services.SystemChrome.LatestStyle() == nil, "latest style kept: %v", services.SystemChrome.LatestStyle())
+		resumed := "AppLifecycleState.resumed"
+		messenger().HandlePlatformMessage("flutter/lifecycle", services.StringCodec{}.EncodeMessage(&resumed), func([]byte) {}).Await()
+		idle()
 	})
 }

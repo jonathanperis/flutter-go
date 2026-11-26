@@ -282,6 +282,10 @@ func TestSystemChannelsCallsMatchFlutter(t *testing.T) {
 		chrome.HandleAppLifecycleStateChanged(ui.AppLifecycleStateResumed)
 		chrome.SetSystemUIOverlayStyle(services.NewSystemUiOverlayStyle())
 		yield()
+		add("back to latest")
+		chrome.SetSystemUIOverlayStyle(services.SystemUiOverlayStyleDark)
+		chrome.SetSystemUIOverlayStyle(services.NewSystemUiOverlayStyle())
+		yield()
 
 		add("scene navigator")
 		nav := services.SystemNavigator
