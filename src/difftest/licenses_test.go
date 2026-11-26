@@ -56,6 +56,10 @@ func TestLicensesMatchFlutter(t *testing.T) {
 	l := async.NewLoop()
 	restore := async.SetCurrent(l)
 	defer restore()
+	// The Dart test runs in its own isolate, with an empty registry; here a
+	// binding created by another test (ServicesBinding.initLicenses) may have
+	// registered its NOTICES collector.
+	foundation.LicenseRegistry.Reset()
 	defer foundation.LicenseRegistry.Reset()
 	var registry []string
 	log := func(s string) { registry = append(registry, s) }

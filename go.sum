@@ -1,9 +1,11 @@
 github.com/go-gl/glfw/v3.3/glfw v0.0.0-20260823155953-d41da22a9587 h1:yzPGEmWIlLQvQ0HvNHpRzLwyJ3pAmVXpa6pGclnH9Ks=
 github.com/go-gl/glfw/v3.3/glfw v0.0.0-20260823155953-d41da22a9587/go.mod h1:SyRD8YfuKk+ZXlDqYiqe1qMSqjNgtHzBTG810KUagMc=
+github.com/google/go-cmp v0.6.0 h1:ofyhxvXcZhMsU5ulbFiLKl/XBFqE1GSq7atu8tAmTRI=
+github.com/google/go-cmp v0.6.0/go.mod h1:17dUlkBOakJ0+DkrSSNjCkIjxS6bF9zb3elmeNGIjoY=
 github.com/rivo/uniseg v0.4.7 h1:WUdvkW8uEhrYfLC4ZzdpI2ztxP1I582+49Oc5Mq64VQ=
 github.com/rivo/uniseg v0.4.7/go.mod h1:FN3SvrM+Zdj16jyLfmOkMNblXMcoc8DfTHruCPUcx88=
-golang.org/x/image v0.30.0 h1:jD5RhkmVAnjqaCUXfbGBrn3lpxbknfN9w2UhHHU+5B4=
-golang.org/x/image v0.30.0/go.mod h1:SAEUTxCCMWSrJcCy/4HwavEsfZZJlYxeHLc6tTiAe/c=
+golang.org/x/image v0.41.0 h1:8wS72eGJMJaBxK6okTzd4WaXumUlTVlb753MlsSvTCo=
+golang.org/x/image v0.41.0/go.mod h1:uIc348UZMSvS5Z65CVZ7iDPaNobNFEPeJ4kbqTOszmA=
 golang.org/x/mod v0.23.0 h1:Zb7khfcRGKk+kqfxFaP5tZqCnDZMjC5VtUBs87Hr6QM=
 golang.org/x/mod v0.23.0/go.mod h1:6SkKJ3Xj0I0BrPOZoBy3bdMptDDU9oJrpohJ3eWZ1fY=
 golang.org/x/sync v0.11.0 h1:GGz8+XQP4FvTTrjZPzNKTMFtSXH80RAzG+5ghFPgK9w=

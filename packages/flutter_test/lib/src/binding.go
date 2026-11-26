@@ -42,6 +42,9 @@ type AutomatedTestWidgetsFlutterBinding struct {
 	TestDefaultBinaryMessengerBindingMixin
 
 	tester *Tester // the test in progress (flutter_test: inTest)
+
+	testRestorationManager *TestRestorationManager
+	testTextInput          *TestTextInput
 }
 
 var automatedTestBinding *AutomatedTestWidgetsFlutterBinding
@@ -84,7 +87,8 @@ func (b *AutomatedTestWidgetsFlutterBinding) DisableShadows() bool { return true
 // (RendererBinding's _handlePersistentFrameCallback).
 func (b *AutomatedTestWidgetsFlutterBinding) InitInstances() {
 	b.TestDefaultBinaryMessengerBindingMixin.InitInstances()
-	scheduler.SetTimeDilation(1.0) // just in case the developer has artificially changed it for development
+	b.testTextInput = NewTestTextInput() // onCleared: _resetFocusedEditable (no EditableText yet)
+	scheduler.SetTimeDilation(1.0)       // just in case the developer has artificially changed it for development
 	b.AddPersistentFrameCallback(b.handlePersistentFrameCallback)
 }
 
@@ -222,6 +226,15 @@ func (b *AutomatedTestWidgetsFlutterBinding) startTest(t *Tester) {
 	}
 	b.tester = t
 	t.restoreLoop = async.SetCurrent(t.loop)
+	// TestWidgetsFlutterBinding.reset().
+	if b.testRestorationManager != nil {
+		b.testRestorationManager.Dispose()
+		b.testRestorationManager = nil
+	}
+	// registerTestTextInput is true: the text input mock is reset and
+	// registered for each test.
+	b.testTextInput.Reset()
+	b.testTextInput.Register()
 	t.lastSize = t.Size
 	t.previousOnError = foundation.FlutterErrorOnError
 	foundation.FlutterErrorOnError = func(details *foundation.FlutterErrorDetails) {
@@ -238,10 +251,20 @@ func (b *AutomatedTestWidgetsFlutterBinding) startTest(t *Tester) {
 func (b *AutomatedTestWidgetsFlutterBinding) postTest(t *Tester) {
 	defer func() {
 		b.tester = nil
+		b.testTextInput.Unregister()
 		b.ResetGestureBinding()
+		// TestWidgetsFlutterBinding's per-test keyboard reset.
+		b.KeyEventManager().KeyMessageHandler = nil
+		services.RawKeyboardInstance.ClearKeysPressed()
+		services.HardwareKeyboardInstance().ClearState()
+		b.KeyEventManager().ClearState()
 		t.restoreLoop()
 		foundation.FlutterErrorOnError = t.previousOnError
 		b.ResetInternalState()
+		if b.testRestorationManager != nil {
+			b.testRestorationManager.Dispose()
+			b.testRestorationManager = nil
+		}
 	}()
 	if e := t.TakeException(); e != nil {
 		t.t.Errorf("An exception was reported and not taken: %v", e)
@@ -277,3 +300,28 @@ func (b *AutomatedTestWidgetsFlutterBinding) postTest(t *Tester) {
 			painting.DebugAssertAllPaintingVarsUnsetOptions{DebugDisableShadowsOverride: b.DisableShadows()})
 	}()
 }
+
+// TestRestorationManager is TestWidgetsFlutterBinding's covariant
+// restorationManager: the test's TestRestorationManager, created on first
+// use and disposed at the end of each test.
+func (b *AutomatedTestWidgetsFlutterBinding) TestRestorationManager() *TestRestorationManager {
+	if b.testRestorationManager == nil {
+		b.testRestorationManager = NewTestRestorationManager()
+	}
+	return b.testRestorationManager
+}
+
+// RestorationManager is the test's TestRestorationManager (its embedded
+// RestorationManager; TestRestorationManager returns the whole).
+func (b *AutomatedTestWidgetsFlutterBinding) RestorationManager() *services.RestorationManager {
+	return &b.TestRestorationManager().RestorationManager
+}
+
+// CreateRestorationManager creates a TestRestorationManager.
+func (b *AutomatedTestWidgetsFlutterBinding) CreateRestorationManager() *services.RestorationManager {
+	return &NewTestRestorationManager().RestorationManager
+}
+
+// TestTextInput is the binding's mock of the platform's text input
+// (testTextInput): reset and registered for every test.
+func (b *AutomatedTestWidgetsFlutterBinding) TestTextInput() *TestTextInput { return b.testTextInput }

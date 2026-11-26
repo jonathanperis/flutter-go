@@ -122,18 +122,72 @@ Start here when continuing flutter-go in a new session.
      codecs and decoding (Go decoders), FragmentProgram/FragmentShader
      (impellerc runtime stages). src/app records frames with
      ui.PictureRecorder/ui.Canvas and presents with dart:ui's Impeller
-     context. Next for it: text.dart (Paragraph; Canvas.drawParagraph is
-     `ui.EngineDrawParagraph` for now) and compositing.dart (Scene,
-     SceneBuilder, EngineLayers); then move rendering off its interim
+     context. compositing.dart is done (item 12) and text.dart (item 11); next: move rendering off its interim
      `rendering.Canvas` onto ui.Canvas (painting library: BoxPainter,
      decorations, image providers). ENGINE GAPs to revisit: Path.combine
      (Skia PathOps — the Flutter SDK's prebuilt libpath_ops.dylib exposes
      an Op for lines/cubics only), AA clips (the SDK records is_aa=false),
      gamma color filters and ColorFilter-as-ImageFilter, drawVertices'
      colors/texture coordinates, blur bounds, mipmap/cubic sampling.
-  10. Split `services` (text-editing model under non-Flutter names) by
-     library; RendererBinding/PaintingBinding/WidgetsBinding into the
+  10. Done: the old text-editing model (services' textedit.go/keys.go) is
+     gone; RendererBinding/PaintingBinding/WidgetsBinding go into the
      bindings as their libraries are ported.
+  12. Done (P3): services in full, 211/211 (keyboard with generated keys
+     and maps, HardwareKeyboard/KeyEventManager/RawKeyboard and all
+     platform data; text input, autofill, deltas, formatters, boundaries,
+     clipboard; assets, restoration, system chrome/navigator/sound,
+     haptics, platform views, mouse cursor, undo/scribe/live text/process
+     text/spell check...), package:characters (`src/pub/characters`),
+     `dart.RegExp`, flutter_test's key simulation, TestTextInput (+ macOS
+     key handler), TestRestorationManager and fake platform views. The
+     interim TextField runs on the real types through an editing bridge in
+     widgets (actions.go, shortcuts.go, focus_manager.go,
+     text_editing_intents.go, default_text_editing_shortcuts.go,
+     editable_text.go). src/app delivers real key events (the macOS
+     embedder's key responders ported) and hosts Clipboard, assets and a
+     text-input stand-in. Next for it: the widgets port proper (FocusNode/
+     FocusManager, Shortcuts/Actions widgets, EditableText with formatters,
+     undo history and multi-line VerticalCaretMovementRun) replaces the
+     bridge; painting's TextPainter.wordBoundaries replaces
+     editable_text.go's interim WordBoundary; src/app: a real text input
+     plugin (NSTextInputContext for IME), SystemSound/SystemNavigator/
+     mouse cursor/platform views hosts (ENGINE GAPs); widgets re-exports
+     package:characters.
+  11. Done (P1): dart:ui text.dart in full (styles, Paragraph,
+     ParagraphBuilder, placeholders, loadFontFromList,
+     Canvas.drawParagraph) on the engine's own txt/SkParagraph inside the
+     Impeller SDK, reached through its vtables (`src/impeller/
+     txt_mirror.h`, `typography_bridge.cc`: re-check the mirrors whenever
+     IMPELLER_SHA moves — `go test ./src/impeller` does). flutter_tester's
+     test fonts are `ui.EngineUseTestFonts()`; flutter_test's tester and
+     src/app lay text out with `rendering.UITextEngine` (ui.Paragraph),
+     `FixedTextEngine` is left for benchmarks. Next for it: painting's
+     TextPainter/TextSpan/StrutStyle/TextStyle on ui.ParagraphBuilder (the
+     painting agent), then drop rendering's interim text engine;
+     loadFontFromList's family names are case-sensitive (the engine
+     lowercases them; see API_MAPPING).
+
+  12. Done (P1): dart:ui in full (194/194): compositing.dart (SceneBuilder,
+     Scene with toImage/toImageSync, EngineLayer and the typed layers with
+     the retained-layer debug checks) over a Go port of the engine's layer
+     tree (flow/layers + LayerStateStack, `compositing_layers.go`), the
+     views and metrics of window.dart/platform_dispatcher.dart (FlutterView
+     full API, Display, ViewPadding, ViewConstraints, DisplayFeature,
+     DisplayCornerRadii, view focus, locales, user settings, scaleFontSize,
+     onError, SystemColor, the deprecated window) with hooks.dart's entry
+     points as `PlatformConfiguration` methods, plugins.dart,
+     isolate_name_server.dart (on the new `src/isolate`), natives.dart's
+     DartPluginRegistrant, platform_isolate.dart, annotations.dart. src/app
+     reports real metrics (G7: the backing scale factor is the view's
+     device pixel ratio, so gestures and drawShadow see 2.0 on Retina) and
+     presents frames through SceneBuilder → FlutterView.render →
+     `EngineLayerTree.Flatten`. Next for it: a real RenderView in
+     rendering (its TransformLayer/OffsetLayer/PictureLayer tree →
+     SceneBuilder, `addToScene`) replacing src/app's one-picture scene;
+     route src/app's mouse/keys through PlatformDispatcher's packets;
+     ENGINE GAPs to revisit: picture bounds (needed for culling and exact
+     saveLayer bounds), texture registry, platform views, performance
+     overlay, superellipse clips (path approximation, ≤2 MSAA samples).
 
 ## Environment
 

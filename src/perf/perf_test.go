@@ -79,7 +79,7 @@ type harness struct {
 
 func newHarness(layoutMode bool) *harness {
 	h := &harness{owner: &BuildOwner{}, tc: impeller.NewTypographyContext(), paint: impeller.NewPaint()}
-	r.SetTextEngine(app.NewTextEngine(h.tc))
+	r.SetTextEngine(r.UITextEngine{})
 	h.owner.RunApp(grid{layoutMode})
 	h.owner.Root().Walk(func(e *Element) {
 		if s, ok := StateOfElement(e).(*gridState); ok {

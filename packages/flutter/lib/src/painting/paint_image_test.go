@@ -23,8 +23,8 @@ type paintImageImages struct{ image300x300, image300x200, image208x142 *ui.Image
 // frame's image sizes flushed.
 func newPaintImageTester(t *testing.T) (*flutter_test.Tester, paintImageImages) {
 	tester := newImageTester(t)
-	ui.NewPlatformConfiguration(nil).UpdateViewGestureMetrics(0, 3.0, ui.GestureSettings{})
-	t.Cleanup(func() { ui.NewPlatformConfiguration(nil).UpdateViewGestureMetrics(0, 1.0, ui.GestureSettings{}) })
+	ui.NewPlatformConfiguration(nil).UpdateViewMetrics(0, viewMetricsWithDPR(3.0))
+	t.Cleanup(func() { ui.NewPlatformConfiguration(nil).UpdateViewMetrics(0, ui.NewViewportMetrics()) })
 	images := paintImageImages{
 		createTestImage(tester, flutter_test.CreateTestImageOptions{Width: 300, Height: 300, NoCache: true}),
 		createTestImage(tester, flutter_test.CreateTestImageOptions{Width: 300, Height: 200, NoCache: true}),
@@ -215,4 +215,12 @@ func TestPaintImageReportsNoDebugLabel(t *testing.T) {
 		info.DisplaySize != ui.NewSize(200, 100).Mul(dpr) {
 		t.Errorf("count %d, info %v", count, info)
 	}
+}
+
+// viewMetricsWithDPR is the implicit view's default metrics with the given
+// device pixel ratio (flutter_tester's is 3.0).
+func viewMetricsWithDPR(dpr float64) ui.ViewportMetrics {
+	m := ui.NewViewportMetrics()
+	m.DevicePixelRatio = dpr
+	return m
 }

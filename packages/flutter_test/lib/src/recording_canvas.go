@@ -292,10 +292,8 @@ func (c *TestRecordingCanvas) DrawImageNine(image *ui.Image, center, dst ui.Rect
 // DrawPicture records drawPicture(picture).
 func (c *TestRecordingCanvas) DrawPicture(picture *ui.Picture) { c.record("drawPicture", picture) }
 
-// DrawParagraph records drawParagraph(paragraph, offset). It is not part
-// of ui.Canvas yet (text.dart's Paragraph is being ported); painters that
-// draw text can call it on a TestRecordingCanvas.
-func (c *TestRecordingCanvas) DrawParagraph(paragraph any, offset ui.Offset) {
+// DrawParagraph records drawParagraph(paragraph, offset).
+func (c *TestRecordingCanvas) DrawParagraph(paragraph ui.Paragraph, offset ui.Offset) {
 	c.record("drawParagraph", paragraph, offset)
 }
 

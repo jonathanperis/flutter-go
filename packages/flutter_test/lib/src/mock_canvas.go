@@ -615,16 +615,14 @@ func (p *PaintPattern) Arc(opts ...PaintPatternArcOptions) *PaintPattern {
 }
 
 // PaintPatternParagraphOptions are paragraph's named parameters
-// (Paragraph: whatever TestRecordingCanvas.DrawParagraph recorded; Offset:
+// (Paragraph: the ui.Paragraph drawn, compared with ==; Offset:
 // a ui.Offset or a Matcher).
 type PaintPatternParagraphOptions struct {
 	Paragraph any
 	Offset    any
 }
 
-// Paragraph expects a call to drawParagraph (see
-// TestRecordingCanvas.DrawParagraph: ui.Canvas has no drawParagraph until
-// text.dart's Paragraph is ported).
+// Paragraph expects a call to drawParagraph.
 func (p *PaintPattern) Paragraph(opts ...PaintPatternParagraphOptions) *PaintPattern {
 	var o PaintPatternParagraphOptions
 	if len(opts) > 0 {

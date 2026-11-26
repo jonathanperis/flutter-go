@@ -17,26 +17,10 @@ import (
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/services"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/widgets"
 	"github.com/jonathanperis/flutter-go/src/async"
-	"github.com/jonathanperis/flutter-go/src/impeller"
 	"github.com/jonathanperis/flutter-go/src/platform/metal"
 )
 
 func init() { runtime.LockOSThread() } // Cocoa needs the main thread.
-
-var keyMap = map[glfw.Key]services.Key{
-	glfw.KeyBackspace: services.KeyBackspace, glfw.KeyDelete: services.KeyDelete,
-	glfw.KeyLeft: services.KeyLeft, glfw.KeyRight: services.KeyRight,
-	glfw.KeyUp: services.KeyUp, glfw.KeyDown: services.KeyDown,
-	glfw.KeyHome: services.KeyHome, glfw.KeyEnd: services.KeyEnd,
-	glfw.KeyEnter: services.KeyEnter, glfw.KeyKPEnter: services.KeyEnter,
-	glfw.KeyTab: services.KeyTab, glfw.KeyA: services.KeyA, glfw.KeyC: services.KeyC,
-	glfw.KeyV: services.KeyV, glfw.KeyX: services.KeyX,
-}
-
-type glfwClipboard struct{ w *glfw.Window }
-
-func (c glfwClipboard) Get() string  { return c.w.GetClipboardString() }
-func (c glfwClipboard) Set(s string) { c.w.SetClipboardString(s) }
 
 // WheelPixelsPerLine converts GLFW scroll units to logical pixels.
 const WheelPixelsPerLine = 20.0
@@ -54,6 +38,10 @@ type Options struct {
 	// InjectText types this text into the focused widget after the first
 	// frame, for unattended runs.
 	InjectText string
+	// InjectKeys delivers these GLFW key events (and committed characters)
+	// after the first frame, as the key and char callbacks would, for
+	// unattended runs.
+	InjectKeys []InjectedKey
 	// InjectTaps synthesizes this many taps at InjectTapAt (logical px), one
 	// per frame, for unattended runs.
 	InjectTaps  int
@@ -62,8 +50,18 @@ type Options struct {
 	Window func(w *glfw.Window)
 }
 
+// InjectedKey is a GLFW key event (Char: the character GLFW's char
+// callback reports after it, 0 for none).
+type InjectedKey struct {
+	Key      glfw.Key
+	Scancode int
+	Action   glfw.Action
+	Mods     glfw.ModifierKey
+	Char     rune
+}
+
 // appBinding is the app's binding (partial WidgetsFlutterBinding:
-// BindingBase with GestureBinding, SchedulerBinding); its persistent frame
+// BindingBase with GestureBinding, SchedulerBinding, ServicesBinding); its persistent frame
 // callback draws the tree into the frame being produced, as
 // WidgetsBinding.drawFrame does, and its hit test finds the tree's gesture
 // targets, as RendererBinding.hitTestInView does.
@@ -71,14 +69,15 @@ type appBinding struct {
 	foundation.BindingBaseBase
 	gestures.GestureBindingMixin
 	scheduler.SchedulerBindingMixin
+	services.ServicesBindingMixin
 	// drawFrame is the rendering pipeline for the frame in progress.
 	drawFrame func()
 	// owner is the tree being shown.
 	owner *widgets.BuildOwner
 }
 
-func (b *appBinding) InitInstances()         { b.SchedulerBindingMixin.InitInstances() }
-func (b *appBinding) InitServiceExtensions() { b.SchedulerBindingMixin.InitServiceExtensions() }
+func (b *appBinding) InitInstances()         { b.ServicesBindingMixin.InitInstances() }
+func (b *appBinding) InitServiceExtensions() { b.ServicesBindingMixin.InitServiceExtensions() }
 func (b *appBinding) Unlocked()              { b.SchedulerBindingMixin.Unlocked() }
 
 func (b *appBinding) HitTestInView(result *gestures.HitTestResult, position ui.Offset, viewID int) {
@@ -95,7 +94,8 @@ func ensureBinding() *appBinding {
 		b := &appBinding{}
 		b.GestureBindingMixin.SetSelf(b)
 		b.SchedulerBindingMixin.SetSelf(b)
-		b.Construct(b, &b.GestureBindingMixin, &b.SchedulerBindingMixin)
+		b.ServicesBindingMixin.SetSelf(b)
+		b.Construct(b, &b.GestureBindingMixin, &b.SchedulerBindingMixin, &b.ServicesBindingMixin)
 		b.AddPersistentFrameCallback(func(time.Duration) {
 			if b.drawFrame != nil {
 				b.drawFrame()
@@ -108,12 +108,23 @@ func ensureBinding() *appBinding {
 
 // engine is the embedder's side of dart:ui's PlatformConfiguration: the
 // framework's frame requests (PlatformDispatcher.scheduleFrame) set
-// needsFrame, and the run loop produces the frame at the next vsync.
-type engine struct{ needsFrame bool }
+// needsFrame, and the run loop produces the frame at the next vsync; the
+// scene FlutterView.render hands over (the layer tree) is presented after
+// the frame.
+type engine struct {
+	needsFrame bool
+	layerTree  *ui.EngineLayerTree
+	window     *glfw.Window // for the platform plugins (platform_plugins.go)
+}
 
 func (e *engine) ScheduleFrame()             { e.needsFrame = true }
 func (e *engine) EndWarmUpFrame()            {}
 func (e *engine) SetNeedsReportTimings(bool) {} // ENGINE GAP: no frame timings are collected
+
+// Render receives the scene of the implicit view (the only one).
+func (e *engine) Render(viewID int, tree *ui.EngineLayerTree, devicePixelRatio float64) {
+	e.layerTree = tree
+}
 
 // Run shows root in a window until it is closed.
 //
@@ -147,36 +158,59 @@ func Run(root widgets.Widget, o Options) error {
 	}
 	layer := metal.Attach(win.GetCocoaWindow())
 	defer layer.Release()
-	tc := impeller.NewTypographyContext()
-	defer tc.Release()
-	r.SetTextEngine(impellerText{tc})
 
-	eng := &engine{}
+	r.SetTextEngine(r.UITextEngine{})
+
+	eng := &engine{window: win}
 	pc := ui.NewPlatformConfiguration(eng)
 	defer ui.SetPlatformConfiguration(pc)()
+	// The platform's metrics: the display, and the implicit view's size and
+	// device pixel ratio (the backing scale factor, 2.0 on Retina).
+	reportDisplay := func() {
+		if mon := glfw.GetPrimaryMonitor(); mon != nil {
+			if mode := mon.GetVideoMode(); mode != nil {
+				sx, _ := mon.GetContentScale()
+				pc.UpdateDisplays([]ui.DisplayData{displayData(mode.Width, mode.Height, mode.RefreshRate, float64(sx))})
+			}
+		}
+	}
+	reportMetrics := func() {
+		ww, wh := win.GetSize()
+		fw, fh := win.GetFramebufferSize()
+		pc.UpdateViewMetrics(0, viewportMetrics(ww, wh, fw, fh, float64(layer.Scale())))
+	}
+	reportDisplay()
+	reportMetrics()
+	view := ui.PlatformDispatcherInstance().ImplicitView()
 	b := ensureBinding()
 	loop := async.Current()
+	// ServicesBinding's channel handlers and keyboard sync complete in
+	// microtasks and posted engine replies.
+	loop.FlushMicrotasks()
+	loop.RunPosted()
+	loop.FlushMicrotasks()
 	owner := &widgets.BuildOwner{OnNeedsFrame: b.EnsureVisualUpdate}
 	epoch := time.Now().Add(-loop.Elapsed()) // frame timestamps and the loop's clock are measured from here
 	router := widgets.NewPointerRouter(owner)
-	owner.Platform = services.MacOS
-	owner.Clipboard = glfwClipboard{win}
-	// Committed text (typing, and IME text once composition finishes).
-	win.SetCharCallback(func(_ *glfw.Window, ch rune) { owner.DispatchText(string(ch)) })
-	win.SetKeyCallback(func(_ *glfw.Window, k glfw.Key, _ int, a glfw.Action, m glfw.ModifierKey) {
-		if a == glfw.Release {
-			return
-		}
-		if key, ok := keyMap[k]; ok {
-			owner.DispatchKey(services.KeyEvent{Key: key,
-				Shift: m&glfw.ModShift != 0, Ctrl: m&glfw.ModControl != 0,
-				Alt: m&glfw.ModAlt != 0, Meta: m&glfw.ModSuper != 0})
-		}
+	owner.Platform = foundation.TargetPlatformMacOS
+	// Keys reach the framework as the macOS embedder sends them (key data,
+	// then raw key messages); the focus system's handleKeyMessage hands them
+	// to the focused widget, and the key downs it doesn't handle go to the
+	// text input host (macOS's key bindings and text insertion).
+	keyboard := &glfwKeyboard{manager: newKeyboardManager(pc), host: textInputHost{focused: owner.Focus}}
+	win.SetInputMode(glfw.LockKeyMods, glfw.True)
+	b.KeyEventManager().KeyMessageHandler = owner.HandleKeyMessage
+	win.SetKeyCallback(func(_ *glfw.Window, k glfw.Key, scancode int, a glfw.Action, m glfw.ModifierKey) {
+		keyboard.onKey(k, scancode, a, m)
 	})
+	// Committed text (typing, and IME text once composition finishes) is
+	// the key down's characters; the text input host inserts it when the
+	// framework doesn't handle the key.
+	win.SetCharCallback(func(_ *glfw.Window, ch rune) { keyboard.onChar(ch) })
 	b.owner = owner
 	router.TimeStamp = func() time.Duration { return time.Since(epoch) }
 	router.AfterEvent = func() { loop.FlushMicrotasks() }
-	owner.DevicePixelRatio = float64(layer.Scale())
+	owner.DevicePixelRatio = view.DevicePixelRatio()
 	ww, wh := win.GetSize()
 	owner.SetViewSize(ui.Size{Width: float64(ww), Height: float64(wh)})
 	owner.RunApp(root)
@@ -206,9 +240,19 @@ func Run(root widgets.Widget, o Options) error {
 		x, y := w.GetCursorPos()
 		router.Scroll(ui.Offset{Dx: x, Dy: y}, -yoff*WheelPixelsPerLine)
 	})
-	// A resize needs a frame at the new size even if frames are disabled
+	// A resize (or a move to a screen of another scale) changes the view's
+	// metrics and needs a frame at the new size even if frames are disabled
 	// (Flutter's handleMetricsChanged: scheduleForcedFrame).
-	win.SetSizeCallback(func(*glfw.Window, int, int) { b.ScheduleForcedFrame() })
+	win.SetSizeCallback(func(*glfw.Window, int, int) {
+		reportMetrics()
+		b.ScheduleForcedFrame()
+	})
+	win.SetContentScaleCallback(func(*glfw.Window, float32, float32) {
+		reportDisplay()
+		reportMetrics()
+		owner.DevicePixelRatio = view.DevicePixelRatio()
+		b.ScheduleForcedFrame()
+	})
 	// The window system asks for a redraw when the window is first shown,
 	// uncovered, or changes screens. Without this, a frame drawn before the
 	// window was visible is never replaced. The tree itself is unchanged, so
@@ -222,28 +266,44 @@ func Run(root widgets.Widget, o Options) error {
 		if eng.needsFrame {
 			eng.needsFrame = false
 			start := time.Now()
-			w, h := win.GetSize()
-			scale := float64(layer.Scale())
-			ui.EngineDevicePixelRatio = scale
-			// The frame is recorded with dart:ui's PictureRecorder/Canvas
-			// (an Impeller display list), in physical pixels.
-			rec := ui.NewPictureRecorder()
-			canvas := ui.NewCanvas(rec)
-			canvas.Scale(scale, scale)
+			dpr := view.DevicePixelRatio()
+			size := view.PhysicalSize()
+			logical := ui.Size{Width: size.Width / dpr, Height: size.Height / dpr}
+			// The frame is painted as RenderView composites it: the tree is
+			// recorded with dart:ui's PictureRecorder/Canvas in logical
+			// pixels, put in a scene under the root transform (device pixel
+			// ratio), and shown with FlutterView.render.
 			b.drawFrame = func() {
-				owner.DrawFrame(ui.Size{Width: float64(w), Height: float64(h)}, NewCanvas(canvas))
+				rec := ui.NewPictureRecorder()
+				canvas := ui.NewCanvas(rec)
+				owner.DrawFrame(logical, NewCanvas(canvas))
+				pic := rec.EndRecording()
+				sb := ui.NewSceneBuilder()
+				sb.PushTransform(rootTransform(dpr))
+				sb.AddPicture(ui.Offset{}, pic)
+				sb.Pop()
+				scene := sb.Build()
+				view.Render(scene)
+				scene.Dispose()
+				pic.Dispose()
 			}
 			frameNumber++
 			b.EnsureFrameCallbacksRegistered() // a refresh can come before the framework asked for a frame
+			eng.layerTree = nil
 			pc.BeginFrame(start.Sub(epoch), frameNumber)
 			b.drawFrame = nil
-			pic := rec.EndRecording()
 			cpu := time.Since(start)
-			err := layer.Present(ctx.Handle(), ui.EnginePictureDisplayList(pic).Handle())
-			pic.Dispose()
-			if err != nil {
-				log.Print(err)
+			if tree := eng.layerTree; tree != nil {
+				// The rasterizer: the layer tree flattened into a display
+				// list, presented with Impeller.
+				dl := tree.Flatten()
+				if err := layer.Present(ctx.Handle(), dl.Handle()); err != nil {
+					log.Print(err)
+				}
+				dl.Release()
+				eng.layerTree = nil
 			}
+			w, h := int(logical.Width), int(logical.Height)
 			frames++
 			if o.OnFrame != nil {
 				o.OnFrame(frames, cpu)
@@ -256,6 +316,15 @@ func Run(root widgets.Widget, o Options) error {
 				owner.DispatchText(o.InjectText)
 				o.InjectText = ""
 			}
+			for _, k := range o.InjectKeys {
+				keyboard.onKey(k.Key, k.Scancode, k.Action, k.Mods)
+				if k.Char != 0 {
+					keyboard.onChar(k.Char)
+				}
+				keyboard.flush()
+				loop.FlushMicrotasks()
+			}
+			o.InjectKeys = nil
 			if o.InjectTaps > 0 {
 				o.InjectTaps--
 				pos := ui.Offset{Dx: o.InjectTapAt[0], Dy: o.InjectTapAt[1]}
@@ -274,6 +343,7 @@ func Run(root widgets.Widget, o Options) error {
 		} else {
 			glfw.WaitEvents()
 		}
+		keyboard.flush()       // a key press GLFW's char callback didn't follow
 		loop.FlushMicrotasks() // microtasks queued by input handlers
 	}
 	if rr := owner.RenderRoot(); rr != nil {

@@ -7,18 +7,15 @@ package ui
 // semanticsEnabled/onSemanticsEnabledChanged, accessibilityFeatures/
 // onAccessibilityFeaturesChanged, onSemanticsActionEvent,
 // setSemanticsTreeEnabled, onPlatformConfigurationChanged and implicitView;
-// from window.dart: AccessibilityFeatures and FlutterView (viewId,
-// platformDispatcher, updateSemantics, toString). From hooks.dart, the
+// from window.dart: AccessibilityFeatures. From hooks.dart, the
 // engine entry points _updateSemanticsEnabled, _updateAccessibilityFeatures
 // and _dispatchSemanticsAction, which an embedder calls through
 // PlatformConfiguration.
 //
-// Views: flutter-go has one implicit view, id 0 (as flutter_tester and
-// single-window embedders do); view management (_addView/_removeView,
-// view metrics, displays) comes with the rendering port.
+// FlutterView and the views are in window.go and
+// platform_dispatcher_views.go.
 
 import (
-	"strconv"
 	"strings"
 
 	"github.com/jonathanperis/flutter-go/src/dart"
@@ -283,31 +280,6 @@ func (f AccessibilityFeatures) String() string {
 	return "AccessibilityFeatures[" + strings.Join(features, ", ") + "]"
 }
 
-// ---- FlutterView (window.dart, partial)
-
-// FlutterView is a view into which a Flutter Scene is drawn (PARTIAL: its
-// id, dispatcher and updateSemantics).
-type FlutterView struct {
-	viewID             int
-	platformDispatcher *PlatformDispatcher
-}
-
-// ViewID is the identifier for this view.
-func (v *FlutterView) ViewID() int { return v.viewID }
-
-// PlatformDispatcher is the platform dispatcher this view is registered
-// with.
-func (v *FlutterView) PlatformDispatcher() *PlatformDispatcher { return v.platformDispatcher }
-
-// UpdateSemantics changes the semantics tree shown by this view (the
-// update goes to the engine's UpdateSemantics; see
-// PlatformConfigurationSemanticsClient).
-func (v *FlutterView) UpdateSemantics(update SemanticsUpdate) {
-	platformConfigurationNativeAPIUpdateSemantics(v.viewID, update)
-}
-
-func (v *FlutterView) String() string { return "FlutterView(id: " + strconv.Itoa(v.viewID) + ")" }
-
 // ---- PlatformDispatcher (accessibility and semantics)
 
 // platformDispatcherSemantics is the state of PlatformDispatcher's
@@ -317,16 +289,6 @@ type platformDispatcherSemantics struct {
 	onSemanticsEnabledChanged      VoidCallback
 	onAccessibilityFeaturesChanged VoidCallback
 	onSemanticsActionEvent         SemanticsActionEventCallback
-	implicitView                   *FlutterView
-}
-
-// ImplicitView is the FlutterView provided by the engine on platforms with
-// an implicit view (flutter-go's single view, id 0).
-func (p *PlatformDispatcher) ImplicitView() *FlutterView {
-	if p.semantics.implicitView == nil {
-		p.semantics.implicitView = &FlutterView{viewID: 0, platformDispatcher: p}
-	}
-	return p.semantics.implicitView
 }
 
 // OnPlatformConfigurationChanged is called when the platform configuration

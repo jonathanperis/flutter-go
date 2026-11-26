@@ -7,12 +7,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/services"
+	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/foundation"
 	. "github.com/jonathanperis/flutter-go/packages/flutter/lib/src/widgets"
 	"github.com/jonathanperis/flutter-go/packages/flutter_test/lib/src"
 )
 
-func bounceTester(t *testing.T, platform services.Platform) (*flutter_test.Tester, *ScrollController) {
+func bounceTester(t *testing.T, platform foundation.TargetPlatform) (*flutter_test.Tester, *ScrollController) {
 	tester := flutter_test.New(t)
 	tester.Owner.Platform = platform
 	c := NewScrollController(0)
@@ -29,11 +29,11 @@ func frames(tester *flutter_test.Tester, c *ScrollController, s []float64, n int
 	return s
 }
 
-func plat(p float64) services.Platform {
+func plat(p float64) foundation.TargetPlatform {
 	if p == 0 {
-		return services.IOS
+		return foundation.TargetPlatformIOS
 	}
-	return services.MacOS
+	return foundation.TargetPlatformMacOS
 }
 
 var bounceScenes = map[string]func(t *testing.T) []float64{}
@@ -57,7 +57,7 @@ func init() {
 		}
 	}
 	bounceScenes["ios_jump_out_of_range"] = func(t *testing.T) []float64 {
-		tester, c := bounceTester(t, services.IOS)
+		tester, c := bounceTester(t, foundation.TargetPlatformIOS)
 		c.JumpTo(-150)
 		s := []float64{c.Offset()}
 		tester.Pump()

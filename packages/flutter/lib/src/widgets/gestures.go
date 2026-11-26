@@ -13,9 +13,9 @@ import (
 	"time"
 
 	ui "github.com/jonathanperis/flutter-go/engine/src/flutter/lib/ui/go"
+	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/foundation"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/gestures"
 	r "github.com/jonathanperis/flutter-go/packages/flutter/lib/src/rendering"
-	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/services"
 )
 
 // Fling velocity limits and the touch slop (gestures' kMinFlingVelocity,
@@ -62,7 +62,7 @@ func (t *tapTarget) HandleEvent(event gestures.PointerEvent, entry gestures.HitT
 type scrollTarget struct {
 	list     *r.RenderFixedExtentList
 	drag     *gestures.VerticalDragGestureRecognizer
-	platform services.Platform
+	platform foundation.TargetPlatform
 }
 
 func newScrollTarget(list *r.RenderFixedExtentList) *scrollTarget {
@@ -98,9 +98,9 @@ func newScrollTarget(list *r.RenderFixedExtentList) *scrollTarget {
 	}
 	t.drag.VelocityTrackerBuilder = func(event gestures.PointerEvent) *gestures.VelocityTracker {
 		switch t.platform { // ScrollBehavior.velocityTrackerBuilder
-		case services.IOS:
+		case foundation.TargetPlatformIOS:
 			return &gestures.NewIOSScrollViewFlingVelocityTracker(event.Kind()).VelocityTracker
-		case services.MacOS:
+		case foundation.TargetPlatformMacOS:
 			return &gestures.NewMacOSScrollViewFlingVelocityTracker(event.Kind()).VelocityTracker
 		}
 		return gestures.NewVelocityTrackerWithKind(event.Kind())
@@ -116,7 +116,7 @@ func timeStampOf(ts *time.Duration) time.Duration {
 }
 
 // configure is ScrollableState's recognizer setup from the physics.
-func (t *scrollTarget) configure(platform services.Platform) {
+func (t *scrollTarget) configure(platform foundation.TargetPlatform) {
 	t.platform = platform
 	if t.list.FlingLimits != nil {
 		minDistance, minVelocity, maxVelocity := t.list.FlingLimits()

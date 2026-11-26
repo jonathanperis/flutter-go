@@ -52,6 +52,9 @@ type Canvas interface {
 	DrawImageRect(image *Image, src, dst Rect, paint *Paint)
 	DrawImageNine(image *Image, center, dst Rect, paint *Paint)
 	DrawPicture(picture *Picture)
+	// DrawParagraph draws a laid-out paragraph with its top left corner at
+	// offset (text_paragraph.go).
+	DrawParagraph(paragraph Paragraph, offset Offset)
 	DrawPoints(pointMode PointMode, points []Offset, paint *Paint)
 	DrawRawPoints(pointMode PointMode, points []float32, paint *Paint)
 	DrawVertices(vertices *Vertices, blendMode BlendMode, paint *Paint)
@@ -74,10 +77,16 @@ type CanvasClipOptions struct {
 	DoAntiAlias *bool // nil: true
 }
 
-// EngineDevicePixelRatio is the implicit view's device pixel ratio the
-// engine passes to drawShadow (canvas.cc reads the view's metrics, 1.0
-// without a view). The embedder sets it.
-var EngineDevicePixelRatio = 1.0
+// implicitViewDevicePixelRatio is the device pixel ratio canvas.cc's
+// drawShadow passes: the implicit view's metrics', 1.0 without them.
+func implicitViewDevicePixelRatio() float32 {
+	if pc := currentPlatformConfiguration; pc != nil {
+		if m := pc.GetMetrics(kImplicitViewID); m != nil {
+			return float32(m.DevicePixelRatio)
+		}
+	}
+	return 1.0
+}
 
 // nativeCanvas is _NativeCanvas plus the engine's Canvas.
 type nativeCanvas struct {
@@ -750,21 +759,7 @@ func (c *nativeCanvas) DrawShadow(path *Path, color Color, elevation float64, tr
 	ic := impeller.Color{A: float32(v>>24) / 255, R: float32(v>>16&0xff) / 255, G: float32(v>>8&0xff) / 255,
 		B: float32(v&0xff) / 255}
 	p := c.impellerPath(path)
-	b.DrawShadow(p, ic, safeNarrow(elevation), transparentOccluder, float32(EngineDevicePixelRatio))
+	b.DrawShadow(p, ic, safeNarrow(elevation), transparentOccluder, implicitViewDevicePixelRatio())
 	p.Release()
 	c.ops++
-}
-
-// EngineDrawParagraph draws a paragraph laid out by the Impeller SDK's
-// typography. It stands in for Canvas.drawParagraph until text.dart's
-// Paragraph is ported.
-func EngineDrawParagraph(canvas Canvas, p *impeller.Paragraph, offset Offset) {
-	c, ok := canvas.(*nativeCanvas)
-	if !ok {
-		panic(argumentError("EngineDrawParagraph needs the engine Canvas"))
-	}
-	if b := c.builder(); b != nil {
-		b.DrawParagraph(p, float32(offset.Dx), float32(offset.Dy))
-		c.ops++
-	}
 }

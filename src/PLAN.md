@@ -1739,3 +1739,363 @@ The standing goal is now full API parity with Flutter 3.50.1's Dart layer
   ran for 8 s with no errors (window opened; screenshots don't work on
   this machine, so the pixels were not inspected on screen — the offscreen
   pixel difftest covers rendering).
+
+### dart:ui text (P1): text.dart on the engine's own SkParagraph
+
+- **Scope.** Every declaration of text.dart: FontStyle, FontWeight,
+  FontFeature (all named constructors), FontVariation, GlyphInfo,
+  TextAlign, Hyphens, TextBaseline, TextDecoration, TextDecorationStyle,
+  TextLeadingDistribution, TextHeightBehavior, TextStyle/ParagraphStyle/
+  StrutStyle with their encodings, toString and ==, TextBox,
+  ParagraphConstraints, BoxHeightStyle/BoxWidthStyle,
+  PlaceholderAlignment, LineMetrics, Paragraph (every query),
+  ParagraphBuilder (styles, placeholders and their scales),
+  loadFontFromList (with the fontsChange message), and
+  Canvas.drawParagraph (the `ui.EngineDrawParagraph` stand-in is gone).
+  TextSelection and FontLoader are services', not dart:ui's. dart:ui parity
+  133 → 158 of 195 (no text.dart name missing).
+- **How it maps to the engine.** The SDK's typography C API is a small
+  subset (no boxes, positions, placeholders, strut, spacing, shadows,
+  features or variations), but its ImpellerParagraphBuilder and
+  ImpellerParagraph hold the engine's txt::ParagraphBuilder and
+  txt::Paragraph — abstract classes whose every method is virtual — over
+  SkParagraph, HarfBuzz and ICU compiled into libimpeller.dylib. So the
+  bridge (`src/impeller/typography_bridge.cc`) declares layout mirrors of
+  the engine headers at the pinned revision (`txt_mirror.h`: txt's
+  TextStyle/ParagraphStyle/LineMetrics, Skia's GlyphInfo/LineMetrics,
+  DlPaint, the interop objects) and calls through the vtables: no hidden
+  symbol, no copied engine code, and the layout is exactly flutter_tester's
+  (the same code). The builder is the SDK's: the encoded ParagraphStyle
+  is written into an ImpellerParagraphStyle's txt::ParagraphStyle, pushed
+  once to make the SDK create its ParagraphBuilderSkia, and popped
+  (SkParagraph's builder is then in its constructor's state: one empty
+  block with the paragraph's text style — checked in
+  ParagraphBuilderImpl.cpp). lib/ui/text's natives (paragraph_builder.cc's
+  decoding of the Dart encodings, paragraph.cc's result encodings) are
+  ported in the bridge; text.dart is Go. The SDK's libc++ (`std::__fl`,
+  LLVM 21) has the system libc++'s object layout and both allocate with
+  malloc/free, so strings, vectors, maps and optionals cross the boundary;
+  a self-test reads values set through the SDK's public setters back
+  through the mirrors (`go test ./src/impeller`).
+- **flutter_tester's fonts.** `flutter test` runs flutter_tester with
+  --use-test-fonts: FlutterTest, Ahem and Cough (extracted from
+  runtime/test_font_data.cc by `src/cmd/gentestfonts`; kCoughFont's array
+  holds 4 bytes more than its declared length, which is what the engine
+  streams) are registered in a second typography context, and
+  txt::TestFontManager (any other family → FlutterTest) is reimplemented
+  as an SkFontMgr subclass over its provider (Skia's SkFontMgr vtable at
+  the pinned revision, with the new onMatch/onFallback), placed in the
+  font collection's test slot with fallback disabled.
+  `ui.EngineUseTestFonts()` turns it on; flutter_test's tester does.
+- **Difftest (text, exact).** 65 scenes from `difftest/text_scenes.json`
+  (shared with Dart), 90 layouts: FlutterTest (wrapping, newlines,
+  trailing spaces, RTL Hebrew and bidi, emoji ZWJ/flags/skin tones,
+  combining marks, CJK with a supplementary char, tabs, mixed sizes,
+  letter/word spacing incl. negative, height/kTextHeightNone/even leading,
+  TextHeightBehavior, struts (forced, not forced, leading only, fallback family, Ahem), an empty paragraph whose last style resets the height, placeholders on the baseline with the default offset, maxLines, ellipsis incl.
+  RTL, all alignments, every placeholder alignment and scale, soft hyphens
+  with both Hyphens, Ahem/Cough/unknown families, locales) and real fonts
+  (Roboto: ligatures on/off, tnum/smcp, kerning with spacing, bold/italic
+  mixes, strut, ellipsis, placeholders, justify; Noto Naskh Arabic RTL and
+  mixed; Roboto Slab's wght axis via fontVariations and fontWeight). Each
+  layout dumps the metrics, line metrics (computeLineMetrics and
+  getLineMetricsAt −1..n), getLineNumberAt −1..n+1, boxes of every
+  one-unit range and of 4 ranges × 12 height/width styles, placeholder
+  boxes, getGlyphInfoAt −1..n, positions and closest glyphs on a grid,
+  word and line boundaries at every offset with both affinities. Plus 37
+  API cases (incl. a family resolved before a font of that name is loaded: loading clears the caches) (toString/== matrices of TextStyle/ParagraphStyle/StrutStyle,
+  the encodings' mutation by pushStyle/build, FontWeight/FontVariation
+  lerps, every FontFeature constructor, errors: asserts, malformed UTF-16,
+  native calls after build/dispose, drawParagraph's checks). Matched on
+  the first run. Flutter plain and --enable-impeller write byte-identical
+  references (the layout is SkParagraph's on both); Go checks both.
+- **Difftest (pixels).** 16 drawParagraph scenes against flutter_tester
+  --enable-impeller: 12 bit-exact (FlutterTest glyphs at integer and
+  fractional offsets, colors with alpha, background, shadow, gradient and
+  stroked foregrounds through the copied DlPaint, RTL ellipsis, Roboto at
+  20 and 9 px, no pushed style), a blurred shadow within 1; decorations differ on one anti-aliased row (one MSAA
+  sample, as lines in painting_pixels), rotated glyphs by ≤13 on edges.
+- **Moved onto ui.Paragraph:** flutter_test's tester and src/app lay text
+  out with `rendering.UITextEngine` (dart:ui ParagraphBuilder; test fonts in
+  tests), replacing the ad-hoc FixedTextEngine and the SDK-API paragraphs;
+  every widget/editing/scene difftest still passes unchanged.
+- **Mutations.** 65 (Go encodings/equality/toString/lerps, the builder
+  and paragraph wrappers, and the C++ bridge's decoding, test font
+  manager and cache clearing): 61 caught. Eight were first missed and
+  caught after adding cases (strut forceStrutHeight false, strut with only
+  leading, strut fallback families, the placeholder's default baseline
+  offset, shadow blur sigma, FontWeight.lerp rounding, kTextHeightNone's
+  height override — visible only in an empty paragraph — and the font
+  cache clearing). 4 equivalent: StrutStyle == on the view instead of
+  the whole buffer (the bytes past the view are always zero); the
+  `offset == line.end` term of getLineBoundary's downstream rule (implied
+  by the other two); the strut's default `""` family (with test fonts an
+  empty family list resolves to FlutterTest too); the initial pop of the
+  style the SDK's builder needs (its style equals the base style; it only
+  differs for unbalanced pops, which are undefined in the engine). A first
+  run filled the disk (each mutation of a cgo file adds a build of every
+  dependent package): the mutation helper now cleans the build cache
+  below 15 GB free.
+- **Divergences:** families loaded with loadFontFromList are matched
+  exactly (the engine's dynamic font manager lowercases ASCII names); the
+  builder's impeller flag is always set (it selects the painting path
+  only).
+
+### dart:ui finished (P1): compositing, views and metrics, plugins, isolates
+
+- **Scope.** Every remaining dart:ui declaration: compositing.dart
+  (SceneBuilder with every push*/add* method, Scene with toImage/
+  toImageSync, EngineLayer and the eleven typed layers with the debug
+  checks of retained layers and their exact messages), window.dart and
+  platform_dispatcher.dart (FlutterView's full API, Display, ViewPadding/
+  WindowPadding, ViewConstraints, DisplayFeature(+Type/State),
+  DisplayCornerRadii, GestureSettings, ViewFocusEvent/State/Direction,
+  PlatformDispatcher's views/displays/onMetricsChanged/onViewFocusChange/
+  requestViewFocusChange/engineId, locales and computePlatformResolvedLocale,
+  the user settings with their callbacks, scaleFontSize with the
+  platform's nonlinear scaling, onError/ErrorCallback, defaultRouteName,
+  the isolate natives, SystemColor/SystemColorPalette, the deprecated
+  window in full), hooks.dart's entry points (as PlatformConfiguration
+  methods, with the engine's ViewportMetrics/DisplayData), plugins.dart,
+  isolate_name_server.dart, natives.dart's DartPluginRegistrant,
+  platform_isolate.dart, annotations.dart. dart:ui parity 158/195 →
+  194/194 (apiparity no longer counts hooks.dart's `void Function(Uri)`
+  return type as a declaration named `Function`). New: `src/isolate`
+  (dart:isolate's SendPort/ReceivePort on async.Loop), `dart.Pragma`,
+  `impeller.DisplayList.Retain`.
+- **How it maps to the engine.** SceneBuilder's natives build the
+  engine's flow layer tree, ported to Go (`compositing_layers.go`):
+  Container/Transform/ClipShape(Rect, RRect, RSuperellipse, Path)/Opacity/
+  ColorFilter/ImageFilter/BackdropFilter/ShaderMask/DisplayList/Texture/
+  PlatformView/PerformanceOverlay layers with Preroll (paint bounds,
+  renderable-state flags) and Paint, and LayerStateStack, which defers
+  opacity and filters to children that can apply them and otherwise saves
+  a layer (the delegate is dart:ui's Canvas, i.e. the SDK's
+  DisplayListBuilder). LayerTree::Flatten paints into a display list;
+  Scene.toImage renders it offscreen as Picture.toImage does. A picture
+  layer retains the picture's display list (SDK refcount), so disposing
+  the picture after addPicture is safe, as in the engine. The SDK doesn't
+  expose a display list's bounds or can_apply_group_opacity, so pictures
+  are "unbounded" and never inherit opacity: no culling, and saveLayers
+  are unbounded when the bounds are unknown — Impeller collapses an
+  opacity saveLayer whose content can take it, so the pixels match.
+- **Views.** The implicit view exists from the start (the engine adds it
+  before main) with default metrics; embedders report metrics with
+  `UpdateViewMetrics` and displays with `UpdateDisplays`, which run
+  hooks.dart's decoding (padding = max(0, viewPadding − viewInsets),
+  display features scaled by 1/dpr, unset touch slop/corner radii → null,
+  the inconsistent-radii ArgumentError). The interim
+  `UpdateViewGestureMetrics` and `ui.EngineDevicePixelRatio` are gone:
+  gestures read the view's metrics, drawShadow the engine's metrics for
+  view 0 (canvas.cc). FlutterView.render goes through
+  PlatformConfigurationNativeApi::Render/RuntimeController::Render (no
+  metrics for the view: the frame is dropped) to the client's optional
+  `PlatformConfigurationRenderClient`.
+- **src/app (G7).** The runner reports the display (GLFW video mode ×
+  content scale, refresh rate) and the implicit view's metrics: physical
+  size = framebuffer size, device pixel ratio = framebuffer/window width
+  (the backing scale factor), tight constraints; again on resize and on
+  content-scale changes. Each frame is composited as RenderView does: the
+  tree is recorded in logical pixels, put in a scene under the root
+  transform (dpr), shown with FlutterView.render, and the engine side
+  flattens the layer tree and presents it. `go run ./src/cmd/counter
+  -frames 60 -taps 3` ran (window opened, exit 0); this machine's display
+  is a 1920×1080 non-Retina screen, so the live device pixel ratio was 1.0
+  (as reported by the view and the display); the 2.0 case is covered by
+  `src/app/metrics_test.go`.
+- **Difftests (exact).** window_api (26 groups: flutter_tester's implicit
+  view, display and dispatcher state — the Go side installs an engine
+  configured as tester_main.cc's ConfigureShell, incl. its en_US/zh_CN
+  locales —, the deprecated window, 11 ViewConstraints with toString/
+  isTight/isSatisfiedBy/÷2/÷3/÷0/==, DisplayFeature/CornerRadii/
+  GestureSettings/ViewFocusEvent/enums, SystemColor errors, plugins,
+  IsolateNameServer, platform isolates, keepToString): matched on the
+  first run. compositing_api (every typed layer through the retained-layer
+  rules: used-once and previously-used-as-oldLayer messages with the hash
+  masked, dispose twice, disposed layers as oldLayer/retained; matrix and
+  Clip.none asserts, leaves, use after build/dispose, render outside a
+  frame): matched on the first run. Findings from the reference: after
+  `build()`/`Scene.dispose()` every native call throws the "native peer
+  has been collected" StateError (so "Scene has been disposed." is
+  unreachable from Dart); `FlutterView.render(disposedScene)` crashes
+  flutter_tester (segfault; not compared); flutter_tester enables
+  platform isolates and runs the UI on the platform thread
+  (isRunningOnPlatformThread is true; Go does the same).
+- **Difftest (pixels).** compositing_pixels, 39 scenes on Impeller: 35
+  within 1 (30 bit-exact, 5 blurs within 1: transforms incl. a zero matrix
+  and a w=2 projective one, hard and
+  anti-aliased rect clips, clip save layers, opacity nested (directly and
+  around a picture)/offset/0/alpha 300 wrapping to 44, color filters with commuting and
+  non-commuting opacity, blur/dilate/matrix image filters incl. offset and
+  opacity, backdrop blur/matrix with and without children and over the whole
+  frame (the mirror tile mode), shader masks
+  incl. under opacity, retained layers, texture/platform-view/overlay
+  leaves); clipRRect and clipPath.oval differ by one MSAA sample on edge
+  pixels (as their draws in painting_pixels); clipRSuperellipse by ≤2
+  samples (the SDK has no superellipse clip: dart:ui's path stands in);
+  "complex" ≤4 on 5 pixels of a skewed circle.
+- **Tests ported.** compositing_test.dart (all 6 tests, the 9 sharing
+  rules × 16 push functions), window_test.dart (all but the zone test),
+  platform_dispatcher_test.dart (ViewConstraints ×3; warm-up frame was
+  already ported), gesture_settings_test.dart, platform_view_test.dart,
+  plugin_utilities_test.dart, isolate_name_server_test.dart (the
+  multi-isolate test with a goroutine as the isolate), plus Go tests of
+  the hooks (views, metrics decoding, displays, focus, locales, user
+  settings incl. copyWith's keep-the-old-family quirk, scaleFontSize's
+  configuration-id path and cache), LayerStateStack decisions, and G7.
+- **Mutations.** 52 (SceneBuilder's debug checks and natives, the layer
+  tree and LayerStateStack, hooks decoding, user settings, scaleFontSize,
+  natives, IsolateNameServer, PluginUtilities, src/app's metrics): 4 first
+  didn't compile (rewritten), 36 caught, 12 missed; 9 of those were caught
+  after adding cases (pixel scenes: opacity directly nested, a w=2
+  matrix, a full-frame backdrop for the mirror tile mode; unit checks of
+  the default clip behavior, opacity bounds offset, overlap disabling
+  opacity inheritance, culling of an empty clip, a right inset larger than
+  its padding, the textScaleFactor 1 identity with a configuration id).
+  3 are equivalent: dropping Clip.antiAliasWithSaveLayer's saveLayer (the
+  children's applyState then saves the same layer, since pictures never
+  inherit opacity here), clipping a zero-radius rrect as an rrect instead
+  of a rect (same pixels), and the "()-" check of callback names (method
+  values and expressions always have a second dot in their names).
+  A mishap to note: the shared scratchpad held another agent's mut2.sh,
+  which was run once by name collision against that agent's worktree for
+  one mutation before being stopped; its file was verified restored.
+### services, part 2 (P3): the rest of the library, and the editing model on Flutter's types
+
+- **Scope.** services is now complete, 211/211 declarations (from 31):
+  keyboard (keyboard_key.g/keyboard_maps.g generated by
+  `src/cmd/genkeycodes` from the clone's .g.dart files, with every map's
+  Dart key order; HardwareKeyboard, KeyEvent family, KeyEventManager with
+  raw-event conversion and synthesis, RawKeyboard and all seven platform
+  RawKeyEventData classes), text input (text_input.dart in full, autofill,
+  text_editing_delta, keyboard_inserted_content, clipboard), text_boundary,
+  text_layout_metrics, text_formatter, asset_bundle/asset_manifest,
+  restoration, system_chrome/navigator/sound, haptic_feedback,
+  platform_views, mouse_cursor/mouse_tracking, undo_manager, scribe,
+  live_text, process_text, spell_check, sensitive_content,
+  browser_context_menu, deferred_component, flavor, font_loader,
+  flutter_version, app_version, predictive_back_event, and ServicesBinding's
+  remaining parts (keyboard, restoration manager, licenses from NOTICES.Z
+  through compute, memory pressure/evict on rootBundle, SystemChrome's
+  lifecycle hook, TextInput.ensureInitialized, and, once master's dart:ui
+  had ViewFocusEvent, onViewFocusChange → handleViewFocusChanged).
+- **Support.** package:characters 1.4.1 in `src/pub/characters` (its
+  generated grapheme tables and automatons, bit for bit; its own tests
+  and Unicode's grapheme test data); `dart.RegExp`/`dart.Pattern` with
+  Dart's (ECMAScript) matching on UTF-16 code units (a backtracker over
+  RE2's parse tree; no look-around/backreferences); Dart String ops at
+  the UTF-16 level on WTF-8 Go strings (`dart.StringLength`, `Substring`,
+  `ReplaceRange`, `CodeUnitAt`, `StringFromCharCodes`, `Concat`), the VM's
+  case mapping (`StringToUpperCase/LowerCase`) and `String.hashCode`,
+  `dart.LinkedMap`, `URIEncodeFull`/`URIPath`, `async.CastFuture`.
+  flutter_test: event_simulation (KeyEventSimulator, simulateKeyDown/Up/
+  RepeatEvent with the TestTextInput fallback, Tester.SendKey*),
+  TestTextInput and its macOS key handler, TestRestorationManager, fake
+  platform views; `flutter_test.New` sets FLUTTER_TEST as `flutter test`
+  does.
+- **Done with five forks** in parallel worktrees (keyboard; text input;
+  formatters/boundaries/characters; assets/restoration/system; platform
+  views/mouse/misc), each with its tests, exact difftests and mutations,
+  then merged here (conflicts only in binding.go's InitInstances and a few
+  duplicated test helpers). Before forking, the old editing model
+  (services' textedit.go/keys.go) moved out of services so the real names
+  were free, and `TextEditingValue` and the String ops were ported first
+  for every fork to share.
+- **The old editing model is gone.** The interim TextField now runs on the
+  real types through a bridge in widgets, named after its Dart files:
+  actions.go (Intent, Action, CallbackAction, DoNothingAction),
+  shortcuts.go (LockState, SingleActivator, CharacterActivator,
+  ShortcutManager's lookup), focus_manager.go (KeyEventResult,
+  combineKeyEventResults, FocusManager.handleKeyMessage over the interim
+  focus), text_editing_intents.go (all intents but the tap-outside ones),
+  default_text_editing_shortcuts.go (every platform's map, the disabling
+  maps, intentForMacOSSelector) and editable_text.go (EditableTextState's
+  actions: delete, update/expand selection, vertical moves for one line,
+  select all, copy/cut/paste through Clipboard, transpose, replace/update
+  selection, performSelector, userUpdateTextEditingValue). The field is a
+  TextInputClient (TextInput.attach on focus, setEditingState after
+  framework edits, updateEditingValue/performAction/performSelector from
+  the platform). Keys travel as in Flutter: simulated key data/raw
+  messages → KeyEventManager → handleKeyMessage → the Shortcuts handlers
+  (DefaultTextEditingShortcuts' disabling map first, as the inner
+  Shortcuts) → the field's actions; on macOS the disabling map stops
+  arrows/deletes, the key goes back unhandled and flutter_test's macOS key
+  handler sends the selectors (as the real macOS text input does).
+  painting's TextPainter.wordBoundaries (WordBoundary, _UntilTextBoundary)
+  is reproduced privately in editable_text.go on a dart:ui Paragraph until
+  the painting port has it.
+- **src/app (macOS).** Real key events: GLFW key/char callbacks are turned
+  into NSEvent-like events and fed to ports of the macOS embedder's
+  FlutterEmbedderKeyResponder and FlutterChannelKeyResponder (key data on
+  flutter/keydata, then the raw keymap message); key downs the framework
+  doesn't handle go to a text-input stand-in (macOS's standard key
+  bindings → performSelectors, insertNewline: → performAction, else
+  insertText). Host-side Clipboard (system pasteboard through GLFW) and
+  flutter/assets handlers. ENGINE GAPs: no NSTextInputContext (IME
+  composition, user key bindings), no keyboard-layout map
+  (UCKeyTranslate), GLFW gives no characters with Cmd/Ctrl held
+  (approximated); no SystemSound/SystemNavigator/mouse cursor/platform
+  view/restoration hosts.
+- **Found:** the Dart VM's case tables are older than Go's `unicode`
+  (419 upper/410 lower mappings excluded, measured over U+0000..U+1FFFF);
+  `String.hashCode` is Jenkins one-at-a-time over UTF-16 units, 30 bits,
+  0 → 1, and `null.hashCode` is 2011 (both reach platform messages);
+  insertion order of Dart Sets/LinkedHashMaps is observable (synthesized
+  key events, restoration bytes); a key_events run must be isolated (raw
+  events carry the binding's frame time stamp); Go reads
+  `raw_keyboard_android.go` as GOOS-constrained (renamed `*_data.go`);
+  Dart canonicalizes `const SingleActivator`s but not the `new` ones built
+  in DefaultTextEditingShortcuts' collection-for loops, so equal keys
+  there coexist in the map (`ShortcutMap.NonConst`); Dart reports
+  outgoing text input call errors only when the reply arrives; Go's JSON
+  decoders turn lone surrogates into U+FFFD (difftest inputs carry code
+  units); restoration data order reaches the engine's bytes; SystemChrome
+  coalesces overlay styles in a microtask; PlatformAssetBundle encodes
+  keys as `Uri(path: Uri.encodeFull(key)).path`; a Texture view whose
+  create gets a null reply falls back to platform_views_2.
+- **Difftests (all exact against Flutter 3.50.1, plain and Impeller runs
+  regenerated):** key_events (3,103 lines), raw_key_event_data (5,459),
+  text_input (625), text_editing_delta (3,040 cases), text_formatter,
+  text_boundary (+ characters scene), restoration (64), asset_manifest
+  (103), system_channels_calls (≈155), platform_views (316),
+  mouse_cursor (108), undo_scribe_misc (287); the editing difftest (8
+  scenes, Android and macOS) passes unchanged through the bridge, and a
+  new editing_actions difftest (16 scenes, every platform, clipboard,
+  selections and new values from the platform, paste over a selection,
+  transposition, expansion, affinity recorded) matched on its first run.
+- **Flutter tests ported** (skips listed in each file): hardware_keyboard
+  12/12, keyboard_key 11/11, keyboard_maps 1/1, raw_keyboard 107/107,
+  text_input, delta_text_input, autofill, text_editing_delta, clipboard
+  (all but hashCode tests and one widget-based one),
+  system_context_menu_controller 13/14, text_boundary (all but
+  moveByWordBoundary, which needs painting), text_formatter (all but the
+  const-canonicalization test), asset_bundle 11/12, asset_manifest 3/3,
+  restoration 9/9, restoration_bucket 24/24, system_chrome 13/13,
+  system_navigator 2/2, system_sound 1/1, haptic_feedback 2/2,
+  deferred_component 2/2, browser_context_menu 2/2, font_loader 2/2,
+  flutter_version + app_version 8/8, predictive_back_event 8/8,
+  platform_views 31/31, mouse_tracking 1/1, undo_manager 2/2, scribe 8/8,
+  process_text 3/3, spell_check 2/2, binding_test (licenses, memory
+  pressure, keyboard sync, textInput handler, view focus), the
+  engine's FlutterEmbedderKeyResponderTest 10/14; package:characters'
+  own tests. The bridge's widgets tests (shortcuts, actions, Focus) pump
+  unported widgets; own tests stand in.
+- **Mutations:** keyboard 45/44/1, text input 54/51/3, S1 57/55/2, S2
+  79/76/3 (each fork's equivalents argued in its report: e.g. a reconciling
+  step right before an assertion, a mask whose low byte is always zero);
+  the editing bridge and TextEditingValue 86 valid, 72 caught, 14
+  equivalent — a single-line field's line, paragraph and document
+  boundaries are all the whole text and it never wraps or holds a line
+  feed (Dart's default single-line formatter), so moveTo vs moveBeyond on
+  them, the upstream caret adjustment, continuesAtWrap and
+  shouldTargetBase can't differ; deleting from base or extent of a
+  collapsed selection is the same; copy's collapsed check repeats the
+  action's; a selection-only update and a full update set the same value;
+  the macOS map's alt+arrow entries are shadowed by the disabling map.
+  Caught only after adding scenes/tests: the forward delete's grapheme
+  alignment and affinity adjustment (platform selections mid-grapheme and
+  with upstream affinity), transposition at the start/with one character,
+  paste over a selection, candidates' order and disabled actions, the
+  UTF-16 caret after EnterText, TextEditingValue's range assertions.
+- **Parity:** master 722 → 944 of 2888 exposed (tested 540 → 682); services
+  31 → 211/211, widgets 31 → 73 (the bridge's declarations).

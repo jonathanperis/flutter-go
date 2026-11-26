@@ -41,7 +41,7 @@ go test ./...                                # unit, widget and difftests
 FLUTTER=/path/to/flutter-3.50.1/bin/flutter ./src/scripts/difftest.sh   # compare with real Flutter
 ```
 
-Requires Go 1.24+ and Xcode command-line tools.
+Requires Go 1.25+ and Xcode command-line tools.
 
 ## Import paths
 

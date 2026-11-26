@@ -15,7 +15,7 @@ const CursorWidth = 2.0
 // It is the render half of TextField (Flutter's RenderEditable, single line).
 type RenderEditable struct {
 	Box
-	value          services.Value
+	value          services.TextEditingValue
 	style          TextStyle
 	focused        bool
 	caretVisible   bool
@@ -30,11 +30,11 @@ func NewEditable(style TextStyle) *RenderEditable {
 	return &RenderEditable{style: style, CaretColor: RGB(0x1d1b20), SelectionColor: ui.Color{R: 0.4, G: 0.31, B: 0.64, A: 0.3}}
 }
 
-func (r *RenderEditable) Children() []RenderBox   { return nil }
-func (r *RenderEditable) HitTestSelf(Offset) bool { return true }
-func (r *RenderEditable) Value() services.Value   { return r.value }
+func (r *RenderEditable) Children() []RenderBox            { return nil }
+func (r *RenderEditable) HitTestSelf(Offset) bool          { return true }
+func (r *RenderEditable) Value() services.TextEditingValue { return r.value }
 
-func (r *RenderEditable) Set(v services.Value, style TextStyle, focused, caretVisible bool) {
+func (r *RenderEditable) Set(v services.TextEditingValue, style TextStyle, focused, caretVisible bool) {
 	if v.Text != r.value.Text || style != r.style {
 		MarkNeedsLayout(r)
 	} else if v != r.value || focused != r.focused || caretVisible != r.caretVisible {
@@ -62,7 +62,7 @@ func (r *RenderEditable) PerformLayout(c Constraints) Size {
 	}
 	size := c.Constrain(ui.NewSize(w, r.lineHeight))
 	// Keep the caret (selection extent) visible.
-	caret := r.para.CaretX(r.value.Selection.Extent)
+	caret := r.para.CaretX(r.value.Selection.ExtentOffset)
 	if caret-r.scrollX > size.Width-CursorWidth {
 		r.scrollX = caret - size.Width + CursorWidth
 	}
@@ -87,12 +87,12 @@ func (r *RenderEditable) Paint(cv Canvas, offset Offset) {
 	origin := ui.NewOffset(offset.Dx-r.scrollX, offset.Dy)
 	sel := r.value.Selection
 	if r.focused && !sel.IsCollapsed() {
-		x0, x1 := r.para.CaretX(sel.Start()), r.para.CaretX(sel.End())
+		x0, x1 := r.para.CaretX(sel.Start), r.para.CaretX(sel.End)
 		cv.DrawRect(ui.NewRectFromLTWH(origin.Dx+x0, origin.Dy, x1-x0, r.lineHeight), r.SelectionColor)
 	}
 	cv.DrawParagraph(r.para, origin)
 	if r.focused && r.caretVisible && sel.IsCollapsed() {
-		x := r.para.CaretX(sel.Extent)
+		x := r.para.CaretX(sel.ExtentOffset)
 		cv.DrawRect(ui.NewRectFromLTWH(origin.Dx+x, origin.Dy, CursorWidth, r.lineHeight), r.CaretColor)
 	}
 	cv.Restore()

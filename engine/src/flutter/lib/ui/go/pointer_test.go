@@ -153,8 +153,11 @@ func TestGestureSettings(t *testing.T) {
 	if v.DevicePixelRatio() != 1.0 || !v.GestureSettings().Equal(GestureSettings{}) {
 		t.Fatal("defaults")
 	}
-	defer delete(viewGestureMetrics, 0)
-	NewPlatformConfiguration(nil).UpdateViewGestureMetrics(0, 3, g)
+	saved := v.configuration
+	defer func() { v.configuration = saved }()
+	m := NewViewportMetrics()
+	m.DevicePixelRatio, m.PhysicalTouchSlop = 3, 1
+	NewPlatformConfiguration(nil).UpdateViewMetrics(0, m)
 	if v.DevicePixelRatio() != 3 || !v.GestureSettings().Equal(g) {
 		t.Fatal("updated metrics")
 	}

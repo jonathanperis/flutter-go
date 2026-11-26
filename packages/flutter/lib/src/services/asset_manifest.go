@@ -1,89 +1,108 @@
 package services
 
-// Port of asset_manifest.dart (Flutter 3.50.1): AssetManifest (the
-// flutter tool's AssetManifest.bin, a StandardMessageCodec map from asset
-// keys to their variants) and AssetMetadata.
+// Port of asset_manifest.dart (Flutter 3.50.1).
 
 import (
 	"regexp"
-	"sort"
 
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/foundation"
 	"github.com/jonathanperis/flutter-go/src/async"
 	"github.com/jonathanperis/flutter-go/src/dart"
 )
 
-const (
-	assetManifestFilename    = "AssetManifest.bin"
-	assetManifestWebFilename = "AssetManifest.bin.json"
-)
+// We use .bin as the extension since it is well-known to represent data
+// in some arbitrary binary format.
+const kAssetManifestFilename = "AssetManifest.bin"
 
 // AssetManifest contains details about available assets and their
-// variants.
+// variants (an abstract class).
 type AssetManifest interface {
-	// ListAssets lists the keys of all main assets (not variants). The
-	// keys not yet looked up with GetAssetVariants come first, sorted (Go
-	// maps lose the manifest's order), then the looked-up ones in lookup
-	// order.
+	// ListAssets lists the keys of all main assets in the application, in
+	// the manifest's order (variants already read through
+	// GetAssetVariants come last, in the order they were read).
 	ListAssets() []string
-	// GetAssetVariants returns the asset's available variants, the main
-	// asset included; nil when key is not a main asset.
+	// GetAssetVariants retrieves metadata about an asset and its variants;
+	// nil (Dart's null) if the asset is not in the manifest.
 	GetAssetVariants(key string) []AssetMetadata
 }
 
 // AssetManifestLoadFromAssetBundle is AssetManifest.loadFromAssetBundle:
-// it loads and parses the manifest of bundle (cached by
-// CachingAssetBundle's LoadStructuredBinaryData).
+// it loads asset manifest data from bundle and parses it (on the web,
+// which flutter-go never is, the manifest is JSON(base64)).
 func AssetManifestLoadFromAssetBundle(bundle AssetBundle) async.Future[AssetManifest] {
 	if foundation.KIsWeb {
-		panic(dart.UnsupportedError{Message: assetManifestWebFilename + " is web-only"})
+		panic(dart.UnsupportedError{Message: "the web asset manifest is not supported"})
 	}
-	return AssetBundleLoadStructuredBinaryData(bundle, assetManifestFilename,
-		func(data []byte) AssetManifest { return assetManifestBinFromStandardMessageCodecMessage(data) })
+	// On every other platform, the binary file contents are used directly.
+	return AssetBundleLoadStructuredBinaryData(bundle, kAssetManifestFilename, assetManifestBinFromStandardMessageCodecMessage)
 }
 
+// assetManifestBin is _AssetManifestBin: it lazily parses the binary asset
+// manifest (a map of asset keys to lists of variant maps with "asset" and
+// "dpr" entries).
 type assetManifestBin struct {
-	data           map[any]any
-	typeCastedData map[string][]AssetMetadata
-	typeCastedKeys []string
+	data          *dart.LinkedMap // _data, in the manifest's order
+	typeCasted    map[string][]AssetMetadata
+	typeCastedOrd []string // _typeCastedData's keys in insertion order
 }
 
-func assetManifestBinFromStandardMessageCodecMessage(message []byte) *assetManifestBin {
-	data := NewStandardMessageCodec().DecodeMessage(message)
-	m, _ := data.(map[any]any)
-	if m == nil && data != nil {
-		panic(dart.NewException("AssetManifest.bin is not a map"))
+func assetManifestBinFromStandardMessageCodecMessage(message []byte) AssetManifest {
+	data := newOrderedStandardMessageCodec().DecodeMessage(message)
+	entries, ok := data.(*dart.LinkedMap)
+	if !ok {
+		panic(dart.TypeError{Message: "type '" + foundation.ObjectRuntimeType(data, "Null") +
+			"' is not a subtype of type 'Map<Object?, Object?>' in type cast"})
 	}
-	return &assetManifestBin{data: m, typeCastedData: map[string][]AssetMetadata{}}
+	return &assetManifestBin{data: entries, typeCasted: map[string][]AssetMetadata{}}
 }
 
 var hashedExtensionSuffixPattern = regexp.MustCompile(`\.[0-9a-f]{8}((?:\.(?:js|wasm|mjs)\.map)|(?:\.[^./]+))?$`)
 
-func stripContentHash(p string) string {
-	loc := hashedExtensionSuffixPattern.FindStringSubmatchIndex(p)
+func stripContentHash(path string) string {
+	loc := hashedExtensionSuffixPattern.FindStringSubmatchIndex(path)
 	if loc == nil {
-		return p
+		return path
 	}
 	group := ""
 	if loc[2] >= 0 {
-		group = p[loc[2]:loc[3]]
+		group = path[loc[2]:loc[3]]
 	}
-	return p[:loc[0]] + group + p[loc[1]:]
+	return path[:loc[0]] + group + path[loc[1]:]
 }
 
 func (m *assetManifestBin) GetAssetVariants(key string) []AssetMetadata {
-	if _, ok := m.typeCastedData[key]; !ok {
-		variantData := m.data[key]
+	// We lazily delay typecasting to prevent a performance hiccup when
+	// parsing large asset manifests.
+	if _, ok := m.typeCasted[key]; !ok {
+		variantData := m.data.Lookup(key)
 		if variantData == nil {
 			return nil
 		}
-		var variants []AssetMetadata
-		for _, d := range variantData.([]any) {
-			data := d.(map[any]any)
-			asset := data["asset"].(string)
+		list, ok := variantData.([]any)
+		if !ok {
+			panic(dart.TypeError{Message: "type '" + foundation.ObjectRuntimeType(variantData, "Object") +
+				"' is not a subtype of type 'Iterable<Object?>' in type cast"})
+		}
+		variants := make([]AssetMetadata, 0, len(list))
+		for _, item := range list {
+			variant, ok := item.(*dart.LinkedMap)
+			if !ok {
+				panic(dart.TypeError{Message: "type '" + foundation.ObjectRuntimeType(item, "Null") +
+					"' is not a subtype of type 'Map<Object?, Object?>' in type cast"})
+			}
+			rawAsset := variant.Lookup("asset")
+			if rawAsset == nil {
+				panic(dart.TypeError{Message: "Null check operator used on a null value"})
+			}
+			asset := castElement[string](rawAsset)
 			var dpr *float64
-			if v, ok := data["dpr"].(float64); ok {
-				dpr = &v
+			if rawDpr := variant.Lookup("dpr"); rawDpr != nil {
+				d, ok := rawDpr.(float64)
+				if !ok {
+					panic(dart.TypeError{Message: "type '" + foundation.ObjectRuntimeType(rawDpr, "Object") +
+						"' is not a subtype of type 'double?' in type cast"})
+				}
+				dpr = &d
 			}
 			variants = append(variants, AssetMetadata{
 				Key:                    asset,
@@ -91,32 +110,29 @@ func (m *assetManifestBin) GetAssetVariants(key string) []AssetMetadata {
 				Main:                   key == asset || stripContentHash(asset) == key,
 			})
 		}
-		if variants == nil {
-			variants = []AssetMetadata{}
-		}
-		m.typeCastedData[key] = variants
-		m.typeCastedKeys = append(m.typeCastedKeys, key)
-		delete(m.data, key)
+		m.typeCasted[key] = variants
+		m.typeCastedOrd = append(m.typeCastedOrd, key)
+		m.data.Remove(key)
 	}
-	return m.typeCastedData[key]
+	return m.typeCasted[key]
 }
 
 func (m *assetManifestBin) ListAssets() []string {
-	keys := make([]string, 0, len(m.data)+len(m.typeCastedKeys))
-	for k := range m.data {
-		keys = append(keys, k.(string))
+	out := make([]string, 0, m.data.Len()+len(m.typeCastedOrd))
+	for _, k := range m.data.Keys() {
+		out = append(out, castElement[string](k))
 	}
-	sort.Strings(keys)
-	return append(keys, m.typeCastedKeys...)
+	return append(out, m.typeCastedOrd...)
 }
 
-// AssetMetadata contains information about an asset.
+// AssetMetadata contains information about an asset (a struct literal).
 type AssetMetadata struct {
-	// TargetDevicePixelRatio is the device pixel ratio this asset is most
-	// ideal for (nil: unspecified).
+	// TargetDevicePixelRatio is the device pixel ratio that this asset is
+	// most ideal for (nil: the main asset, not a resolution variant).
 	TargetDevicePixelRatio *float64
-	// Key is the asset's key, its path in the bundle.
+	// Key is the asset's key, which is the path to the asset specified in
+	// the pubspec.
 	Key string
-	// Main is whether this is the main asset rather than a variant.
+	// Main is whether or not this is a main asset (not a variant).
 	Main bool
 }

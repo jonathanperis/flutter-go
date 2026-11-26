@@ -5,10 +5,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/foundation"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/painting"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/services"
 	. "github.com/jonathanperis/flutter-go/packages/flutter/lib/src/widgets"
 	"github.com/jonathanperis/flutter-go/packages/flutter_test/lib/src"
+	"github.com/jonathanperis/flutter-go/src/async"
 )
 
 func caretDrawn(t *flutter_test.Tester) bool {
@@ -56,8 +58,8 @@ func TestTapPlacesCaret(t *testing.T) {
 	// Test font: 14px per glyph. x=45 is nearest the boundary after "hel" (42).
 	tester.TapAt(45, 5)
 	tester.Pump()
-	if got := c.Value().Selection; got != services.Collapsed(3) {
-		t.Fatalf("selection = %+v, want caret at 3", got)
+	if got := c.Value().Selection; !got.Equal(services.NewTextSelectionCollapsed(3)) {
+		t.Fatalf("selection = %v, want caret at 3", got)
 	}
 }
 
@@ -65,16 +67,42 @@ func TestClipboardAndSubmit(t *testing.T) {
 	var submitted string
 	c := NewTextEditingController("")
 	tester := flutter_test.New(t)
+	var clip *string
+	messenger := tester.Binding().DefaultBinaryMessenger().(*flutter_test.TestDefaultBinaryMessenger)
+	messenger.SetMockMethodCallHandler(services.SystemChannels.Platform, func(call services.MethodCall) async.Future[any] {
+		switch call.Method {
+		case "Clipboard.setData":
+			s := call.Arguments.(map[string]any)["text"].(string)
+			clip = &s
+		case "Clipboard.getData":
+			if clip != nil {
+				return async.FutureValue[any](map[string]any{"text": *clip})
+			}
+		}
+		return async.FutureValue[any](nil)
+	})
+	defer messenger.SetMockMethodCallHandler(services.SystemChannels.Platform, nil)
 	tester.PumpWidget(TextField{Controller: c, Autofocus: true, OnSubmitted: func(s string) { submitted = s }})
 	tester.EnterText("copy me")
-	tester.SendKey(services.KeyEvent{Key: services.KeyA, Ctrl: true})
-	tester.SendKey(services.KeyEvent{Key: services.KeyX, Ctrl: true})
-	if c.Text() != "" || tester.Owner.Clipboard.Get() != "copy me" {
-		t.Fatalf("cut: text %q clipboard %q", c.Text(), tester.Owner.Clipboard.Get())
+	chord := func(key services.LogicalKeyboardKey) {
+		tester.SendKeyDownEvent(services.LogicalKeyboardKeyControlLeft)
+		tester.SendKeyEvent(key)
+		tester.SendKeyUpEvent(services.LogicalKeyboardKeyControlLeft)
+		tester.Pump()
 	}
-	tester.SendKey(services.KeyEvent{Key: services.KeyV, Ctrl: true})
-	tester.SendKey(services.KeyEvent{Key: services.KeyV, Ctrl: true})
-	tester.SendKey(services.KeyEvent{Key: services.KeyEnter})
+	chord(services.LogicalKeyboardKeyKeyA)
+	chord(services.LogicalKeyboardKeyKeyX)
+	if c.Text() != "" || clip == nil || *clip != "copy me" {
+		t.Fatalf("cut: text %q clipboard %v", c.Text(), clip)
+	}
+	chord(services.LogicalKeyboardKeyKeyV)
+	chord(services.LogicalKeyboardKeyKeyV)
+	// Enter is the platform's: its text input sends the action.
+	if tester.SendKeyEvent(services.LogicalKeyboardKeyEnter) {
+		t.Fatal("Enter should not be handled by the framework (DoNothingAndStopPropagationTextIntent)")
+	}
+	tester.Binding().TestTextInput().ReceiveAction(services.TextInputActionDone)
+	tester.Pump()
 	if submitted != "copy mecopy me" {
 		t.Fatalf("submitted %q", submitted)
 	}
@@ -97,21 +125,31 @@ func TestFocusMovesBetweenFields(t *testing.T) {
 }
 
 func TestMacOSShortcuts(t *testing.T) {
+	mac := foundation.TargetPlatformMacOS
+	foundation.SetDebugDefaultTargetPlatformOverride(&mac)
+	defer foundation.SetDebugDefaultTargetPlatformOverride(nil)
 	c := NewTextEditingController("")
 	tester := flutter_test.New(t)
-	tester.Owner.Platform = services.MacOS
+	tester.Owner.Platform = foundation.TargetPlatformMacOS
 	tester.PumpWidget(TextField{Controller: c, Autofocus: true})
 	tester.EnterText("hello brave world")
-	tester.SendKey(services.KeyEvent{Key: services.KeyLeft, Alt: true}) // word left on macOS
-	if c.Value().Selection != services.Collapsed(12) {
-		t.Fatalf("alt+left: %+v", c.Value().Selection)
+	with := func(mod, key services.LogicalKeyboardKey) {
+		tester.SendKeyDownEvent(mod)
+		tester.SendKeyEvent(key)
+		tester.SendKeyUpEvent(mod)
+		tester.Pump()
 	}
-	tester.SendKey(services.KeyEvent{Key: services.KeyLeft, Meta: true}) // line start on macOS
-	if c.Value().Selection != services.Collapsed(0) {
-		t.Fatalf("cmd+left: %+v", c.Value().Selection)
+	with(services.LogicalKeyboardKeyAltLeft, services.LogicalKeyboardKeyArrowLeft) // word left on macOS
+	if !c.Value().Selection.Equal(services.NewTextSelectionCollapsed(12)) {
+		t.Fatalf("alt+left: %v", c.Value().Selection)
 	}
-	tester.SendKey(services.KeyEvent{Key: services.KeyEnd}) // scrolls on macOS; caret stays
-	if c.Value().Selection != services.Collapsed(0) {
-		t.Fatalf("end moved the caret on macOS: %+v", c.Value().Selection)
+	with(services.LogicalKeyboardKeyMetaLeft, services.LogicalKeyboardKeyArrowLeft) // line start on macOS
+	if !c.Value().Selection.Equal(services.NewTextSelectionCollapsed(0)) {
+		t.Fatalf("cmd+left: %v", c.Value().Selection)
+	}
+	tester.SendKeyEvent(services.LogicalKeyboardKeyEnd) // scrolls on macOS; caret stays
+	tester.Pump()
+	if !c.Value().Selection.Equal(services.NewTextSelectionCollapsed(0)) {
+		t.Fatalf("end moved the caret on macOS: %v", c.Value().Selection)
 	}
 }

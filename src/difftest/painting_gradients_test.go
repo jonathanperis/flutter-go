@@ -720,8 +720,8 @@ func TestPaintingGradientsMatchFlutter(t *testing.T) {
 	}
 	tester := flutter_test.New(t)
 	// flutter_tester's view has a device pixel ratio of 3.0.
-	ui.NewPlatformConfiguration(nil).UpdateViewGestureMetrics(0, 3.0, ui.GestureSettings{})
-	defer ui.NewPlatformConfiguration(nil).UpdateViewGestureMetrics(0, 1.0, ui.GestureSettings{})
+	ui.NewPlatformConfiguration(nil).UpdateViewMetrics(0, viewMetricsWithDPR(3.0))
+	defer ui.NewPlatformConfiguration(nil).UpdateViewMetrics(0, ui.NewViewportMetrics())
 	cases := paintingGradientsCases(t, tester)
 	if len(ref) != len(cases) {
 		t.Errorf("reference has %d cases, Go has %d", len(ref), len(cases))

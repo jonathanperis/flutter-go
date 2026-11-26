@@ -189,8 +189,8 @@ func TestPaintingDecorationsPixelsMatchFlutter(t *testing.T) {
 		t.Fatal("no Metal device: the pixel difftest needs one")
 	}
 	flutter_test.New(t) // paintImage reads PaintingBinding.instance
-	ui.NewPlatformConfiguration(nil).UpdateViewGestureMetrics(0, 3.0, ui.GestureSettings{})
-	defer ui.NewPlatformConfiguration(nil).UpdateViewGestureMetrics(0, 1.0, ui.GestureSettings{})
+	ui.NewPlatformConfiguration(nil).UpdateViewMetrics(0, viewMetricsWithDPR(3.0))
+	defer ui.NewPlatformConfiguration(nil).UpdateViewMetrics(0, ui.NewViewportMetrics())
 	img := checkerImage(t)
 	scenes := decorationPixelScenes(img)
 	if len(ref) != len(scenes) {
@@ -233,4 +233,12 @@ func TestPaintingDecorationsPixelsMatchFlutter(t *testing.T) {
 			t.Errorf("%s: max channel difference %d (%d pixels > 2), tolerance %+v", name, maxDiff, over2, tol)
 		}
 	}
+}
+
+// viewMetricsWithDPR is the implicit view's default metrics with the given
+// device pixel ratio (flutter_tester's is 3.0).
+func viewMetricsWithDPR(dpr float64) ui.ViewportMetrics {
+	m := ui.NewViewportMetrics()
+	m.DevicePixelRatio = dpr
+	return m
 }

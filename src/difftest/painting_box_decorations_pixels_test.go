@@ -174,8 +174,8 @@ func TestPaintingBoxDecorationsPixelsMatchFlutter(t *testing.T) {
 	// As the Dart side: the test binding disables shadows; paint them.
 	defer func(old bool) { p.DebugDisableShadows = old }(p.DebugDisableShadows)
 	p.DebugDisableShadows = false
-	ui.NewPlatformConfiguration(nil).UpdateViewGestureMetrics(0, 3.0, ui.GestureSettings{})
-	defer ui.NewPlatformConfiguration(nil).UpdateViewGestureMetrics(0, 1.0, ui.GestureSettings{})
+	ui.NewPlatformConfiguration(nil).UpdateViewMetrics(0, viewMetricsWithDPR(3.0))
+	defer ui.NewPlatformConfiguration(nil).UpdateViewMetrics(0, ui.NewViewportMetrics())
 	defer func() {
 		p.ImageCacheInstance().Clear()
 		p.ImageCacheInstance().ClearLiveImages()

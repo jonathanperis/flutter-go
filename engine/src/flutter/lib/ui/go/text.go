@@ -1,9 +1,11 @@
 package ui
 
-// Partial port of engine/src/flutter/lib/ui/text.dart (Flutter 3.50.1):
-// TextDirection, TextAffinity, TextPosition and TextRange (what semantics
-// and services' TextSelection need). Text styles, paragraphs and the rest of
-// text.dart come with the painting port.
+// Port of engine/src/flutter/lib/ui/text.dart (Flutter 3.50.1), in parts:
+// this file has TextDirection, TextAffinity, TextPosition and TextRange;
+// text_font.go the font and decoration types, text_style.go TextStyle,
+// ParagraphStyle and StrutStyle, text_metrics.go GlyphInfo, TextBox,
+// LineMetrics and the box/placeholder enums, text_paragraph.go Paragraph,
+// ParagraphBuilder and loadFontFromList.
 
 import (
 	"strconv"

@@ -1,6 +1,6 @@
 package services
 
-// Partial port of binding.dart (Flutter 3.50.1): ServicesBinding's
+// Port of binding.dart (Flutter 3.50.1): ServicesBinding's
 // messaging (defaultBinaryMessenger, createBinaryMessenger, channelBuffers,
 // rootIsolateToken, _DefaultBinaryMessenger), the system, accessibility,
 // lifecycle and platform channel handlers (memory pressure, accessibility
@@ -8,15 +8,18 @@ package services
 // system context menu client), exitApplication, initializationComplete and
 // the service extensions.
 //
-// Not ported yet (they come with their libraries): the keyboard
-// (HardwareKeyboard, KeyEventManager, the key event channel), the
-// restoration manager, TextInput.ensureInitialized, the licenses read from
-// the asset bundle (initLicenses), the root bundle's clear/evict
-// (handleMemoryPressure and evict do nothing else), SystemChrome's
-// lifecycle hook, and PlatformDispatcher.onViewFocusChange /
-// handleViewFocusChanged.
+// Also the keyboard (HardwareKeyboard, KeyEventManager, the key event
+// channel; hardware_keyboard.go), the restoration manager, the licenses
+// read from the asset bundle (initLicenses), the root bundle's clear/evict
+// and SystemChrome's lifecycle hook, TextInput.ensureInitialized and
+// PlatformDispatcher.onViewFocusChange (handleViewFocusChanged).
 
 import (
+	"bytes"
+	"compress/gzip"
+	"io"
+	"strings"
+
 	ui "github.com/jonathanperis/flutter-go/engine/src/flutter/lib/ui/go"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/foundation"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/scheduler"
@@ -54,6 +57,10 @@ type ServicesBinding interface {
 	// from PlatformDispatcher.InitialLifecycleState, unless it is already
 	// set or the initial state is empty.
 	ReadInitialLifecycleStateFromNativeWindow()
+	// HandleViewFocusChanged is called whenever the PlatformDispatcher
+	// receives a notification that the focus state on a view has changed
+	// (PlatformDispatcher.onViewFocusChange); overrides must call it.
+	HandleViewFocusChanged(event ui.ViewFocusEvent)
 	// AccessibilityFocus is the id of the semantics node that has
 	// accessibility focus on the platform (nil when none).
 	AccessibilityFocus() *foundation.ValueNotifier[*int]
@@ -70,6 +77,21 @@ type ServicesBinding interface {
 	// InitializationComplete tells the platform that the framework has
 	// initialized (it may then remove the splash screen).
 	InitializationComplete() async.Future[async.Void]
+	// InitLicenses adds the licenses the flutter tool collected (the
+	// NOTICES.Z asset) to the LicenseRegistry; overrides must call it.
+	InitLicenses()
+	// RestorationManager is the RestorationManager synchronizing the
+	// restoration data with the engine (a binding may return a subtype's
+	// embedded manager, as flutter_test's does).
+	RestorationManager() *RestorationManager
+	// CreateRestorationManager creates the RestorationManager (called once,
+	// by InitInstances; bindings override it).
+	CreateRestorationManager() *RestorationManager
+
+	// Keyboard is the global HardwareKeyboard (HardwareKeyboard.instance).
+	Keyboard() *HardwareKeyboard
+	// KeyEventManager dispatches key messages (deprecated).
+	KeyEventManager() *KeyEventManager
 
 	servicesBinding() *ServicesBindingMixin
 }
@@ -118,9 +140,12 @@ type ServicesBindingMixin struct {
 	self ServicesBinding
 
 	defaultBinaryMessenger  BinaryMessenger
+	restorationManager      *RestorationManager
 	accessibilityFocus      *foundation.ValueNotifier[*int]
 	systemUiChangeCallback  SystemUiChangeCallback
 	systemContextMenuClient SystemContextMenuClient
+	keyboard                *HardwareKeyboard
+	keyEventManager         *KeyEventManager
 }
 
 // SetSelf points the mixin at the binding embedding it, whose methods it
@@ -152,6 +177,9 @@ func (m *ServicesBindingMixin) InitInstances() {
 	self := m.outer()
 	servicesBindingInstance = self
 	m.defaultBinaryMessenger = self.CreateBinaryMessenger()
+	m.restorationManager = self.CreateRestorationManager()
+	m.initKeyboard()
+	self.InitLicenses()
 	// The handlers' Future<void> results are encoded as null.
 	SystemChannels.System.SetMessageHandler(func(message any) async.Future[any] {
 		return voidToNull(self.HandleSystemMessage(message))
@@ -161,6 +189,8 @@ func (m *ServicesBindingMixin) InitInstances() {
 	})
 	SystemChannels.Lifecycle.SetMessageHandler(m.handleLifecycleMessage)
 	SystemChannels.Platform.SetMethodCallHandler(m.handlePlatformMessage)
+	self.PlatformDispatcher().SetOnViewFocusChange(self.HandleViewFocusChanged)
+	TextInputEnsureInitialized()
 	self.ReadInitialLifecycleStateFromNativeWindow()
 	self.InitializationComplete()
 }
@@ -172,6 +202,23 @@ func voidToNull(f async.Future[async.Void]) async.Future[any] {
 		f.Await()
 		return nil
 	})
+}
+
+func (m *ServicesBindingMixin) Keyboard() *HardwareKeyboard { return m.keyboard }
+
+func (m *ServicesBindingMixin) KeyEventManager() *KeyEventManager { return m.keyEventManager }
+
+// initKeyboard is _initKeyboard: the key handlers are installed once the
+// platform has answered getKeyboardState.
+func (m *ServicesBindingMixin) initKeyboard() {
+	m.keyboard = NewHardwareKeyboard()
+	m.keyEventManager = NewKeyEventManager(m.keyboard, RawKeyboardInstance)
+	async.OnComplete(m.keyboard.SyncKeyboardState(), func(async.Void) {
+		m.outer().PlatformDispatcher().SetOnKeyData(m.keyEventManager.HandleKeyData)
+		SystemChannels.KeyEvent.SetMessageHandler(func(message any) async.Future[any] {
+			return async.Then(m.keyEventManager.HandleRawKeyMessage(message), func(r map[string]any) any { return r })
+		})
+	}, nil)
 }
 
 func (m *ServicesBindingMixin) DefaultBinaryMessenger() BinaryMessenger {
@@ -229,6 +276,79 @@ func (m *ServicesBindingMixin) Evict(asset string) {
 	RootBundle.Evict(asset)
 }
 
+func (m *ServicesBindingMixin) InitLicenses() {
+	foundation.LicenseRegistry.AddLicense(m.addLicenses)
+}
+
+func (m *ServicesBindingMixin) addLicenses() async.Stream[foundation.LicenseEntry] {
+	var controller *async.StreamController[foundation.LicenseEntry]
+	controller = async.NewStreamController[foundation.LicenseEntry](async.StreamControllerOptions{
+		OnListen: func() {
+			async.AsyncVoid(func() {
+				var rawLicenses string
+				if foundation.KIsWeb {
+					// NOTICES for web isn't compressed since we don't have
+					// access to dart:io on the client side and it's already
+					// compressed between the server and client.
+					rawLicenses = RootBundle.LoadString("NOTICES", LoadStringOptions{NoCache: true}).Await()
+				} else {
+					// The compressed version doesn't have a more common .gz
+					// extension because gradle for Android non-transparently
+					// manipulates .gz files.
+					licenseBytes := RootBundle.Load("NOTICES.Z").Await()
+					decompress, decode := "decompressLicenses", "utf8DecodeLicenses"
+					unzippedBytes := foundation.Compute(gzipDecode, licenseBytes,
+						foundation.ComputeOptions{DebugLabel: &decompress}).Await()
+					rawLicenses = foundation.Compute(dart.UTF8Decode, unzippedBytes,
+						foundation.ComputeOptions{DebugLabel: &decode}).Await()
+				}
+				parse := "parseLicenses"
+				licenses := foundation.Compute(parseLicenses, rawLicenses,
+					foundation.ComputeOptions{DebugLabel: &parse}).Await()
+				for _, license := range licenses {
+					controller.Add(license)
+				}
+				controller.Close().Await()
+			})
+		},
+	})
+	return controller.Stream()
+}
+
+// gzipDecode is dart:io's gzip.decode (concatenated members included).
+func gzipDecode(data []byte) []byte {
+	r, err := gzip.NewReader(bytes.NewReader(data))
+	if err != nil {
+		panic(dart.NewFormatException("Filter error, bad data"))
+	}
+	out, err := io.ReadAll(r)
+	if err != nil {
+		panic(dart.NewFormatException("Filter error, bad data"))
+	}
+	return out
+}
+
+// parseLicenses is _parseLicenses (run in another isolate by
+// _addLicenses): the NOTICES text split into entries at lines of 80
+// dashes; an entry's first paragraph lists its packages, one per line.
+func parseLicenses(rawLicenses string) []foundation.LicenseEntry {
+	licenseSeparator := "\n" + strings.Repeat("-", 80) + "\n"
+	var out []foundation.LicenseEntry
+	for _, license := range strings.Split(rawLicenses, licenseSeparator) {
+		if split := strings.Index(license, "\n\n"); split >= 0 {
+			out = append(out, foundation.NewLicenseEntryWithLineBreaks(
+				strings.Split(license[:split], "\n"), license[split+2:]))
+		} else {
+			out = append(out, foundation.NewLicenseEntryWithLineBreaks([]string{}, license))
+		}
+	}
+	return out
+}
+
+// HandleViewFocusChanged is handleViewFocusChanged: it does nothing (later
+// bindings override it).
+func (m *ServicesBindingMixin) HandleViewFocusChanged(event ui.ViewFocusEvent) {}
+
 func (m *ServicesBindingMixin) ReadInitialLifecycleStateFromNativeWindow() {
 	self := m.outer()
 	if self.LifecycleState() != nil || self.PlatformDispatcher().InitialLifecycleState() == "" {
@@ -250,7 +370,7 @@ func (m *ServicesBindingMixin) handleLifecycleMessage(message *string) async.Fut
 		generated := m.generateStateTransitions(m.outer().LifecycleState(), *state)
 		for _, stateChange := range generated {
 			m.outer().HandleAppLifecycleStateChanged(stateChange)
-			// SystemChrome.handleAppLifecycleStateChanged: not ported yet.
+			SystemChrome.HandleAppLifecycleStateChanged(stateChange)
 		}
 		return nil
 	})
@@ -424,6 +544,12 @@ func (m *ServicesBindingMixin) ExitApplication(exitType ui.AppExitType, exitCode
 			return ui.AppExitResponseExit
 		}
 	})
+}
+
+func (m *ServicesBindingMixin) RestorationManager() *RestorationManager { return m.restorationManager }
+
+func (m *ServicesBindingMixin) CreateRestorationManager() *RestorationManager {
+	return NewRestorationManager()
 }
 
 func (m *ServicesBindingMixin) SetSystemUiChangeCallback(callback SystemUiChangeCallback) {
