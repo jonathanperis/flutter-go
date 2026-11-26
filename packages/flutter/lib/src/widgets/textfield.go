@@ -1,20 +1,37 @@
 package widgets
 
+// Interim single-line text field (flutter-go's own widget, until
+// EditableText/TextField are ported). Its state behaves as
+// EditableTextState does for the parts ported in editable_text.go: the
+// value is a services.TextEditingValue, keys go through the default text
+// editing shortcuts to EditableText's actions, and it is a TextInputClient
+// of the platform's text input (TextInput.attach on focus, setEditingState
+// when the framework changes the value, updateEditingValue/performAction/
+// performSelector from the platform).
+
 import (
+	"reflect"
 	"time"
 
 	"github.com/jonathanperis/flutter-go/src/async"
+	"github.com/jonathanperis/flutter-go/src/dart"
 
 	r "github.com/jonathanperis/flutter-go/packages/flutter/lib/src/rendering"
-	"github.com/jonathanperis/flutter-go/src/textedit"
+	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/services"
 )
 
 // CursorBlinkHalfPeriod is Flutter's cursor blink interval.
 const CursorBlinkHalfPeriod = 500 * time.Millisecond
 
-// KeyTarget receives keyboard input while focused.
+// KeyTarget is the interim primary focus: a widget receiving keyboard
+// input while focused.
 type KeyTarget interface {
-	HandleKey(ev textedit.KeyEvent) bool
+	// KeyEventHandlers are the onKeyEvent handlers of the focused node and
+	// its ancestors, leaf first (see BuildOwner.HandleKeyMessage).
+	KeyEventHandlers() []OnKeyEventCallback
+	// InsertText commits text as a platform text input plugin does (the
+	// selection is replaced and the new value sent with
+	// TextInputClient.updateEditingValue).
 	InsertText(s string)
 	focusChanged(focused bool)
 }
@@ -36,15 +53,8 @@ func (o *BuildOwner) RequestFocus(t KeyTarget) {
 	}
 }
 
-// DispatchKey sends a key to the focused target.
-func (o *BuildOwner) DispatchKey(ev textedit.KeyEvent) bool {
-	if o.focus == nil {
-		return false
-	}
-	return o.focus.HandleKey(ev)
-}
-
-// DispatchText sends committed text (typing, IME commit) to the focused target.
+// DispatchText sends committed text (typing, IME commit) to the focused
+// target, as the platform's text input plugin would.
 func (o *BuildOwner) DispatchText(s string) {
 	if o.focus != nil {
 		o.focus.InsertText(s)
@@ -53,21 +63,24 @@ func (o *BuildOwner) DispatchText(s string) {
 
 // TextEditingController holds the value of a TextField.
 type TextEditingController struct {
-	value     textedit.Value
+	value     services.TextEditingValue
 	listeners []func()
 }
 
+// NewTextEditingController is TextEditingController(text:): the text with
+// no selection.
 func NewTextEditingController(text string) *TextEditingController {
-	n := textedit.Len16(text)
-	return &TextEditingController{value: textedit.Value{Text: text, Selection: textedit.Collapsed(n), Composing: textedit.Selection{Base: -1, Extent: -1}}}
+	return &TextEditingController{value: services.NewTextEditingValue(services.TextEditingValueOptions{Text: text})}
 }
 
-func (c *TextEditingController) Value() textedit.Value { return c.value }
-func (c *TextEditingController) Text() string          { return c.value.Text }
-func (c *TextEditingController) AddListener(f func())  { c.listeners = append(c.listeners, f) }
+func (c *TextEditingController) Value() services.TextEditingValue { return c.value }
+func (c *TextEditingController) Text() string                     { return c.value.Text }
+func (c *TextEditingController) AddListener(f func())             { c.listeners = append(c.listeners, f) }
 
-func (c *TextEditingController) SetValue(v textedit.Value) {
-	if v == c.value {
+// SetValue sets the value and notifies the listeners when it changed
+// (ValueNotifier's ==).
+func (c *TextEditingController) SetValue(v services.TextEditingValue) {
+	if v.Equal(c.value) {
 		return
 	}
 	c.value = v
@@ -76,9 +89,10 @@ func (c *TextEditingController) SetValue(v textedit.Value) {
 	}
 }
 
-// SetText replaces the text and puts the caret at the end.
+// SetText is the text setter: the selection and composing range are
+// cleared.
 func (c *TextEditingController) SetText(s string) {
-	c.SetValue(textedit.Value{Text: s, Selection: textedit.Collapsed(textedit.Len16(s)), Composing: textedit.Selection{Base: -1, Extent: -1}})
+	c.SetValue(services.NewTextEditingValue(services.TextEditingValueOptions{Text: s}))
 }
 
 // TextField is a single-line text input.
@@ -86,6 +100,7 @@ type TextField struct {
 	Controller  *TextEditingController // nil: the field keeps its own
 	Style       r.TextStyle
 	Autofocus   bool
+	ReadOnly    bool
 	OnChanged   func(text string)
 	OnSubmitted func(text string)
 }
@@ -94,11 +109,19 @@ func (TextField) CreateState() State { return &textFieldState{} }
 
 type textFieldState struct {
 	StateOf[TextField]
+	services.TextInputClientMixin
 	own          *TextEditingController
 	focused      bool
 	caretVisible bool
 	blinkTimer   *async.Timer
 	render       *r.RenderEditable
+
+	actions    map[reflect.Type]Action
+	textLayout *editableTextLayout
+
+	connection                     *services.TextInputConnection
+	lastKnownRemoteTextEditingValue *services.TextEditingValue
+	batchEditDepth                 int
 }
 
 func (s *textFieldState) controller() *TextEditingController {
@@ -112,7 +135,8 @@ func (s *textFieldState) controller() *TextEditingController {
 }
 
 func (s *textFieldState) InitState() {
-	s.controller().AddListener(s.onValueChanged)
+	s.actions = s.buildActions()
+	s.controller().AddListener(s.didChangeTextEditingValue)
 	if s.Widget().Autofocus {
 		s.Context().owner.RequestFocus(s)
 	}
@@ -123,10 +147,13 @@ func (s *textFieldState) Dispose() {
 	if o.focus == KeyTarget(s) {
 		o.focus = nil
 	}
+	s.closeInputConnectionIfNeeded()
 	s.stopBlink()
 }
 
-func (s *textFieldState) onValueChanged() {
+// didChangeTextEditingValue is _didChangeTextEditingValue.
+func (s *textFieldState) didChangeTextEditingValue() {
+	s.updateRemoteEditingValueIfNeeded()
 	if s.Context().mounted {
 		s.restartBlink()
 		s.SetState(nil)
@@ -135,47 +162,171 @@ func (s *textFieldState) onValueChanged() {
 
 // --- KeyTarget
 
+func (s *textFieldState) KeyEventHandlers() []OnKeyEventCallback {
+	return DefaultTextEditingShortcutsHandlers(s.findAction)
+}
+
+func (s *textFieldState) InsertText(text string) {
+	v := s.value()
+	sel := v.Selection
+	if !sel.IsValid() {
+		return
+	}
+	caret := services.NewTextSelectionCollapsed(sel.Start + dart.StringLength(text))
+	newValue := services.NewTextEditingValue(services.TextEditingValueOptions{
+		Text:      dart.Concat(sel.TextBefore(v.Text), text, sel.TextAfter(v.Text)),
+		Selection: &caret,
+	})
+	s.UpdateEditingValue(newValue)
+}
+
+// focusChanged is _handleFocusChanged.
 func (s *textFieldState) focusChanged(focused bool) {
 	s.focused = focused
 	if focused {
-		c := s.controller()
-		if c.value.Selection.Base < 0 { // like Flutter: focusing puts the caret at the end
-			c.value.Selection = textedit.Collapsed(c.value.Len())
-		}
+		s.openInputConnection()
 		s.restartBlink()
+		if !s.value().Selection.IsValid() {
+			// Place the cursor at the end if the selection is invalid when
+			// the field receives focus.
+			s.handleSelectionChanged(services.NewTextSelectionCollapsed(dart.StringLength(s.value().Text)))
+		}
 	} else {
+		s.closeInputConnectionIfNeeded()
 		s.stopBlink()
 	}
 	s.SetState(nil)
 }
 
-func (s *textFieldState) HandleKey(ev textedit.KeyEvent) bool {
-	o := s.Context().owner
-	if ev.Key == textedit.KeyEnter {
-		if f := s.Widget().OnSubmitted; f != nil {
-			f(s.controller().Text())
+// handleSelectionChanged is _handleSelectionChanged's controller update.
+func (s *textFieldState) handleSelectionChanged(selection services.TextSelection) {
+	v := s.value()
+	s.controller().SetValue(v.CopyWith(services.TextEditingValueCopyWithOptions{Selection: &selection}))
+}
+
+// --- the text input connection.
+
+func (s *textFieldState) openInputConnection() {
+	if s.Widget().ReadOnly {
+		return
+	}
+	if s.connection == nil || !s.connection.Attached() {
+		localValue := s.value()
+		s.connection = services.TextInputAttach(s, services.NewTextInputConfiguration())
+		s.connection.SetEditingState(localValue)
+		s.connection.Show()
+		s.lastKnownRemoteTextEditingValue = &localValue
+	} else {
+		s.connection.Show()
+	}
+}
+
+func (s *textFieldState) closeInputConnectionIfNeeded() {
+	if s.connection != nil && s.connection.Attached() {
+		s.connection.Close()
+	}
+	s.connection = nil
+	s.lastKnownRemoteTextEditingValue = nil
+}
+
+// updateRemoteEditingValueIfNeeded is _updateRemoteEditingValueIfNeeded.
+func (s *textFieldState) updateRemoteEditingValueIfNeeded() {
+	if s.batchEditDepth > 0 || s.connection == nil || !s.connection.Attached() {
+		return
+	}
+	localValue := s.value()
+	if s.lastKnownRemoteTextEditingValue != nil && localValue.Equal(*s.lastKnownRemoteTextEditingValue) {
+		return
+	}
+	s.connection.SetEditingState(localValue)
+	s.lastKnownRemoteTextEditingValue = &localValue
+}
+
+// TextEditingValue is TextSelectionDelegate.textEditingValue.
+func (s *textFieldState) TextEditingValue() services.TextEditingValue { return s.value() }
+
+// UserUpdateTextEditingValue is userUpdateTextEditingValue.
+func (s *textFieldState) UserUpdateTextEditingValue(value services.TextEditingValue, cause services.SelectionChangedCause) {
+	if value.Equal(s.value()) {
+		if !s.focused {
+			s.Context().owner.RequestFocus(s)
 		}
-		return true
+		return
 	}
-	v, ok := textedit.HandleKey(s.controller().Value(), ev, o.Platform, o.Clipboard)
-	if ok {
-		s.setValue(v)
-	}
-	return ok
+	s.formatAndSetValue(value)
 }
 
-func (s *textFieldState) InsertText(text string) {
-	s.setValue(textedit.InsertText(s.controller().Value(), text))
-}
-
-func (s *textFieldState) setValue(v textedit.Value) {
-	c := s.controller()
-	changed := v.Text != c.value.Text
-	c.SetValue(v)
-	if changed {
+// formatAndSetValue is _formatAndSetValue (no input formatters): the value
+// is set in a batch edit (one setEditingState at its end) and onChanged is
+// called when the text changed.
+func (s *textFieldState) formatAndSetValue(value services.TextEditingValue) {
+	oldValue := s.value()
+	s.batchEditDepth++
+	s.controller().SetValue(value)
+	if oldValue.Text != value.Text {
 		if f := s.Widget().OnChanged; f != nil {
-			f(v.Text)
+			f(value.Text)
 		}
+	}
+	s.batchEditDepth--
+	s.updateRemoteEditingValueIfNeeded()
+}
+
+// --- TextInputClient
+
+func (s *textFieldState) CurrentTextEditingValue() *services.TextEditingValue {
+	v := s.value()
+	return &v
+}
+
+func (s *textFieldState) CurrentAutofillScope() services.AutofillScope { return nil }
+
+// UpdateEditingValue is updateEditingValue: the platform's new state.
+func (s *textFieldState) UpdateEditingValue(value services.TextEditingValue) {
+	if s.Widget().ReadOnly {
+		return
+	}
+	current := s.value()
+	// _checkNeedsAdjustAffinity: trust the engine's affinity only if the
+	// text or selection changes.
+	if value.Text == current.Text && value.Selection.IsCollapsed() == current.Selection.IsCollapsed() &&
+		value.Selection.Start == current.Selection.Start && value.Selection.Affinity != current.Selection.Affinity {
+		sel := value.Selection.CopyWith(services.TextSelectionCopyWithOptions{Affinity: &current.Selection.Affinity})
+		value = value.CopyWith(services.TextEditingValueCopyWithOptions{Selection: &sel})
+	}
+	s.lastKnownRemoteTextEditingValue = &value
+	if value.Equal(current) {
+		return
+	}
+	if value.Text == current.Text && value.Composing == current.Composing {
+		// The selection is the only change.
+		s.handleSelectionChanged(value.Selection)
+	} else {
+		s.formatAndSetValue(value)
+	}
+}
+
+// PerformAction is performAction: a single-line field finalizes editing
+// (onSubmitted) for every action.
+func (s *textFieldState) PerformAction(action services.TextInputAction) {
+	if f := s.Widget().OnSubmitted; f != nil {
+		f(s.value().Text)
+	}
+}
+
+func (s *textFieldState) PerformPrivateCommand(string, map[string]any)             {}
+func (s *textFieldState) UpdateFloatingCursor(services.RawFloatingCursorPoint)    {}
+func (s *textFieldState) ShowAutocorrectionPromptRect(int, int)                   {}
+func (s *textFieldState) InsertContent(services.KeyboardInsertedContent)          {}
+func (s *textFieldState) DidChangeInputControl(_, _ services.TextInputControl) {}
+
+// ConnectionClosed is connectionClosed: the platform closed the input
+// connection.
+func (s *textFieldState) ConnectionClosed() {
+	if s.connection != nil {
+		s.connection.ConnectionClosedReceived()
+		s.connection = nil
+		s.lastKnownRemoteTextEditingValue = nil
 	}
 }
 
@@ -213,9 +364,7 @@ func (s *textFieldState) tapAt(global r.Offset) {
 	o.RequestFocus(s)
 	if s.render != nil {
 		local := global.Sub(r.GlobalOffset(s.render))
-		v := s.controller().Value()
-		v.Selection = textedit.Collapsed(s.render.OffsetAt(local))
-		s.controller().SetValue(v)
+		s.handleSelectionChanged(services.NewTextSelectionCollapsed(s.render.OffsetAt(local)))
 	}
 }
 
@@ -223,7 +372,7 @@ func (s *textFieldState) Build(*Element) Widget {
 	return GestureDetector{
 		OnTapAt: s.tapAt,
 		Child: editable{
-			value: s.controller().Value(), style: s.Widget().Style,
+			value: s.value(), style: s.Widget().Style,
 			focused: s.focused, caretVisible: s.caretVisible,
 			onCreate: func(re *r.RenderEditable) { s.render = re },
 		},
@@ -231,7 +380,7 @@ func (s *textFieldState) Build(*Element) Widget {
 }
 
 type editable struct {
-	value                 textedit.Value
+	value                 services.TextEditingValue
 	style                 r.TextStyle
 	focused, caretVisible bool
 	onCreate              func(*r.RenderEditable)
@@ -247,3 +396,4 @@ func (w editable) CreateRenderObject() r.RenderBox {
 func (w editable) UpdateRenderObject(ro r.RenderBox) {
 	ro.(*r.RenderEditable).Set(w.value, w.style, w.focused, w.caretVisible)
 }
+

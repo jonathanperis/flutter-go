@@ -10,7 +10,6 @@ import (
 
 	ui "github.com/jonathanperis/flutter-go/engine/src/flutter/lib/ui/go"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/foundation"
-	"github.com/jonathanperis/flutter-go/src/textedit"
 	"github.com/jonathanperis/flutter-go/src/async"
 
 	r "github.com/jonathanperis/flutter-go/packages/flutter/lib/src/rendering"
@@ -54,6 +53,9 @@ func (t *Tester) TakeException() any {
 // FakeAsync zone). When the test ends, the tree is unmounted and
 // flutter_test's post-test invariants are checked.
 func New(t testing.TB) *Tester {
+	// `flutter test` sets FLUTTER_TEST in the test environment
+	// (defaultTargetPlatform is android under it).
+	t.Setenv("FLUTTER_TEST", "true")
 	// `flutter test` runs flutter_tester with --use-test-fonts.
 	ui.EngineUseTestFonts()
 	r.SetTextEngine(r.UITextEngine{})
@@ -72,7 +74,9 @@ func New(t testing.TB) *Tester {
 	// flutter_test awaits each event it sends, running its microtasks (the
 	// gesture arena resolves a lone member in one).
 	tt.router.AfterEvent = func() { tt.loop.FlushMicrotasks() }
-	o.Clipboard = &MemoryClipboard{}
+	// FocusManager registers its handleKeyMessage as the key event
+	// manager's keyMessageHandler.
+	binding.KeyEventManager().KeyMessageHandler = o.HandleKeyMessage
 	o.OnNeedsFrame = binding.EnsureVisualUpdate
 	binding.startTest(tt)
 	t.Cleanup(func() { binding.postTest(tt) })
@@ -216,18 +220,6 @@ func (t *Tester) FlingGesture(f Finder, dy float64, duration time.Duration) {
 func (t *Tester) TapAt(x, y float64) {
 	t.router.PointerDown(ui.Offset{Dx: x, Dy: y})
 	t.router.PointerUp(ui.Offset{Dx: x, Dy: y})
-}
-
-// MemoryClipboard is an in-memory clipboard for tests.
-type MemoryClipboard struct{ Text string }
-
-func (c *MemoryClipboard) Get() string  { return c.Text }
-func (c *MemoryClipboard) Set(s string) { c.Text = s }
-
-// SendKey sends a key to the focused widget and pumps a frame.
-func (t *Tester) SendKey(ev textedit.KeyEvent) {
-	t.Owner.DispatchKey(ev)
-	t.Pump()
 }
 
 // EnterText types s into the focused widget (replacing the selection, as a

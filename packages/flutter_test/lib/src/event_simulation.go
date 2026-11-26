@@ -4,9 +4,7 @@ package flutter_test
 // KeyEventSimulator, simulateKeyDownEvent/UpEvent/RepeatEvent and
 // KeySimulatorTransitModeVariant.
 //
-// Differences: there is no TestAsyncUtils guard; a key that no handler
-// handles is not forwarded to TestTextInput.handleKeyDownEvent/UpEvent
-// (TestTextInput comes with the text input port); the transit-mode variant
+// Differences: there is no TestAsyncUtils guard; the transit-mode variant
 // is a plain struct (flutter_test's TestVariant is not ported).
 
 import (
@@ -643,15 +641,30 @@ func (s keyEventSimulator) SimulateKeyRepeatEvent(key services.LogicalKeyboardKe
 	return s.simulate(key, ui.KeyEventTypeRepeat, simulateOpts(opts))
 }
 
-// SimulateKeyDownEvent is simulateKeyDownEvent (KeyEventSimulator's, see
-// the file comment for the TestTextInput fallback).
+// SimulateKeyDownEvent is simulateKeyDownEvent: KeyEventSimulator's, then,
+// when the framework didn't handle the key and the binding is the test
+// binding, TestTextInput's handleKeyDownEvent (the platform's text input
+// may respond to it, e.g. macOS's key bindings).
 func SimulateKeyDownEvent(key services.LogicalKeyboardKey, opts ...SimulateKeyEventOptions) async.Future[bool] {
-	return KeyEventSimulator.SimulateKeyDownEvent(key, opts...)
+	return async.Async(func() bool {
+		handled := KeyEventSimulator.SimulateKeyDownEvent(key, opts...).Await()
+		if b, ok := services.ServicesBindingInstance().(*AutomatedTestWidgetsFlutterBinding); !handled && ok {
+			b.TestTextInput().HandleKeyDownEvent(key).Await()
+		}
+		return handled
+	})
 }
 
-// SimulateKeyUpEvent is simulateKeyUpEvent.
+// SimulateKeyUpEvent is simulateKeyUpEvent (with TestTextInput's
+// handleKeyUpEvent for an unhandled key, as SimulateKeyDownEvent).
 func SimulateKeyUpEvent(key services.LogicalKeyboardKey, opts ...SimulateKeyEventOptions) async.Future[bool] {
-	return KeyEventSimulator.SimulateKeyUpEvent(key, opts...)
+	return async.Async(func() bool {
+		handled := KeyEventSimulator.SimulateKeyUpEvent(key, opts...).Await()
+		if b, ok := services.ServicesBindingInstance().(*AutomatedTestWidgetsFlutterBinding); !handled && ok {
+			b.TestTextInput().HandleKeyUpEvent(key).Await()
+		}
+		return handled
+	})
 }
 
 // SimulateKeyRepeatEvent is simulateKeyRepeatEvent.

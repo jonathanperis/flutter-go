@@ -22,14 +22,13 @@ package app
 //     ASCII control character of a letter.
 
 import (
-	"time"
 
 	"github.com/go-gl/glfw/v3.3/glfw"
 
 	ui "github.com/jonathanperis/flutter-go/engine/src/flutter/lib/ui/go"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/services"
 	"github.com/jonathanperis/flutter-go/src/dart"
-	"github.com/jonathanperis/flutter-go/src/textedit"
+	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/widgets"
 )
 
 // glfwModifierKeys are GLFW's modifier keys with the macOS key code and
@@ -48,6 +47,8 @@ type glfwKeyboard struct {
 	sidedFlags int
 	capsLock   bool
 	pending    *keyEvent
+	// host receives the key downs the framework did not handle.
+	host textInputHost
 }
 
 // independentFlags derives NSEvent's device-independent modifier bits from
@@ -81,7 +82,11 @@ func (k *glfwKeyboard) flush() {
 	if k.pending != nil {
 		e := *k.pending
 		k.pending = nil
-		k.manager.handleEvent(e, nil)
+		var onUnhandled func()
+		if e.Type == nsEventTypeKeyDown && k.host.focused != nil {
+			onUnhandled = func() { k.host.handleUnhandled(e) }
+		}
+		k.manager.handleEvent(e, onUnhandled)
 	}
 }
 
@@ -166,42 +171,137 @@ func newKeyboardManager(pc *ui.PlatformConfiguration) *keyboardManager {
 	return &keyboardManager{embedder: embedder, channel: channel}
 }
 
-// legacyKeys maps logical keys to the interim text-editing model's keys.
-var legacyKeys = map[services.LogicalKeyboardKey]textedit.Key{
-	services.LogicalKeyboardKeyBackspace: textedit.KeyBackspace, services.LogicalKeyboardKeyDelete: textedit.KeyDelete,
-	services.LogicalKeyboardKeyArrowLeft: textedit.KeyLeft, services.LogicalKeyboardKeyArrowRight: textedit.KeyRight,
-	services.LogicalKeyboardKeyArrowUp: textedit.KeyUp, services.LogicalKeyboardKeyArrowDown: textedit.KeyDown,
-	services.LogicalKeyboardKeyHome: textedit.KeyHome, services.LogicalKeyboardKeyEnd: textedit.KeyEnd,
-	services.LogicalKeyboardKeyEnter: textedit.KeyEnter, services.LogicalKeyboardKeyNumpadEnter: textedit.KeyEnter,
-	services.LogicalKeyboardKeyTab: textedit.KeyTab, services.LogicalKeyboardKeyKeyA: textedit.KeyA,
-	services.LogicalKeyboardKeyKeyC: textedit.KeyC, services.LogicalKeyboardKeyKeyV: textedit.KeyV,
-	services.LogicalKeyboardKeyKeyX: textedit.KeyX,
+// textInputHost stands for the macOS embedder's text input plugin
+// (FlutterTextInputPlugin) receiving a key down the framework did not
+// handle (interpretKeyEvents:): a key bound by NSStandardKeyBindingResponding
+// becomes its selectors (TextInputClient.performSelectors; insertNewline:
+// on a single-line field is performAction), other characters are inserted
+// (insertText:). ENGINE GAP: no NSTextInputContext (no IME composition,
+// no user key bindings); the bindings are the standard ones, as
+// flutter_test's MacOSTestTextInputKeyHandler lists them.
+type textInputHost struct {
+	focused func() widgets.KeyTarget
 }
 
-// legacyKeyMessageHandler is a temporary KeyEventManager.keyMessageHandler
-// (until widgets' focus and shortcuts are ported): it hands key downs and
-// repeats to the focused widget as the interim model's key events.
-func legacyKeyMessageHandler(dispatch func(textedit.KeyEvent) bool) services.KeyMessageHandler {
-	return func(message *services.KeyMessage) bool {
-		handled := false
-		for _, e := range message.Events {
-			switch e.(type) {
-			case *services.KeyDownEvent, *services.KeyRepeatEvent:
-			default:
-				continue
-			}
-			key, ok := legacyKeys[e.LogicalKey()]
-			if !ok {
-				continue
-			}
-			hk := services.HardwareKeyboardInstance()
-			if dispatch(textedit.KeyEvent{Key: key, Shift: hk.IsShiftPressed(), Ctrl: hk.IsControlPressed(),
-				Alt: hk.IsAltPressed(), Meta: hk.IsMetaPressed()}) {
-				handled = true
+type macBinding struct {
+	key                       services.LogicalKeyboardKey
+	shift, alt, meta, control bool
+}
+
+var macStandardKeyBindings = func() map[macBinding][]string {
+	m := map[macBinding][]string{}
+	add := func(key services.LogicalKeyboardKey, mods string, selectors ...string) {
+		b := macBinding{key: key}
+		for _, c := range mods {
+			switch c {
+			case 's':
+				b.shift = true
+			case 'a':
+				b.alt = true
+			case 'm':
+				b.meta = true
+			case 'c':
+				b.control = true
 			}
 		}
-		return handled
+		m[b] = selectors
 	}
-}
+	for _, s := range []string{"s", ""} {
+		add(services.LogicalKeyboardKeyBackspace, s, "deleteBackward:")
+		add(services.LogicalKeyboardKeyBackspace, s+"a", "deleteWordBackward:")
+		add(services.LogicalKeyboardKeyBackspace, s+"m", "deleteToBeginningOfLine:")
+		add(services.LogicalKeyboardKeyBackspace, s+"c", "deleteBackwardByDecomposingPreviousCharacter:")
+		add(services.LogicalKeyboardKeyDelete, s, "deleteForward:")
+		add(services.LogicalKeyboardKeyDelete, s+"a", "deleteWordForward:")
+		add(services.LogicalKeyboardKeyDelete, s+"m", "deleteToEndOfLine:")
+	}
+	L, R, U, D := services.LogicalKeyboardKeyArrowLeft, services.LogicalKeyboardKeyArrowRight,
+		services.LogicalKeyboardKeyArrowUp, services.LogicalKeyboardKeyArrowDown
+	add(L, "", "moveLeft:")
+	add(R, "", "moveRight:")
+	add(U, "", "moveUp:")
+	add(D, "", "moveDown:")
+	add(L, "s", "moveLeftAndModifySelection:")
+	add(R, "s", "moveRightAndModifySelection:")
+	add(U, "s", "moveUpAndModifySelection:")
+	add(D, "s", "moveDownAndModifySelection:")
+	add(L, "a", "moveWordLeft:")
+	add(R, "a", "moveWordRight:")
+	add(U, "a", "moveBackward:", "moveToBeginningOfParagraph:")
+	add(D, "a", "moveForward:", "moveToEndOfParagraph:")
+	add(L, "as", "moveWordLeftAndModifySelection:")
+	add(R, "as", "moveWordRightAndModifySelection:")
+	add(U, "as", "moveParagraphBackwardAndModifySelection:")
+	add(D, "as", "moveParagraphForwardAndModifySelection:")
+	add(L, "m", "moveToLeftEndOfLine:")
+	add(R, "m", "moveToRightEndOfLine:")
+	add(U, "m", "moveToBeginningOfDocument:")
+	add(D, "m", "moveToEndOfDocument:")
+	add(L, "ms", "moveToLeftEndOfLineAndModifySelection:")
+	add(R, "ms", "moveToRightEndOfLineAndModifySelection:")
+	add(U, "ms", "moveToBeginningOfDocumentAndModifySelection:")
+	add(D, "ms", "moveToEndOfDocumentAndModifySelection:")
+	add(services.LogicalKeyboardKeyKeyA, "cs", "moveToBeginningOfParagraphAndModifySelection:")
+	add(services.LogicalKeyboardKeyKeyA, "c", "moveToBeginningOfParagraph:")
+	add(services.LogicalKeyboardKeyKeyB, "cs", "moveBackwardAndModifySelection:")
+	add(services.LogicalKeyboardKeyKeyB, "c", "moveBackward:")
+	add(services.LogicalKeyboardKeyKeyE, "cs", "moveToEndOfParagraphAndModifySelection:")
+	add(services.LogicalKeyboardKeyKeyE, "c", "moveToEndOfParagraph:")
+	add(services.LogicalKeyboardKeyKeyF, "cs", "moveForwardAndModifySelection:")
+	add(services.LogicalKeyboardKeyKeyF, "c", "moveForward:")
+	add(services.LogicalKeyboardKeyKeyN, "c", "moveDown:")
+	add(services.LogicalKeyboardKeyKeyN, "cs", "moveDownAndModifySelection:")
+	add(services.LogicalKeyboardKeyKeyP, "c", "moveUp:")
+	add(services.LogicalKeyboardKeyKeyP, "cs", "moveUpAndModifySelection:")
+	add(services.LogicalKeyboardKeyKeyT, "c", "transpose:")
+	add(services.LogicalKeyboardKeyHome, "", "scrollToBeginningOfDocument:")
+	add(services.LogicalKeyboardKeyEnd, "", "scrollToEndOfDocument:")
+	add(services.LogicalKeyboardKeyHome, "s", "moveToBeginningOfDocumentAndModifySelection:")
+	add(services.LogicalKeyboardKeyEnd, "s", "moveToEndOfDocumentAndModifySelection:")
+	add(services.LogicalKeyboardKeyPageUp, "", "scrollPageUp:")
+	add(services.LogicalKeyboardKeyPageDown, "", "scrollPageDown:")
+	add(services.LogicalKeyboardKeyPageUp, "s", "pageUpAndModifySelection:")
+	add(services.LogicalKeyboardKeyPageDown, "s", "pageDownAndModifySelection:")
+	add(services.LogicalKeyboardKeyEscape, "", "cancelOperation:")
+	add(services.LogicalKeyboardKeyEnter, "", "insertNewline:")
+	add(services.LogicalKeyboardKeyNumpadEnter, "", "insertNewline:")
+	add(services.LogicalKeyboardKeyTab, "", "insertTab:")
+	add(services.LogicalKeyboardKeyTab, "s", "insertBacktab:")
+	return m
+}()
 
-var _ = time.Second
+// handleUnhandled is the text input plugin's handling of an unhandled key
+// down.
+func (h textInputHost) handleUnhandled(e keyEvent) {
+	target := h.focused()
+	client, ok := target.(services.TextInputClient)
+	if !ok {
+		return
+	}
+	b := macBinding{shift: e.ModifierFlags&nsModifierFlagShift != 0, alt: e.ModifierFlags&nsModifierFlagOption != 0,
+		meta: e.ModifierFlags&nsModifierFlagCommand != 0, control: e.ModifierFlags&nsModifierFlagControl != 0}
+	if key, ok := services.KMacOsToLogicalKey[e.KeyCode]; ok {
+		b.key = key
+	} else if len(e.CharactersIgnoringModifiers) > 0 {
+		b.key = services.LogicalKeyboardKey{KeyID: int([]rune(e.CharactersIgnoringModifiers)[0])}
+	}
+	if selectors, ok := macStandardKeyBindings[b]; ok {
+		for _, selector := range selectors {
+			if selector == "insertNewline:" {
+				client.PerformAction(services.TextInputActionDone)
+				continue
+			}
+			client.PerformSelector(selector)
+		}
+		return
+	}
+	if b.meta || b.control || e.Characters == "" {
+		return
+	}
+	for _, r := range e.Characters {
+		if r < 0x20 || r == 0x7f || (r >= 0xF700 && r <= 0xF8FF) { // control and function-key characters
+			return
+		}
+	}
+	target.InsertText(e.Characters)
+}

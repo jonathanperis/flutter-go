@@ -18,7 +18,6 @@ import (
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/gestures"
 	r "github.com/jonathanperis/flutter-go/packages/flutter/lib/src/rendering"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/scheduler"
-	"github.com/jonathanperis/flutter-go/src/textedit"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/foundation"
 )
 
@@ -528,8 +527,6 @@ type BuildOwner struct {
 	DevicePixelRatio float64
 	// Platform selects keyboard shortcuts (flutter_test's default is Android).
 	Platform foundation.TargetPlatform
-	// Clipboard backs copy/cut/paste; nil disables them.
-	Clipboard textedit.Clipboard
 	focus     KeyTarget
 	app       Widget
 	viewSize  r.Size

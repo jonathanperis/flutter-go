@@ -2,12 +2,12 @@ package flutter_test
 
 // Port of packages/flutter_test/lib/src/test_text_input.dart (Flutter
 // 3.50.1): TestTextInput, the binding's mock of the platform's text input
-// plugin. Not ported: the macOS key handler (test_text_input_key_handler.dart:
-// handleKeyDownEvent/handleKeyUpEvent need the keyboard library), and
-// TestAsyncUtils.guard around receiveAction.
+// plugin, with its macOS key handler (test_text_input_key_handler.go). Not
+// ported: TestAsyncUtils.guard around receiveAction.
 
 import (
 	ui "github.com/jonathanperis/flutter-go/engine/src/flutter/lib/ui/go"
+	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/foundation"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/services"
 	"github.com/jonathanperis/flutter-go/src/async"
 	"github.com/jonathanperis/flutter-go/src/dart"
@@ -31,6 +31,9 @@ type TestTextInput struct {
 
 	client    *int
 	isVisible bool
+	// keyHandler is the platform-specific key handler that can process
+	// unhandled keyboard events (nil: none).
+	keyHandler TestTextInputKeyHandler
 	handler   func(services.MethodCall) async.Future[any]
 }
 
@@ -95,6 +98,7 @@ func (t *TestTextInput) Reset() {
 	t.SetClientArgs = nil
 	t.EditingState = nil
 	t.isVisible = false
+	t.keyHandler = nil
 }
 
 func (t *TestTextInput) handleTextInputCall(methodCall services.MethodCall) async.Future[any] {
@@ -111,6 +115,7 @@ func (t *TestTextInput) handleTextInputCall(methodCall services.MethodCall) asyn
 		case "TextInput.clearClient":
 			t.client = nil
 			t.isVisible = false
+			t.keyHandler = nil
 			if t.OnCleared != nil {
 				t.OnCleared()
 			}
@@ -118,8 +123,12 @@ func (t *TestTextInput) handleTextInputCall(methodCall services.MethodCall) asyn
 			t.EditingState = methodCall.Arguments.(map[string]any)
 		case "TextInput.show":
 			t.isVisible = true
+			if !foundation.KIsWeb && foundation.DefaultTargetPlatform() == foundation.TargetPlatformMacOS && t.keyHandler == nil {
+				t.keyHandler = NewMacOSTestTextInputKeyHandler(t.clientID())
+			}
 		case "TextInput.hide":
 			t.isVisible = false
+			t.keyHandler = nil
 		}
 		return nil
 	})
@@ -244,4 +253,22 @@ func (t *TestTextInput) ScribbleRemovePlaceholder() async.Future[async.Void] {
 // keyboard shortcut.
 func (t *TestTextInput) HandleKeyboardUndo(direction string) async.Future[async.Void] {
 	return t.sendAndWait("TextInputClient.handleUndo", []any{direction}, func([]byte) {})
+}
+
+// HandleKeyDownEvent gives text input a chance to respond to an unhandled
+// key down event.
+func (t *TestTextInput) HandleKeyDownEvent(key services.LogicalKeyboardKey) async.Future[async.Void] {
+	if t.keyHandler == nil {
+		return async.FutureValue(async.Void{})
+	}
+	return t.keyHandler.HandleKeyDownEvent(key)
+}
+
+// HandleKeyUpEvent gives text input a chance to respond to an unhandled
+// key up event.
+func (t *TestTextInput) HandleKeyUpEvent(key services.LogicalKeyboardKey) async.Future[async.Void] {
+	if t.keyHandler == nil {
+		return async.FutureValue(async.Void{})
+	}
+	return t.keyHandler.HandleKeyUpEvent(key)
 }

@@ -22,11 +22,6 @@ import (
 
 func init() { runtime.LockOSThread() } // Cocoa needs the main thread.
 
-type glfwClipboard struct{ w *glfw.Window }
-
-func (c glfwClipboard) Get() string  { return c.w.GetClipboardString() }
-func (c glfwClipboard) Set(s string) { c.w.SetClipboardString(s) }
-
 // WheelPixelsPerLine converts GLFW scroll units to logical pixels.
 const WheelPixelsPerLine = 20.0
 
@@ -172,22 +167,20 @@ func Run(root widgets.Widget, o Options) error {
 	epoch := time.Now().Add(-loop.Elapsed()) // frame timestamps and the loop's clock are measured from here
 	router := widgets.NewPointerRouter(owner)
 	owner.Platform = foundation.TargetPlatformMacOS
-	owner.Clipboard = glfwClipboard{win}
 	// Keys reach the framework as the macOS embedder sends them (key data,
-	// then raw key messages); until widgets' focus system is ported, a
-	// keyMessageHandler hands them to the focused widget.
-	keyboard := &glfwKeyboard{manager: newKeyboardManager(pc)}
+	// then raw key messages); the focus system's handleKeyMessage hands them
+	// to the focused widget, and the key downs it doesn't handle go to the
+	// text input host (macOS's key bindings and text insertion).
+	keyboard := &glfwKeyboard{manager: newKeyboardManager(pc), host: textInputHost{focused: owner.Focus}}
 	win.SetInputMode(glfw.LockKeyMods, glfw.True)
-	b.KeyEventManager().KeyMessageHandler = legacyKeyMessageHandler(owner.DispatchKey)
+	b.KeyEventManager().KeyMessageHandler = owner.HandleKeyMessage
 	win.SetKeyCallback(func(_ *glfw.Window, k glfw.Key, scancode int, a glfw.Action, m glfw.ModifierKey) {
 		keyboard.onKey(k, scancode, a, m)
 	})
-	// Committed text (typing, and IME text once composition finishes). ENGINE
-	// GAP: there is no text input plugin; the text goes to the focused widget.
-	win.SetCharCallback(func(_ *glfw.Window, ch rune) {
-		keyboard.onChar(ch)
-		owner.DispatchText(string(ch))
-	})
+	// Committed text (typing, and IME text once composition finishes) is
+	// the key down's characters; the text input host inserts it when the
+	// framework doesn't handle the key.
+	win.SetCharCallback(func(_ *glfw.Window, ch rune) { keyboard.onChar(ch) })
 	b.owner = owner
 	router.TimeStamp = func() time.Duration { return time.Since(epoch) }
 	router.AfterEvent = func() { loop.FlushMicrotasks() }
@@ -275,7 +268,6 @@ func Run(root widgets.Widget, o Options) error {
 				keyboard.onKey(k.Key, k.Scancode, k.Action, k.Mods)
 				if k.Char != 0 {
 					keyboard.onChar(k.Char)
-					owner.DispatchText(string(k.Char))
 				}
 				keyboard.flush()
 				loop.FlushMicrotasks()

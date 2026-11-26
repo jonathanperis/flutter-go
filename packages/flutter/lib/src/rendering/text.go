@@ -6,7 +6,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/jonathanperis/flutter-go/src/textedit"
+	"github.com/jonathanperis/flutter-go/src/dart"
+	"github.com/jonathanperis/flutter-go/src/pub/characters"
 )
 
 type TextStyle struct {
@@ -101,7 +102,7 @@ func (p *UIParagraph) Release()                   { p.Paragraph.Dispose() }
 // CaretX is the left edge of the grapheme starting at off, or the right
 // edge of the last one at the end of the text (single line, LTR).
 func (p *UIParagraph) CaretX(off int) float64 {
-	n := textedit.Len16(p.text)
+	n := dart.StringLength(p.text)
 	if n == 0 || off <= 0 {
 		return 0
 	}
@@ -141,7 +142,7 @@ func (p fixedParagraph) Release()                   {}
 
 // In the test font every grapheme cluster is one square glyph.
 func (p fixedParagraph) CaretX(off int) float64 {
-	stops := textedit.GraphemeStops(p.text)
+	stops := graphemeStops(p.text)
 	n := 0
 	for i, st := range stops {
 		if st <= off {
@@ -152,7 +153,7 @@ func (p fixedParagraph) CaretX(off int) float64 {
 }
 
 func (p fixedParagraph) OffsetAtX(x float64) int {
-	stops := textedit.GraphemeStops(p.text)
+	stops := graphemeStops(p.text)
 	i := int(math.Round(x / p.size))
 	return stops[max(0, min(i, len(stops)-1))]
 }
@@ -221,4 +222,16 @@ func (r *RenderParagraph) Dispose() {
 		r.para.Release()
 		r.para = nil
 	}
+}
+
+// graphemeStops returns the UTF-16 offsets of the grapheme cluster
+// boundaries of s (package:characters), including 0 and the length.
+func graphemeStops(s string) []int {
+	stops := []int{0}
+	n := 0
+	for c := range characters.NewCharacters(s).All() {
+		n += dart.StringLength(c)
+		stops = append(stops, n)
+	}
+	return stops
 }
