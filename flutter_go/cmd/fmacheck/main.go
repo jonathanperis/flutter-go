@@ -49,6 +49,36 @@ func main() {
 				continue
 			}
 			ast.Inspect(f, func(n ast.Node) bool {
+				// A product stored in a variable can still fuse with a later
+				// add or subtract of that variable (the compiler's SSA form
+				// has no statement boundaries): `t *= n; return t - trunc(t)`
+				// became one multiply-subtract.
+				var stored []ast.Expr
+				switch s := n.(type) {
+				case *ast.AssignStmt:
+					if s.Tok == token.MUL_ASSIGN && len(s.Lhs) == 1 && isFloat(p.TypesInfo, s.Lhs[0]) {
+						found++
+						fmt.Printf("%s: %s stores an unrounded product (write v = float64(v * x))\n",
+							p.Fset.Position(s.Pos()), types.ExprString(s.Lhs[0])+" *= "+types.ExprString(s.Rhs[0]))
+					}
+					if s.Tok == token.ASSIGN || s.Tok == token.DEFINE {
+						stored = s.Rhs
+					}
+				case *ast.ValueSpec:
+					stored = s.Values
+				}
+				for _, rhs := range stored {
+					if !isMul(p.TypesInfo, rhs) {
+						continue
+					}
+					found++
+					fmt.Printf("%s: %s is stored unrounded and may fuse with a later add\n",
+						p.Fset.Position(rhs.Pos()), types.ExprString(rhs))
+					typ := types.TypeString(p.TypesInfo.Types[rhs].Type.Underlying(), nil)
+					edits[name] = append(edits[name],
+						insert{p.Fset.Position(rhs.Pos()).Offset, typ + "(", false},
+						insert{p.Fset.Position(rhs.End()).Offset, ")", true})
+				}
 				if be, ok := n.(*ast.BinaryExpr); ok && isFloatConstOp(p.TypesInfo, be) {
 					fmt.Printf("%s: %s is a constant expression Go evaluates exactly; Dart rounds each step\n",
 						p.Fset.Position(be.Pos()), types.ExprString(be))

@@ -14,6 +14,7 @@ every ported library follows them, and `cmd/apiparity` checks the result.
 | `dart:async` (the subset Flutter's API uses) | `flutter_go/async` |
 | `dart:developer` (service extensions, timeline) | `flutter_go/developer` |
 | `dart:io` (the types Flutter's API mentions) | `flutter_go/io` |
+| `dart:core`, `dart:math` (the parts Flutter needs) | `flutter_go/dart` (`dart.Random`, `dart.Pow`, `dart.Sin`, `dart.ArgumentError`, `dart.DoubleToString`...) |
 
 Go files sit beside the Dart files they replace and keep their base name
 (`friction_simulation.dart` → `friction_simulation.go`), so the two trees
@@ -328,3 +329,14 @@ Each divergence is listed here when it is introduced.
 - dart:developer: no VM service and no timeline recorder (ENGINE GAP, see
   PLAN.md); `developer.LookupExtension` is how a registered service
   extension is invoked.
+- curves: curves are used by pointer and built with constructors
+  (`animation.NewCubic(0.25, 0.1, 0.25, 1.0)`, not struct literals: the
+  embedded `CurveBase` needs `self`). Dart's `const` curves are the fields
+  of `animation.Curves`. Two curves built with the same arguments are
+  distinct pointers (Dart canonicalizes equal `const` instances, which only
+  `identical` can observe: Curve doesn't override `==`).
+  `ElasticInCurve([period])` is `NewElasticInCurve(period ...float64)`;
+  `Curve2D.generateSamples` returns `iter.Seq[Curve2DSample]`.
+- curves: a curve that overrides `transform` itself (as `Split` does)
+  defines `Transform` on its own type; `TransformInternal` overrides are
+  reached through `self`.

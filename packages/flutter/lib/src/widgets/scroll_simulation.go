@@ -158,7 +158,7 @@ func NewClampingScrollSimulation(o ClampingScrollSimulationOptions) *ClampingScr
 	}
 	referenceVelocity := s.Friction * physicalCoeff / kInflexion
 	androidDuration := dart.Pow(math.Abs(s.Velocity)/referenceVelocity, 1/(kDecelerationRate-1.0))
-	s.duration = kDecelerationRate * kInflexion * androidDuration
+	s.duration = float64(kDecelerationRate * kInflexion * androidDuration)
 	s.distance = s.Velocity * s.duration / kDecelerationRate
 	return s
 }

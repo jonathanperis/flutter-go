@@ -195,7 +195,10 @@ func inventory(entry, root string) []Decl {
 	have := map[string]bool{}
 	var visit func(path string, f filter)
 	visit = func(path string, f filter) {
-		key := path + fmt.Sprint(f)
+		// An empty show set (export nothing) must not look like nil (no
+		// restriction): both print as map[], which skipped the later
+		// unrestricted visit of a file first reached through a narrow show.
+		key := path + fmt.Sprint(f) + fmt.Sprint(f.show == nil)
 		if seen[key] {
 			return
 		}

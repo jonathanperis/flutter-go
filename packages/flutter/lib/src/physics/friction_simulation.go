@@ -55,7 +55,7 @@ func (s *FrictionSimulation) init(drag, position, velocity float64, opts ...Fric
 		s.SimulationBase = NewSimulationBase(*o.Tolerance)
 	}
 	s.drag, s.dragLog, s.x, s.v = drag, dart.Log(drag), position, velocity
-	s.constantDeceleration = o.ConstantDeceleration * sign(velocity)
+	s.constantDeceleration = float64(o.ConstantDeceleration * sign(velocity))
 	s.finalTime = math.Inf(1) // must be infinite while Newton's method calls Dx
 	s.finalTime = newtonsMethod(0, 0, s.Dx, func(t float64) float64 {
 		return float64((s.v * dart.Pow(s.drag, t) * s.dragLog)) - s.constantDeceleration

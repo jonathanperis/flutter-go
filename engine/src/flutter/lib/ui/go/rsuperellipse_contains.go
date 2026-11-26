@@ -127,7 +127,7 @@ func computeNAndXj(ratio f32) (f32, f32) {
 	ratio = clamp32(ratio, kMinRatio, kSecondMaxRatio)
 	var steps f32
 	if ratio < kFirstMaxRatio {
-		steps = (ratio - kMinRatio) * kFirstStepInverse
+		steps = float32((ratio - kMinRatio) * kFirstStepInverse)
 	} else {
 		steps = float32((ratio-kFirstMaxRatio)*kSecondStepInverse) + kFirstNumRecords - 1
 	}
@@ -158,10 +158,10 @@ func computeOctant(center point32, a, radius f32) seOctant {
 		return seOctant{offset: center, seA: a, seN: 0, circleStart: point32{a, a}}
 	}
 	ratio := a * 2 / radius
-	g := kGapFactor * radius
+	g := float32(kGapFactor * radius)
 	n, xjRatio := computeNAndXj(ratio)
-	xJ := xjRatio * a
-	yJ := pow32(1-pow32(xjRatio, n), 1/n) * a
+	xJ := float32(xjRatio * a)
+	yJ := float32(pow32(1-pow32(xjRatio, n), 1/n) * a)
 	maxTheta := asin32(pow32(xjRatio, n/2))
 	tanPhiJ := pow32(xJ/yJ, n-1)
 	d := (xJ - float32(tanPhiJ*yJ)) / (1 - tanPhiJ)

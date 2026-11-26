@@ -105,7 +105,7 @@ func (p fixedParagraph) OffsetAtX(x float64) int {
 func (FixedTextEngine) Layout(text string, style TextStyle, maxWidth float64) Paragraph {
 	size := style.Size()
 	words := strings.Split(text, " ")
-	full := float64(utf8.RuneCountInString(strings.TrimRight(text, " "))) * size
+	full := float64(float64(utf8.RuneCountInString(strings.TrimRight(text, " "))) * size)
 	perLine := math.Max(1, math.Floor(maxWidth/size)) // glyphs per line
 	lines, used := 1, 0.0                             // glyphs used on current line
 	for i, w := range words {

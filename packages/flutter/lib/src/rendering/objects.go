@@ -155,10 +155,10 @@ func (r *RenderPositionedBox) PerformLayout(c Constraints) Size {
 	cs := Layout(r.child, c.Loosen())
 	w, h := Inf, Inf
 	if shrinkW {
-		w = cs.Width * factor(r.widthFactor)
+		w = float64(cs.Width * factor(r.widthFactor))
 	}
 	if shrinkH {
-		h = cs.Height * factor(r.heightFactor)
+		h = float64(cs.Height * factor(r.heightFactor))
 	}
 	size := c.Constrain(ui.NewSize(w, h))
 	r.child.Base().Offset = r.alignment.Along(size, cs)

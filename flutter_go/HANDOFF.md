@@ -17,7 +17,8 @@ Start here when continuing flutter-go in a new session.
   divergence from Flutter's API gets listed there.
 - **Done:** P0 pin, layout (upstream tree at the root, Go beside the Dart
   it replaces) and `physics`; `flutter_go/async` (dart:async semantics);
-  dart:ui `math`, `lerp` and `geometry` (P1 started). Stages 0–10 and G1–G4
+  dart:ui `math`, `lerp` and `geometry` (P1 started); animation's
+  `curves.dart` (with `dart.Random`, the VM's generator). Stages 0–10 and G1–G4
   (see PLAN.md) are verified on 3.50.1. Parity: see flutter_go/docs/PARITY.md.
 - **Next, in order:**
   1. Done: `RSuperellipse.Contains` (engine C++ ported to Go).

@@ -144,7 +144,7 @@ func (r *RenderFlex) PerformLayout(c Constraints) Size {
 				if child == lastFlex {
 					extent = freeSpace - allocatedFlex
 				} else {
-					extent = perFlex * float64(b.Flex)
+					extent = float64(perFlex * float64(b.Flex))
 				}
 			}
 			minExtent := 0.0

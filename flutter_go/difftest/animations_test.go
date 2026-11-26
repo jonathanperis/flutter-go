@@ -37,7 +37,7 @@ func sampleBox(t *flutter_test.Tester) []float64 {
 
 var animScenes = map[string]func(t *testing.T) [][]float64{
 	"container_retarget": func(t *testing.T) [][]float64 {
-		d, c := 300*time.Millisecond, animation.EaseInOut
+		d, c := 300*time.Millisecond, animation.Curves.EaseInOut
 		tester := flutter_test.New(t)
 		var s [][]float64
 		tester.PumpWidget(animBox(100, 50, argb(0xffff0000), d, c))
@@ -57,7 +57,7 @@ var animScenes = map[string]func(t *testing.T) [][]float64{
 		return s
 	},
 	"container_fast_out_slow_in": func(t *testing.T) [][]float64 {
-		d, c := 250*time.Millisecond, animation.FastOutSlowIn
+		d, c := 250*time.Millisecond, animation.Curves.FastOutSlowIn
 		tester := flutter_test.New(t)
 		var s [][]float64
 		tester.PumpWidget(animBox(10, 10, argb(0xff000000), d, c))
@@ -74,7 +74,7 @@ var animScenes = map[string]func(t *testing.T) [][]float64{
 		tester.PumpWidget(ListViewBuilder{ItemCount: 1000, ItemExtent: 50, Controller: ctrl,
 			ItemBuilder: func(*Element, int) Widget { return SizedBox{} }})
 		var s [][]float64
-		ctrl.AnimateTo(2000, 400*time.Millisecond, animation.EaseOut) // outside a frame
+		ctrl.AnimateTo(2000, 400*time.Millisecond, animation.Curves.EaseOut) // outside a frame
 		tester.Pump()
 		s = append(s, []float64{ctrl.Offset()})
 		for i := 0; i < 30; i++ {
@@ -90,7 +90,7 @@ var animScenes = map[string]func(t *testing.T) [][]float64{
 			ItemBuilder: func(*Element, int) Widget { return SizedBox{} }})
 		tester.Pump(100 * time.Millisecond)
 		var s [][]float64
-		ctrl.AnimateTo(1000, 200*time.Millisecond, animation.Linear)
+		ctrl.AnimateTo(1000, 200*time.Millisecond, animation.Curves.Linear)
 		for i := 0; i < 16; i++ {
 			tester.Pump(16 * time.Millisecond)
 			s = append(s, []float64{ctrl.Offset()})

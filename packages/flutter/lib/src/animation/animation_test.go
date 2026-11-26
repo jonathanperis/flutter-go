@@ -66,7 +66,7 @@ func TestReverseDurationScalesWithDistance(t *testing.T) {
 }
 
 func TestCubicEndpointsAndMonotonic(t *testing.T) {
-	for _, c := range []Curve{Ease, EaseIn, EaseOut, EaseInOut, FastOutSlowIn} {
+	for _, c := range []Curve{Curves.Ease, Curves.EaseIn, Curves.EaseOut, Curves.EaseInOut, Curves.FastOutSlowIn} {
 		if c.Transform(0) != 0 || c.Transform(1) != 1 {
 			t.Fatalf("%v endpoints", c)
 		}
@@ -80,7 +80,7 @@ func TestCubicEndpointsAndMonotonic(t *testing.T) {
 		}
 	}
 	// Flutter: Curves.easeInOut.transform(0.5) == 0.5 (symmetric curve).
-	if v := EaseInOut.Transform(0.5); math.Abs(v-0.5) > 1e-3 {
+	if v := Curves.EaseInOut.Transform(0.5); math.Abs(v-0.5) > 1e-3 {
 		t.Fatalf("easeInOut(0.5) = %v", v)
 	}
 }

@@ -57,15 +57,21 @@ func (o Offset) Distance() float64        { return math.Sqrt(float64(o.Dx*o.Dx) 
 func (o Offset) DistanceSquared() float64 { return float64(o.Dx*o.Dx) + float64(o.Dy*o.Dy) }
 func (o Offset) Direction() float64       { return dart.Atan2(o.Dy, o.Dx) }
 
-func (o Offset) Scale(scaleX, scaleY float64) Offset { return Offset{o.Dx * scaleX, o.Dy * scaleY} }
+// Products are rounded explicitly (float64(...)) so that, once inlined, a
+// caller adding them can't fuse them into a multiply-add (Dart never does).
+func (o Offset) Scale(scaleX, scaleY float64) Offset {
+	return Offset{float64(o.Dx * scaleX), float64(o.Dy * scaleY)}
+}
 func (o Offset) Translate(translateX, translateY float64) Offset {
 	return Offset{o.Dx + translateX, o.Dy + translateY}
 }
 
-func (o Offset) Neg() Offset                { return Offset{-o.Dx, -o.Dy} }
-func (o Offset) Sub(other Offset) Offset    { return Offset{o.Dx - other.Dx, o.Dy - other.Dy} }
-func (o Offset) Add(other Offset) Offset    { return Offset{o.Dx + other.Dx, o.Dy + other.Dy} }
-func (o Offset) Mul(operand float64) Offset { return Offset{o.Dx * operand, o.Dy * operand} }
+func (o Offset) Neg() Offset             { return Offset{-o.Dx, -o.Dy} }
+func (o Offset) Sub(other Offset) Offset { return Offset{o.Dx - other.Dx, o.Dy - other.Dy} }
+func (o Offset) Add(other Offset) Offset { return Offset{o.Dx + other.Dx, o.Dy + other.Dy} }
+func (o Offset) Mul(operand float64) Offset {
+	return Offset{float64(o.Dx * operand), float64(o.Dy * operand)}
+}
 func (o Offset) Div(operand float64) Offset { return Offset{o.Dx / operand, o.Dy / operand} }
 func (o Offset) TruncDiv(operand float64) Offset {
 	return Offset{dart.TruncDiv(o.Dx, operand), dart.TruncDiv(o.Dy, operand)}
@@ -679,8 +685,8 @@ type RSTransformComponents struct {
 }
 
 func NewRSTransformFromComponents(c RSTransformComponents) RSTransform {
-	scos := dart.Cos(c.Rotation) * c.Scale
-	ssin := dart.Sin(c.Rotation) * c.Scale
+	scos := float64(dart.Cos(c.Rotation) * c.Scale)
+	ssin := float64(dart.Sin(c.Rotation) * c.Scale)
 	tx := c.TranslateX + float64(-scos*c.AnchorX) + float64(ssin*c.AnchorY)
 	ty := c.TranslateY + float64(-ssin*c.AnchorX) - float64(scos*c.AnchorY)
 	return NewRSTransform(scos, ssin, tx, ty)

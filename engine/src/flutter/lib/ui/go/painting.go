@@ -212,7 +212,7 @@ func ColorAlphaBlend(foreground, background Color) Color {
 			G: float64(alpha*foreground.G) + float64(invAlpha*background.G),
 			B: float64(alpha*foreground.B) + float64(invAlpha*background.B), ColorSpace: foreground.ColorSpace}
 	}
-	backAlpha = backAlpha * invAlpha
+	backAlpha = float64(backAlpha * invAlpha)
 	outAlpha := alpha + backAlpha
 	return Color{A: outAlpha, R: (float64(foreground.R*alpha) + float64(background.R*backAlpha)) / outAlpha,
 		G: (float64(foreground.G*alpha) + float64(background.G*backAlpha)) / outAlpha,

@@ -95,7 +95,7 @@ func leastSquares(x, y, w []float64, degree int) ([]float64, bool) {
 	for h := 0; h < m; h++ {
 		a[0][h] = w[h]
 		for i := 1; i < n; i++ {
-			a[i][h] = a[i-1][h] * x[h]
+			a[i][h] = float64(a[i-1][h] * x[h])
 		}
 	}
 	dot := func(p, q []float64) float64 {
@@ -122,7 +122,7 @@ func leastSquares(x, y, w []float64, degree int) ([]float64, bool) {
 		}
 		inv := 1.0 / norm
 		for h := 0; h < m; h++ {
-			q[j][h] *= inv
+			q[j][h] = float64(q[j][h] * inv)
 		}
 		for i := 0; i < n; i++ {
 			if i >= j {
@@ -132,7 +132,7 @@ func leastSquares(x, y, w []float64, degree int) ([]float64, bool) {
 	}
 	wy := make([]float64, m)
 	for h := 0; h < m; h++ {
-		wy[h] = y[h] * w[h]
+		wy[h] = float64(y[h] * w[h])
 	}
 	coeffs := make([]float64, n)
 	for i := n - 1; i >= 0; i-- {

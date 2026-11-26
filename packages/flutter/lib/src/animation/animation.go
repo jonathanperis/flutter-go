@@ -175,53 +175,6 @@ func (t *Ticker) tick(ts time.Duration) {
 }
 
 // ---------------------------------------------------------------------------
-// Curves
-
-type Curve interface{ Transform(t float64) float64 }
-
-type linear struct{}
-
-func (linear) Transform(t float64) float64 { return t }
-
-// Cubic is Flutter's Cubic curve, solved with the same bisection and error
-// bound so results match Flutter's exactly.
-type Cubic struct{ A, B, C, D float64 }
-
-const cubicErrorBound = 0.001
-
-func evaluateCubic(a, b, m float64) float64 {
-	return float64(3*a*(1-m)*(1-m)*m) + float64(3*b*(1-m)*m*m) + float64(m*m*m)
-}
-
-func (c Cubic) Transform(t float64) float64 {
-	if t == 0 || t == 1 {
-		return t
-	}
-	start, end := 0.0, 1.0
-	for {
-		mid := (start + end) / 2
-		estimate := evaluateCubic(c.A, c.C, mid)
-		if math.Abs(t-estimate) < cubicErrorBound {
-			return evaluateCubic(c.B, c.D, mid)
-		}
-		if estimate < t {
-			start = mid
-		} else {
-			end = mid
-		}
-	}
-}
-
-var (
-	Linear        Curve = linear{}
-	Ease          Curve = Cubic{0.25, 0.1, 0.25, 1.0}
-	EaseIn        Curve = Cubic{0.42, 0.0, 1.0, 1.0}
-	EaseOut       Curve = Cubic{0.0, 0.0, 0.58, 1.0}
-	EaseInOut     Curve = Cubic{0.42, 0.0, 0.58, 1.0}
-	FastOutSlowIn Curve = Cubic{0.4, 0.0, 0.2, 1.0}
-)
-
-// ---------------------------------------------------------------------------
 // AnimationController
 
 type Status int
@@ -277,8 +230,8 @@ func (c *Controller) SetValue(v float64) {
 	c.notify()
 }
 
-func (c *Controller) Forward() { c.animate(c.upper, c.scaledDuration(c.upper), Linear, Forward) }
-func (c *Controller) Reverse() { c.animate(c.lower, c.scaledDuration(c.lower), Linear, Reverse) }
+func (c *Controller) Forward() { c.animate(c.upper, c.scaledDuration(c.upper), Curves.Linear, Forward) }
+func (c *Controller) Reverse() { c.animate(c.lower, c.scaledDuration(c.lower), Curves.Linear, Reverse) }
 
 // AnimateTo animates to target over d (not scaled) with curve.
 func (c *Controller) AnimateTo(target float64, d time.Duration, curve Curve) {

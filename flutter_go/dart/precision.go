@@ -12,11 +12,25 @@ import (
 type RangeError struct {
 	Value, Start, End int
 	Name              string
+	Message           string // "" means Dart's default, "Invalid value"
+}
+
+// NewRangeErrorRange is RangeError.range(invalidValue, start, end, name, message).
+func NewRangeErrorRange(invalidValue, start, end int, name, message string) RangeError {
+	return RangeError{Value: invalidValue, Start: start, End: end, Name: name, Message: message}
 }
 
 func (e RangeError) Error() string {
-	return "RangeError (" + e.Name + "): Invalid value: Not in inclusive range " +
-		strconv.Itoa(e.Start) + ".." + strconv.Itoa(e.End) + ": " + strconv.Itoa(e.Value)
+	msg := e.Message
+	if msg == "" {
+		msg = "Invalid value"
+	}
+	s := "RangeError"
+	if e.Name != "" {
+		s += " (" + e.Name + ")"
+	}
+	return s + ": " + msg + ": Not in inclusive range " + strconv.Itoa(e.Start) + ".." + strconv.Itoa(e.End) +
+		": " + strconv.Itoa(e.Value)
 }
 
 // ToStringAsPrecision is Dart's double.toStringAsPrecision(precision): the

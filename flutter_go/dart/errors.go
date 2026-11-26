@@ -34,3 +34,8 @@ func (e ArgumentError) Error() string {
 	}
 	return s + ": " + SafeToString(e.Value)
 }
+
+// NewArgumentErrorValue is ArgumentError.value(value, name, message).
+func NewArgumentErrorValue(value any, name, message string) ArgumentError {
+	return ArgumentError{Message: message, Name: name, Value: value, HasValue: true}
+}

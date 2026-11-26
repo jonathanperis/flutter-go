@@ -922,3 +922,87 @@ The standing goal is now full API parity with Flutter 3.50.1's Dart layer
   rule, timeout of a failed future, a value arriving after the timeout and
   SynchronousFuture.timeout needed extra scenes), and the 8 async ones
   (still caught).
+
+### animation: curves.dart (and dart:math's Random)
+- `packages/flutter/lib/src/animation/curves.go` ports curves.dart in full:
+  `ParametricCurve[T]`/`Curve`/`Curve2D` as interfaces with embeddable
+  `ParametricCurveBase`/`CurveBase`/`Curve2DBase` (self pattern, so
+  `Transform`'s assert and 0/1 shortcut call a subclass's
+  `TransformInternal`, and `Curve2D`'s sampling calls an overridden
+  `SamplingSeed`), every public class, the private `_Linear`,
+  `_DecelerateCurve` and `_Bounce*Curve` (Go types with the Dart names, so
+  `toString` matches), and `Curves` as a package-level struct with all 43
+  constants. The old minimal `Curve`/`Cubic`/`Linear`... in animation.go
+  are gone; `Controller`, widgets and cmd/animate use `Curves.X`.
+- **`dart.Random`** (`flutter_go/dart/random.go`) ports the VM's `_Random`
+  (math_patch.dart): Thomas Wang seed mix, four cranks, multiply-with-carry,
+  `nextInt` with the power-of-two fast path and rejection loop, `nextDouble`
+  from 26+27 bits, `nextBool`. Checked against `dart run` output for 14
+  seeds (incl. min/max int64 and seed 9223367638806167551, found by
+  inverting the mix, whose mixed seed is 0 → 0x5a17) × 6 doubles, 14
+  `nextInt` maxes and 8 bools, plus Dart's RangeError text: identical on the
+  first run. `generateSamples` needs it to match Flutter's samples.
+  `flutter_go/dart` also gained `ArgumentError`, `RangeError`,
+  `UnimplementedError` (Dart's toString texts).
+- Flutter's tests: curves_test.dart 22/22, plus own tests (a curve
+  embedding `CurveBase` from outside, unbound-self panic, Split's
+  base `transformInternal` throwing UnimplementedError, toString forms,
+  parameter asserts).
+- **Difftest** (`difftest/curves_test.go` + `flutter/test/curves_test.dart`):
+  82 curves (all 43 `Curves`, SawTooth ×3, Interval ×7 incl. nested and the
+  degenerate `Interval(0.5, 0.5)`, Split ×5, Threshold ×4, Cubic ×3,
+  ThreePointCubic, Elastic periods ×6, FlippedCurve ×5, CatmullRomCurve ×5)
+  at 124 t values (i/97, edges like 1e-9, 5e-324, the bounce breakpoints)
+  plus `toString` and `flipped.toString`; 9 Curve2Ds (CatmullRomSpline with
+  handles/tension/precompute/a near-closed loop, a closed circle with and
+  without its own seed, a wave) sampled, `generateSamples` with 3 option
+  sets (t, point and `Curve2DSample.toString`), `findInverse` at 21 x,
+  `samplingSeed`; 23 error cases (assert messages, FlutterError, the
+  ArgumentError, the NaN seed's UnsupportedError); `validateControlPoints`
+  for 16 point sets × 3 tensions with and without reasons. 16,381 doubles,
+  all compared **bit for bit**: identical.
+- **Found by the difftest: Go fuses across statements, and across
+  inlined calls.** `t *= count; return t - trunc(t)` (SawTooth) compiled
+  to one multiply-subtract: `SawTooth(3)` at 1/3 gave -5.6e-17 instead of
+  Dart's 0. fmacheck only looked at `a*b + c` inside one expression; it now
+  also flags a product stored unrounded (`v := a*b`, `v = a*b`, `v *= x`),
+  and `-fix` wraps it. That found and fixed 18 more sites (ui geometry,
+  painting, rsuperellipse, friction, flex, objects, text, scroll_simulation,
+  velocity; existing difftests unchanged, drag-fling still 2.6e-11).
+  `ui.Offset.Mul`/`Scale` now round their products: a mutation removing
+  that fails the spline difftest, so the fusion through an inlined method
+  is real. fmacheck still can't see a product returned from a function or
+  stored in a struct literal and added by an inlining caller; such
+  helpers need `float64(...)` by hand.
+- Flutter quirks kept: `ThreePointCubic.toString` in debug is just
+  `"ThreePointCubic "` (the description is objectRuntimeType's *optimized*
+  value, and a trailing space is appended); `Interval(0.5, 0.5)` maps 0.5
+  to 1.0 (0/0 is NaN, which `clampDouble` sends to the upper bound);
+  asserts without messages report `null`; `Split` overrides `transform`
+  (so its `transformInternal` throws UnimplementedError); validate's
+  "more than one Y" check happens before the per-sample loop and bails
+  unless reasons are collected.
+- Mutations: 104 valid, 89 caught, 15 equivalent. Caught only after adding
+  cases: Split's range assert, validate's Y tolerance at the ends, the
+  X range (above 1 and below 0) and `x >= 1.0` (found by searching control
+  points with the Go port; Flutter confirmed). Equivalent: Cubic's `<`
+  bound (exact tie unreachable), `estimate <= t` (then |t-estimate| is 0),
+  midpoint `start + (end-start)/2` (exact for these dyadics), Interval's
+  0/1 shortcut and Split's `t == split` and `<=` (the inner transform or
+  the other branch gives the same value), `trunc` vs `floor` (t ≥ 0),
+  `<=` at bounceInOut/elasticInOut/ThreePointCubic midpoints (both branches
+  give the same bits), isFlat `<=` (exact tie), CatmullRomCurve's search
+  `>` (lands on the same sample's y), validate's `x <= 0` (index 1 is
+  always (0,0), so monotonicity fails first), Random's `>=` in the
+  rejection loop and its power-of-two fast path (both only differ for
+  powers of two, where the slow path gives the same result).
+- **apiparity bug fixed:** an export with an empty `show` set and an
+  unrestricted export printed the same key (`map[]`), so a file first
+  reached through a narrow `show` (curves.dart via `animations.dart`) was
+  never visited again unfiltered. Totals were undercounted: now 2,885
+  declarations (was 2,792); animation 54 (was 28), services 211, gestures
+  188. Parity: 175 → 191 exposed, 127 → 143 tested; animation 1 → 17.
+- Merge note: the curves and foundation ports each added Dart error types
+  to `flutter_go/dart`; unified on the value types (`ArgumentError`,
+  `RangeError` with an optional message, `UnimplementedError`), with
+  `NewArgumentErrorValue`/`NewRangeErrorRange` constructors.

@@ -41,12 +41,12 @@ func (s *demoState) Build(*Element) Widget {
 		Expanded{Child: ColoredBox{Color: r.RGB(0xfef7ff), Child: Center{Child: GestureDetector{
 			OnTap: func() { s.SetState(func() { s.big = !s.big }) },
 			Child: AnimatedBox{Width: w, Height: h, Color: c, Duration: 600 * time.Millisecond,
-				Curve: animation.FastOutSlowIn,
+				Curve: animation.Curves.FastOutSlowIn,
 				Child: Center{Child: Text{Text: "tap me", Style: r.TextStyle{FontSize: 20, Color: r.RGB(0xffffff)}}}},
 		}}}},
 		SizedBox{Width: F(260), Child: Column{CrossAxisAlignment: r.CrossStretch, Children: []Widget{
 			GestureDetector{
-				OnTap: func() { s.scroll.AnimateTo(0, 800*time.Millisecond, animation.EaseInOut) },
+				OnTap: func() { s.scroll.AnimateTo(0, 800*time.Millisecond, animation.Curves.EaseInOut) },
 				Child: ColoredBox{Color: r.RGB(0x1d1b20), Child: Padding{Padding: r.All(16), Child: Text{
 					Text: "↑ animate to top", Style: r.TextStyle{FontSize: 16, Color: r.RGB(0xffffff)}}}},
 			},
