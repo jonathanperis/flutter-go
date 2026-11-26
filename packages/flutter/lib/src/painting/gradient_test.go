@@ -260,6 +260,22 @@ func TestGradientFromColor(t *testing.T) {
 		Colors: gtColors(0xFF00FF00, 0xFF00FF00, 0xFF00FF00), Stops: []float64{0, 0.5, 1}, Transform: NewGradientRotation(2)}))
 }
 
+// lerpingGradient lerps from any gradient (a user gradient overriding
+// lerpFrom).
+type lerpingGradient struct{ testGradient }
+
+func (g *lerpingGradient) LerpFrom(a Gradient, t float64) Gradient { return g }
+
+// Go-only: Gradient.lerp asks a.lerpTo only when b.lerpFrom fails.
+func TestGradientLerpPrefersLerpFrom(t *testing.T) {
+	b := &lerpingGradient{}
+	b.Init(b, gtColors(0xFF000000, 0xFFFFFFFF), nil, nil)
+	a := NewLinearGradient(LinearGradientOptions{Colors: gtColors(0xFF00FF00, 0xFF0000FF)})
+	if got := GradientLerp(a, b, 0.25); got != Gradient(b) {
+		t.Errorf("got %v", got)
+	}
+}
+
 // testGradient is a Gradient written outside the library, on GradientBase.
 type testGradient struct{ GradientBase }
 

@@ -70,6 +70,10 @@ func decorationPixelScenes(img *ui.Image) map[string]func(c ui.Canvas) {
 				TileMode: ui.TileModeDecal, Focal: NewAlignment(-0.3, -0.2), FocalRadius: 0.05,
 				Transform: NewGradientRotation(-0.9)}), full, nil)
 		},
+		"radial.focal.wide": func(c ui.Canvas) {
+			shaderRect(c, NewRadialGradient(RadialGradientOptions{Center: NewAlignment(0.1, 0.2), Radius: f(0.9), Colors: rgb,
+				Focal: NewAlignment(-0.4, 0.1), FocalRadius: 0.3}), ui.NewRectFromLTWH(0, 12, 64, 30), nil)
+		},
 		"radial.repeated": func(c ui.Canvas) {
 			shaderRect(c, NewRadialGradient(RadialGradientOptions{Radius: f(0.2), Colors: col(0xFFFFFFFF, 0xFF004080),
 				Stops: []float64{0.2, 0.9}, TileMode: ui.TileModeRepeated}), full, nil)

@@ -80,6 +80,16 @@ Map<String, void Function(Canvas c)> scenes(ui.Image img) {
           focalRadius: 0.05,
           transform: GradientRotation(-0.9),
         )),
+    'radial.focal.wide': (Canvas c) => shaderRect(
+        c,
+        const RadialGradient(
+          center: Alignment(0.1, 0.2),
+          radius: 0.9,
+          colors: rgb,
+          focal: Alignment(-0.4, 0.1),
+          focalRadius: 0.3,
+        ),
+        rect: const Rect.fromLTWH(0, 12, 64, 30)),
     'radial.repeated': (Canvas c) => shaderRect(
         c,
         const RadialGradient(

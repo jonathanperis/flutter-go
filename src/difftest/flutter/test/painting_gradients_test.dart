@@ -136,6 +136,13 @@ class RecCanvas implements Canvas {
 
 // An image provider with a stable toString/== whose image is available
 // synchronously.
+// A decoration that lerps with nothing.
+class PlainDecoration extends Decoration {
+  const PlainDecoration();
+  @override
+  BoxPainter createBoxPainter([VoidCallback? onChanged]) => throw UnimplementedError();
+}
+
 class TestProvider extends ImageProvider<TestProvider> {
   const TestProvider(this.name, this.image, [this.scale = 1.0, this.label]);
   final String name;
@@ -262,6 +269,28 @@ void main() {
     out['gradient.withOpacity'] = <Object?>[
       for (final Gradient g in gs)
         for (final double o in <double>[0.0, 0.37, 1.0, 1.5]) errOr(() => grad(g.withOpacity(o))),
+    ];
+    // Duplicate stops (the sample's first/last-stop and lastIndexWhere rules)
+    // and gradients that differ only in their stops.
+    const List<Color> c4 = <Color>[Color(0xFFFF0000), Color(0xFF00FF00), Color(0xFF0000FF), Color(0x80FFFFFF)];
+    final List<Gradient> dup = <Gradient>[
+      const LinearGradient(colors: c4, stops: <double>[0.25, 0.25, 0.6, 1.0]),
+      const LinearGradient(colors: c4, stops: <double>[0.0, 0.5, 0.5, 1.0]),
+      const RadialGradient(colors: c4, stops: <double>[0.0, 0.4, 0.75, 0.75]),
+      const SweepGradient(colors: c4, stops: <double>[0.3, 0.3, 0.3, 0.9]),
+    ];
+    out['gradient.duplicateStops'] = <Object?>[
+      for (final Gradient a in dup)
+        for (final Gradient b in <Gradient>[...dup, gs[1], gs[4], gs[7]])
+          for (final double t in <double>[0.0, 0.3, 1.0]) errOr(() => grad(Gradient.lerp(a, b, t))),
+    ];
+    const List<Color> c2 = <Color>[Color(0xFF000000), Color(0xFFFFFFFF)];
+    out['gradient.equalStops'] = <bool>[
+      const LinearGradient(colors: c2) == const LinearGradient(colors: c2, stops: <double>[0, 1]),
+      const LinearGradient(colors: c2, stops: <double>[0, 0.5]) == const LinearGradient(colors: c2, stops: <double>[0, 1]),
+      const RadialGradient(colors: c2) == const RadialGradient(colors: c2, stops: <double>[0, 1]),
+      const SweepGradient(colors: c2, stops: <double>[0, 0.5]) == const SweepGradient(colors: c2, stops: <double>[0, 1]),
+      const LinearGradient(colors: c2, stops: <double>[0, 1]) == const LinearGradient(colors: c2, stops: <double>[0, 1]),
     ];
     out['gradient.fromColor'] = <Object?>[
       for (final Gradient g in gs) grad(g.fromColor(const Color(0xFF0080FF))),
@@ -453,6 +482,7 @@ void main() {
       (const Rect.fromLTWH(-5.0, 3.0, 20.5, 11.25), null, BoxFit.contain),
       (const Rect.fromLTWH(0, 0, 400, 290), 'Fits', BoxFit.fill),
       (const Rect.fromLTWH(0, 0, 90, 90), 'Small', BoxFit.cover),
+      (const Rect.fromLTWH(0, 0, 130, 120), 'Allowance', BoxFit.fill),
     ]) {
       final RecCanvas c = RecCanvas();
       paintImage(canvas: c, rect: o.$1, image: img512, debugImageLabel: o.$2, fit: o.$3, flipHorizontally: true);
@@ -518,7 +548,16 @@ void main() {
             errOr(() => logo(Decoration.lerp(a, b, t))),
           ],
     ];
+    out['decoration.lerp.unrelated'] = <Object?>[
+      for (final double t in ts) ...<Object?>[
+        logo(Decoration.lerp(l1, const PlainDecoration(), t)),
+        logo(Decoration.lerp(const PlainDecoration(), l2, t)),
+      ],
+    ];
     out['flutterLogo.equal'] = <Object?>[
+      FlutterLogoDecoration.lerp(null, l0, 0.5) == l0,
+      FlutterLogoDecoration.lerp(null, l0, 0.5) == FlutterLogoDecoration.lerp(null, l0, 0.5),
+      FlutterLogoDecoration.lerp(l1, null, 0.25) == l1,
       for (final FlutterLogoDecoration? a in logos)
         for (final FlutterLogoDecoration? b in logos) a == b,
     ];

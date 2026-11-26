@@ -349,6 +349,35 @@ func paintingGradientsCases(t *testing.T, tester *flutter_test.Tester) map[strin
 		fromColor = append(fromColor, pgGrad(g.FromColor(ui.NewColor(0xFF0080FF))))
 	}
 	out["gradient.scale"], out["gradient.withOpacity"], out["gradient.fromColor"] = scale, opacity, fromColor
+	// Duplicate stops (the sample's first/last-stop and lastIndexWhere
+	// rules) and gradients that differ only in their stops.
+	c4 := []ui.Color{ui.NewColor(0xFFFF0000), ui.NewColor(0xFF00FF00), ui.NewColor(0xFF0000FF), ui.NewColor(0x80FFFFFF)}
+	dup := []Gradient{
+		NewLinearGradient(LinearGradientOptions{Colors: c4, Stops: []float64{0.25, 0.25, 0.6, 1.0}}),
+		NewLinearGradient(LinearGradientOptions{Colors: c4, Stops: []float64{0.0, 0.5, 0.5, 1.0}}),
+		NewRadialGradient(RadialGradientOptions{Colors: c4, Stops: []float64{0.0, 0.4, 0.75, 0.75}}),
+		NewSweepGradient(SweepGradientOptions{Colors: c4, Stops: []float64{0.3, 0.3, 0.3, 0.9}}),
+	}
+	var dupLerps []any
+	for _, a := range dup {
+		for _, b := range append(append([]Gradient{}, dup...), gs[1], gs[4], gs[7]) {
+			for _, tt := range []float64{0.0, 0.3, 1.0} {
+				dupLerps = append(dupLerps, pgErrOr(func() any { return pgGrad(GradientLerp(a, b, tt)) }))
+			}
+		}
+	}
+	out["gradient.duplicateStops"] = dupLerps
+	bw := []ui.Color{ui.NewColor(0xFF000000), ui.NewColor(0xFFFFFFFF)}
+	lg := func(s []float64) Gradient { return NewLinearGradient(LinearGradientOptions{Colors: bw, Stops: s}) }
+	out["gradient.equalStops"] = []bool{
+		GradientsEqual(lg(nil), lg([]float64{0, 1})),
+		GradientsEqual(lg([]float64{0, 0.5}), lg([]float64{0, 1})),
+		GradientsEqual(NewRadialGradient(RadialGradientOptions{Colors: bw}),
+			NewRadialGradient(RadialGradientOptions{Colors: bw, Stops: []float64{0, 1}})),
+		GradientsEqual(NewSweepGradient(SweepGradientOptions{Colors: bw, Stops: []float64{0, 0.5}}),
+			NewSweepGradient(SweepGradientOptions{Colors: bw, Stops: []float64{0, 1}})),
+		GradientsEqual(lg([]float64{0, 1}), lg([]float64{0, 1})),
+	}
 	shaderRect := ui.NewRectFromLTWH(1.0, 2.0, 30.0, 40.0)
 	ltr, rtl := ui.TextDirectionLtr, ui.TextDirectionRtl
 	var shaders []any
@@ -553,7 +582,7 @@ func paintingGradientsCases(t *testing.T, tester *flutter_test.Tester) map[strin
 	}
 	var inverted []any
 	big, fits2 := "Big", "Fits"
-	small := "Small"
+	small, allowance := "Small", "Allowance"
 	for _, o := range []struct {
 		rect  ui.Rect
 		label *string
@@ -563,6 +592,7 @@ func paintingGradientsCases(t *testing.T, tester *flutter_test.Tester) map[strin
 		{ui.NewRectFromLTWH(-5.0, 3.0, 20.5, 11.25), nil, BoxFitContain},
 		{ui.NewRectFromLTWH(0, 0, 400, 290), &fits2, BoxFitFill},
 		{ui.NewRectFromLTWH(0, 0, 90, 90), &small, BoxFitCover},
+		{ui.NewRectFromLTWH(0, 0, 130, 120), &allowance, BoxFitFill},
 	} {
 		c := flutter_test.NewTestRecordingCanvas()
 		PaintImage(c, o.rect, img512, PaintImageOptions{DebugImageLabel: o.label, Fit: fitP(o.fit), FlipHorizontally: true})
@@ -627,6 +657,15 @@ func paintingGradientsCases(t *testing.T, tester *flutter_test.Tester) map[strin
 		return d
 	}
 	var logoLerp, logoEq []any
+	logoEq = append(logoEq, FlutterLogoDecorationLerp(nil, l0, 0.5).Equal(l0),
+		FlutterLogoDecorationLerp(nil, l0, 0.5).Equal(FlutterLogoDecorationLerp(nil, l0, 0.5)),
+		FlutterLogoDecorationLerp(l1, nil, 0.25).Equal(l1))
+	var unrelated []any
+	for _, tt := range pgTs {
+		unrelated = append(unrelated, logo(DecorationLerp(l1, NewPlainDecoration(), tt)),
+			logo(DecorationLerp(NewPlainDecoration(), l2, tt)))
+	}
+	out["decoration.lerp.unrelated"] = unrelated
 	for _, a := range logos {
 		for _, b := range logos {
 			for _, tt := range pgTs {
@@ -715,3 +754,14 @@ func TestPaintingGradientsMatchFlutter(t *testing.T) {
 		t.Errorf("%s:\n Go:      %v\n Flutter: %v", name, g, want)
 	}
 }
+
+// PlainDecoration is the Dart side's decoration that lerps with nothing.
+type PlainDecoration struct{ DecorationBase }
+
+func NewPlainDecoration() *PlainDecoration {
+	d := &PlainDecoration{}
+	d.SetSelf(d)
+	return d
+}
+
+func (d *PlainDecoration) CreateBoxPainter(onChanged func()) BoxPainter { return nil }
