@@ -1,20 +1,15 @@
 package painting
 
 // Port of flutter_logo.dart (Flutter 3.50.1): FlutterLogoStyle and
-// FlutterLogoDecoration.
-//
-// PARTIAL: the "Flutter" label of the horizontal and stacked styles needs
-// TextPainter (text_painter.dart, not ported yet, nor is dart:ui's
-// Paragraph). The painter draws everything else exactly as Dart does (the
-// mark, its position and size for every style and transition, the opacity
-// layer) and leaves out the label's drawing (its clip, transform, text and
-// fade).
+// FlutterLogoDecoration, with the "Flutter" label of the horizontal and
+// stacked styles drawn by a TextPainter.
 
 import (
 	"math"
 
 	ui "github.com/jonathanperis/flutter-go/engine/src/flutter/lib/ui/go"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/foundation"
+	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/services"
 	"github.com/jonathanperis/flutter-go/src/dart"
 )
 
@@ -218,11 +213,54 @@ func (d *FlutterLogoDecoration) DebugFillProperties(properties *foundation.Diagn
 type flutterLogoPainter struct {
 	BoxPainterBase
 	config *FlutterLogoDecoration
+
+	// These are configured assuming a font size of 100.0.
+	textPainter      *TextPainter
+	textBoundingRect ui.Rect
 }
 
 func newFlutterLogoPainter(config *FlutterLogoDecoration) *flutterLogoPainter {
 	config.DebugAssertIsValid()
-	return &flutterLogoPainter{config: config}
+	p := &flutterLogoPainter{config: config}
+	p.prepareText()
+	return p
+}
+
+// Dispose disposes of the label's text painter.
+func (p *flutterLogoPainter) Dispose() {
+	p.textPainter.Dispose()
+	p.BoxPainterBase.Dispose()
+}
+
+func (p *flutterLogoPainter) prepareText() {
+	const kLabel = "Flutter"
+	color := p.config.TextColor
+	family := "Roboto"
+	// 247 is the height of the F when the fontSize is 350, assuming device
+	// pixel ratio 1.0.
+	fontSize := 100.0 * 350.0 / 247.0
+	weight := ui.FontWeightW300
+	baseline := ui.TextBaselineAlphabetic
+	label := kLabel
+	ltr := ui.TextDirectionLtr
+	p.textPainter = NewTextPainter(TextPainterOptions{
+		Text: NewTextSpan(TextSpanOptions{
+			Text: &label,
+			Style: NewTextStyle(TextStyleOptions{Color: &color, FontFamily: &family, FontSize: &fontSize,
+				FontWeight: &weight, TextBaseline: &baseline}),
+		}),
+		TextDirection: &ltr,
+	})
+	p.textPainter.Layout()
+	boxes := p.textPainter.GetBoxesForSelection(services.NewTextSelection(0, len(kLabel)))
+	switch {
+	case len(boxes) == 0:
+		panic(dart.StateError{Message: "No element"})
+	case len(boxes) > 1:
+		panic(dart.StateError{Message: "Too many elements"})
+	}
+	textSize := boxes[0]
+	p.textBoundingRect = ui.NewRectFromLTRB(textSize.Left, textSize.Top, textSize.Right, textSize.Bottom)
 }
 
 func pathOf(points ...float64) *ui.Path {
@@ -335,10 +373,83 @@ func (p *flutterLogoPainter) Paint(canvas ui.Canvas, offset ui.Offset, configura
 		bounds := offset.And(canvasSize)
 		canvas.SaveLayer(&bounds, layerPaint)
 	}
-	// PARTIAL: the "Flutter" label of the horizontal (position > 0) and
-	// stacked (position < 0) styles is not drawn (no TextPainter yet).
+	if p.config.position != 0.0 {
+		if p.config.position > 0.0 {
+			p.paintHorizontalLabel(canvas, rect, logoSquare)
+		} else if p.config.position < 0.0 {
+			p.paintStackedLabel(canvas, logoTargetSquare)
+		}
+	}
 	p.paintLogo(canvas, logoSquare)
 	if p.config.opacity < 1.0 {
 		canvas.Restore()
 	}
+}
+
+// Dart evaluates these constants one rounding at a time.
+var (
+	logoLabelInset = func() float64 { inset := 10.4; inset = float64(inset * 2.0); inset /= 202.0; return 1 - inset }()
+	logoLabelLeft  = func() float64 { left := 256.4; return left / 820.0 }()
+)
+
+// paintHorizontalLabel draws the label to the right of the mark, clipped
+// to a wedge from the mark's center while the style transitions.
+func (p *flutterLogoPainter) paintHorizontalLabel(canvas ui.Canvas, rect, logoSquare ui.Rect) {
+	fontSize := float64(float64(2.0/3.0*logoSquare.Height()) * logoLabelInset)
+	scale := fontSize / 100.0
+	// Position of text in rest position: 256.4 is the distance from the
+	// left edge to the left of the F when the whole logo is 820.0 wide, 32
+	// the distance from the text bounding box edge to the left edge of the
+	// F when the font size is 350.
+	finalLeftTextPosition := float64(logoLabelLeft*rect.Width()) - float64((32.0/350.0)*fontSize)
+	// Position of text when just starting the animation.
+	initialLeftTextPosition := rect.Width()/2.0 - float64(p.textBoundingRect.Width()*scale)
+	textOffset := ui.NewOffset(
+		rect.Left+*ui.LerpDouble(&initialLeftTextPosition, &finalLeftTextPosition, p.config.position),
+		rect.Top+(rect.Height()-float64(p.textBoundingRect.Height()*scale))/2.0,
+	)
+	canvas.Save()
+	if p.config.position < 1.0 {
+		center := logoSquare.Center()
+		path := ui.NewPath()
+		path.MoveTo(center.Dx, center.Dy)
+		path.LineTo(center.Dx+rect.Width(), center.Dy-rect.Width())
+		path.LineTo(center.Dx+rect.Width(), center.Dy+rect.Width())
+		path.Close()
+		canvas.ClipPath(path)
+	}
+	canvas.Translate(textOffset.Dx, textOffset.Dy)
+	canvas.Scale(scale, scale)
+	p.textPainter.Paint(canvas, ui.OffsetZero)
+	canvas.Restore()
+}
+
+// paintStackedLabel draws the label below the mark, faded in by a
+// modulating gradient while the style transitions.
+func (p *flutterLogoPainter) paintStackedLabel(canvas ui.Canvas, logoTargetSquare ui.Rect) {
+	fontSize := float64(float64(0.35*logoTargetSquare.Height()) * logoLabelInset)
+	scale := fontSize / 100.0
+	if p.config.position > -1.0 {
+		// This limits what the drawRect call below is going to blend with.
+		bounds := p.textBoundingRect
+		canvas.SaveLayer(&bounds, ui.NewPaint())
+	} else {
+		canvas.Save()
+	}
+	canvas.Translate(logoTargetSquare.Center().Dx-float64(p.textBoundingRect.Width()*scale)/2.0, logoTargetSquare.Bottom)
+	canvas.Scale(scale, scale)
+	p.textPainter.Paint(canvas, ui.OffsetZero)
+	if p.config.position > -1.0 {
+		paint := ui.NewPaint()
+		paint.SetBlendMode(ui.BlendModeModulate)
+		position := math.Abs(p.config.position)
+		paint.SetShader(ui.NewGradientLinear(
+			ui.NewOffset(p.textBoundingRect.Width()*-0.5, 0.0),
+			ui.NewOffset(p.textBoundingRect.Width()*1.5, 0.0),
+			[]ui.Color{ui.NewColor(0xFFFFFFFF), ui.NewColor(0xFFFFFFFF), ui.NewColor(0x00FFFFFF), ui.NewColor(0x00FFFFFF)},
+			ui.GradientLinearOptions{ColorStops: []float64{0.0, math.Max(0.0, position-0.1), math.Min(position+0.1, 1.0), 1.0}},
+		))
+		canvas.DrawRect(p.textBoundingRect.Inflate(p.textBoundingRect.Width()*0.5), paint)
+	}
+	canvas.Restore()
 }
