@@ -10,3 +10,24 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   fake_async: ^1.3.3
+flutter:
+  shaders:
+    - shaders/all_uniforms.frag
+    - shaders/blue_green_sampler.frag
+    - shaders/children_and_uniforms.frag
+    - shaders/circle_sdf.frag
+    - shaders/double_sampler.frag
+    - shaders/filter_shader.frag
+    - shaders/float_uniform.frag
+    - shaders/functions.frag
+    - shaders/mat3_array_uniform.frag
+    - shaders/missing_size.frag
+    - shaders/missing_texture.frag
+    - shaders/no_uniforms.frag
+    - shaders/sdf.frag
+    - shaders/texture.frag
+    - shaders/uniform_mat2.frag
+    - shaders/uniform_ordering.frag
+    - shaders/uniforms.frag
+    - shaders/vec2_uniform.frag
+    - shaders/vec3_uniform.frag

@@ -2,6 +2,7 @@
 package app
 
 import (
+	"errors"
 	"log"
 	"runtime"
 	"time"
@@ -122,11 +123,12 @@ func Run(root widgets.Widget, o Options) error {
 		o.Window(win)
 	}
 
-	ctx, err := impeller.NewMetalContext()
-	if err != nil {
-		return err
+	// dart:ui's engine context: images decoded or rasterized by dart:ui are
+	// textures in it, so frames are presented with it too.
+	ctx := ui.EngineImpellerContext()
+	if ctx == nil {
+		return errors.New("app: could not create an Impeller (Metal) context")
 	}
-	defer ctx.Release()
 	layer := metal.Attach(win.GetCocoaWindow())
 	defer layer.Release()
 	tc := impeller.NewTypographyContext()
@@ -195,8 +197,6 @@ func Run(root widgets.Widget, o Options) error {
 	// this is an engine-side frame (the framework repaints from its layers).
 	win.SetRefreshCallback(func(*glfw.Window) { eng.needsFrame = true })
 
-	paint := impeller.NewPaint()
-	defer paint.Release()
 	var frameNumber uint64
 	for frames := 0; !win.ShouldClose(); {
 		loop.ElapseTo(time.Since(epoch)) // timers due by now, with their microtasks
@@ -205,21 +205,24 @@ func Run(root widgets.Widget, o Options) error {
 			eng.needsFrame = false
 			start := time.Now()
 			w, h := win.GetSize()
-			scale := layer.Scale()
-			dlb := impeller.NewDisplayListBuilder()
-			dlb.Scale(scale, scale)
+			scale := float64(layer.Scale())
+			ui.EngineDevicePixelRatio = scale
+			// The frame is recorded with dart:ui's PictureRecorder/Canvas
+			// (an Impeller display list), in physical pixels.
+			rec := ui.NewPictureRecorder()
+			canvas := ui.NewCanvas(rec)
+			canvas.Scale(scale, scale)
 			b.drawFrame = func() {
-				owner.DrawFrame(ui.Size{Width: float64(w), Height: float64(h)}, &impellerCanvas{dlb, paint})
+				owner.DrawFrame(ui.Size{Width: float64(w), Height: float64(h)}, NewCanvas(canvas))
 			}
 			frameNumber++
 			b.EnsureFrameCallbacksRegistered() // a refresh can come before the framework asked for a frame
 			pc.BeginFrame(start.Sub(epoch), frameNumber)
 			b.drawFrame = nil
-			dl := dlb.Build()
-			dlb.Release()
+			pic := rec.EndRecording()
 			cpu := time.Since(start)
-			err := layer.Present(ctx.Handle(), dl.Handle())
-			dl.Release()
+			err := layer.Present(ctx.Handle(), ui.EnginePictureDisplayList(pic).Handle())
+			pic.Dispose()
 			if err != nil {
 				log.Print(err)
 			}

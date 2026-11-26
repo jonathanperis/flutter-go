@@ -29,8 +29,16 @@ func (e RangeError) Error() string {
 	if e.Name != "" {
 		s += " (" + e.Name + ")"
 	}
-	return s + ": " + msg + ": Not in inclusive range " + strconv.Itoa(e.Start) + ".." + strconv.Itoa(e.End) +
-		": " + strconv.Itoa(e.Value)
+	var explanation string
+	switch {
+	case e.End > e.Start:
+		explanation = ": Not in inclusive range " + strconv.Itoa(e.Start) + ".." + strconv.Itoa(e.End)
+	case e.End < e.Start:
+		explanation = ": Valid value range is empty"
+	default:
+		explanation = ": Only valid value is " + strconv.Itoa(e.Start)
+	}
+	return s + ": " + msg + explanation + ": " + strconv.Itoa(e.Value)
 }
 
 // ToStringAsPrecision is Dart's double.toStringAsPrecision(precision): the

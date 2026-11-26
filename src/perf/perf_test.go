@@ -106,10 +106,9 @@ func (h *harness) frame(useImpeller bool) {
 		h.owner.DrawFrame(size, nopCanvas{})
 		return
 	}
-	b := impeller.NewDisplayListBuilder()
-	h.owner.DrawFrame(size, app.NewCanvas(b, h.paint))
-	b.Build().Release()
-	b.Release()
+	rec := ui.NewPictureRecorder()
+	h.owner.DrawFrame(size, app.NewCanvas(ui.NewCanvas(rec)))
+	rec.EndRecording().Dispose()
 }
 
 func BenchmarkFrame(b *testing.B) {

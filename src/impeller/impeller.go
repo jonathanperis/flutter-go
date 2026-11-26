@@ -22,7 +22,11 @@ import (
 // Version is the C API version this binding was compiled against.
 func Version() uint32 { return uint32(C.fg_impeller_version()) }
 
-type Color struct{ R, G, B, A float32 }
+// Color is an ImpellerColor; Space is its ImpellerColorSpace (0: sRGB).
+type Color struct {
+	R, G, B, A float32
+	Space     int
+}
 
 func (c Color) c() C.ImpellerColor {
 	return C.ImpellerColor{red: C.float(c.R), green: C.float(c.G), blue: C.float(c.B), alpha: C.float(c.A)}

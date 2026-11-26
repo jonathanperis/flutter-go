@@ -3,75 +3,75 @@ package app
 import (
 	"math"
 
+	ui "github.com/jonathanperis/flutter-go/engine/src/flutter/lib/ui/go"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/services"
 
 	r "github.com/jonathanperis/flutter-go/packages/flutter/lib/src/rendering"
 	"github.com/jonathanperis/flutter-go/src/impeller"
 )
 
-// NewCanvas returns a rendering.Canvas that records into b. It needs no GPU.
-func NewCanvas(b *impeller.DisplayListBuilder, p *impeller.Paint) r.Canvas {
-	return &impellerCanvas{b, p}
-}
+// NewCanvas returns a rendering.Canvas that draws through dart:ui's Canvas
+// (which records an Impeller display list). It needs no GPU.
+func NewCanvas(c ui.Canvas) r.Canvas { return &uiCanvas{c: c, paint: ui.NewPaint()} }
 
 // NewTextEngine returns an Impeller-backed rendering.TextEngine.
 func NewTextEngine(tc *impeller.TypographyContext) r.TextEngine { return impellerText{tc} }
 
-// impellerCanvas implements rendering.Canvas on an Impeller display list.
-type impellerCanvas struct {
-	b     *impeller.DisplayListBuilder
-	paint *impeller.Paint
+// uiCanvas implements rendering.Canvas (flutter-go's interim render-object
+// canvas) on dart:ui's Canvas, as Flutter's PaintingContext paints into a
+// ui.Canvas.
+type uiCanvas struct {
+	c     ui.Canvas
+	paint *ui.Paint
+}
+
+func (c *uiCanvas) Save()                    { c.c.Save() }
+func (c *uiCanvas) Restore()                 { c.c.Restore() }
+func (c *uiCanvas) Translate(dx, dy float64) { c.c.Translate(dx, dy) }
+func (c *uiCanvas) ClipRect(x r.Rect)        { c.c.ClipRect(x) }
+
+func (c *uiCanvas) DrawRect(x r.Rect, col r.Color) {
+	c.paint.SetColor(col)
+	c.c.DrawRect(x, c.paint)
+}
+
+func (c *uiCanvas) DrawRRect(x r.Rect, radius float64, col r.Color) {
+	c.paint.SetColor(col)
+	c.c.DrawRRect(ui.NewRRectFromRectXY(x, radius, radius), c.paint)
+}
+
+// uiRecording records a separate picture (a repaint boundary's layer).
+type uiRecording struct {
+	rec *ui.PictureRecorder
+	c   *uiCanvas
+}
+
+func (rc uiRecording) Canvas() r.Canvas { return rc.c }
+func (rc uiRecording) End() r.Picture   { return picture{rc.rec.EndRecording()} }
+
+// picture adapts *ui.Picture to rendering.Picture.
+type picture struct{ p *ui.Picture }
+
+func (p picture) Release() { p.p.Dispose() }
+
+func (c *uiCanvas) NewRecording() r.Recording {
+	rec := ui.NewPictureRecorder()
+	return uiRecording{rec, &uiCanvas{c: ui.NewCanvas(rec), paint: c.paint}}
+}
+
+func (c *uiCanvas) DrawPicture(p r.Picture, at r.Offset) {
+	c.c.Save()
+	c.c.Translate(at.Dx, at.Dy)
+	c.c.DrawPicture(p.(picture).p)
+	c.c.Restore()
+}
+
+func (c *uiCanvas) DrawParagraph(p r.Paragraph, at r.Offset) {
+	ui.EngineDrawParagraph(c.c, p.(*paragraph).p, at)
 }
 
 func color(c r.Color) impeller.Color {
 	return impeller.Color{R: float32(c.R), G: float32(c.G), B: float32(c.B), A: float32(c.A)}
-}
-
-func rect(x r.Rect) impeller.Rect {
-	return impeller.Rect{X: float32(x.Left), Y: float32(x.Top), W: float32(x.Width()), H: float32(x.Height())}
-}
-
-func (c *impellerCanvas) Save()                    { c.b.Save() }
-func (c *impellerCanvas) Restore()                 { c.b.Restore() }
-func (c *impellerCanvas) Translate(dx, dy float64) { c.b.Translate(float32(dx), float32(dy)) }
-func (c *impellerCanvas) ClipRect(x r.Rect)        { c.b.ClipRect(rect(x)) }
-
-func (c *impellerCanvas) DrawRect(x r.Rect, col r.Color) {
-	c.paint.SetColor(color(col))
-	c.b.DrawRect(rect(x), c.paint)
-}
-
-func (c *impellerCanvas) DrawRRect(x r.Rect, radius float64, col r.Color) {
-	c.paint.SetColor(color(col))
-	c.b.DrawRoundedRect(rect(x), float32(radius), c.paint)
-}
-
-type impellerRecording struct {
-	b *impeller.DisplayListBuilder
-	c *impellerCanvas
-}
-
-func (r impellerRecording) Canvas() r.Canvas { return r.c }
-func (r impellerRecording) End() r.Picture {
-	dl := r.b.Build()
-	r.b.Release()
-	return dl
-}
-
-func (c *impellerCanvas) NewRecording() r.Recording {
-	b := impeller.NewDisplayListBuilder()
-	return impellerRecording{b, &impellerCanvas{b, c.paint}}
-}
-
-func (c *impellerCanvas) DrawPicture(p r.Picture, at r.Offset) {
-	c.b.Save()
-	c.b.Translate(float32(at.Dx), float32(at.Dy))
-	c.b.DrawDisplayList(p.(*impeller.DisplayList), 1)
-	c.b.Restore()
-}
-
-func (c *impellerCanvas) DrawParagraph(p r.Paragraph, at r.Offset) {
-	c.b.DrawParagraph(p.(*paragraph).p, float32(at.Dx), float32(at.Dy))
 }
 
 // impellerText implements rendering.TextEngine with Impeller's typography.

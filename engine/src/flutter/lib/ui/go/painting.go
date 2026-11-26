@@ -1,8 +1,7 @@
 package ui
 
-// Port of engine/src/flutter/lib/ui/painting.dart (Flutter 3.50.1), part
-// by part. So far: Color and ColorSpace; Image and Picture (partial: their
-// static onCreate/onDispose hooks only).
+// Port of engine/src/flutter/lib/ui/painting.dart (Flutter 3.50.1): Color
+// and ColorSpace. The rest of painting.dart is in painting_*.go.
 
 import (
 	"math"
@@ -321,27 +320,3 @@ func colorTransform(source, destination ColorSpace) colorTransformFunc {
 	}
 	return identityTransform
 }
-
-// ---- Image and Picture (partial) ----
-
-// ImageEventCallback is called with an Image when it is created or disposed.
-type ImageEventCallback func(image *Image)
-
-// Image is an opaque handle to raw decoded image data (partial).
-type Image struct{ _ int }
-
-// ImageOnCreate and ImageOnDispose are Image.onCreate and Image.onDispose,
-// called when an image is created or disposed.
-var ImageOnCreate, ImageOnDispose ImageEventCallback
-
-// PictureEventCallback is called with a Picture when it is created or
-// disposed.
-type PictureEventCallback func(picture *Picture)
-
-// Picture is an object representing a sequence of recorded graphical
-// operations (partial).
-type Picture struct{ _ int }
-
-// PictureOnCreate and PictureOnDispose are Picture.onCreate and
-// Picture.onDispose.
-var PictureOnCreate, PictureOnDispose PictureEventCallback
