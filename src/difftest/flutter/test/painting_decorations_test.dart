@@ -61,13 +61,28 @@ String pathSig(Path p, Rect area, {int n = 9}) {
   return b.toString();
 }
 
-String paintF(Paint p) =>
+// shaderId numbers shaders in the order a painter first uses them, so a
+// shader re-created for a new rect (or a cached one) shows.
+String shaderId(Shader? s, List<Shader> seen) {
+  if (s == null) {
+    return 'noshader';
+  }
+  int i = seen.indexWhere((Shader x) => identical(x, s));
+  if (i < 0) {
+    seen.add(s);
+    i = seen.length - 1;
+  }
+  return 'shader#$i';
+}
+
+String paintF(Paint p, List<Shader> seen) =>
     '${col(p.color)}/${d(p.strokeWidth)}/${p.style}/${p.blendMode}/${p.maskFilter}/'
-    '${p.shader == null ? 'noshader' : 'shader'}/${p.filterQuality}/${p.invertColors}/${p.isAntiAlias}';
+    '${shaderId(p.shader, seen)}/${p.filterQuality}/${p.invertColors}/${p.isAntiAlias}';
 
 class Rec implements Canvas {
-  Rec(this.area);
+  Rec(this.area, this.shaders);
   final Rect area;
+  final List<Shader> shaders;
   final List<String> log = <String>[];
 
   String arg(Object? a) {
@@ -84,7 +99,7 @@ class Rec implements Canvas {
       return pathSig(a, area, n: 7);
     }
     if (a is Paint) {
-      return paintF(a);
+      return paintF(a, shaders);
     }
     if (a is Offset) {
       return off(a);
@@ -188,7 +203,7 @@ List<BoxDecoration> boxes(ui.Image img) => <BoxDecoration>[
   BoxDecoration(
     color: const Color(0xFFFFCC00),
     backgroundBlendMode: BlendMode.multiply,
-    border: Border(top: bs(0xFF0000FF, 5), left: bs(0xFF00FF00, 3, strokeAlign: BorderSide.strokeAlignOutside)),
+    border: Border(top: bs(0xFF0000FF, 5), left: bs(0xFF00FF00, 3)),
   ),
   const BoxDecoration(gradient: rad, shape: BoxShape.circle, boxShadow: shadows2),
   BoxDecoration(
@@ -211,6 +226,12 @@ List<BoxDecoration> boxes(ui.Image img) => <BoxDecoration>[
     border: Border.all(width: 2),
   ),
   BoxDecoration(image: DecorationImage(image: Img(img, 'c'), repeat: ImageRepeat.repeatX, scale: 2)),
+  BoxDecoration(color: const Color(0xFF444444), boxShadow: <BoxShadow>[shadows2[0], shadows2[1]]),
+  BoxDecoration(
+    color: const Color(0xFF00FF88),
+    border: BorderDirectional(top: bs(0xFF000000, 4), start: bs(0xFF000000, 4), end: bs(0xFF000000, 4), bottom: bs(0xFF000000, 4)),
+  ),
+  BoxDecoration(color: const Color(0xFF884488), shape: BoxShape.circle, border: Border(top: bs(0xFF000000, 2))),
 ];
 
 List<ShapeDecoration> shapeDecos(ui.Image img) => <ShapeDecoration>[
@@ -250,18 +271,22 @@ List<ShapeDecoration> shapeDecos(ui.Image img) => <ShapeDecoration>[
     image: DecorationImage(image: Img(img, 't'), alignment: AlignmentDirectional.centerStart),
     shape: const RoundedRectangleBorder(borderRadius: BorderRadiusDirectional.only(topEnd: Radius.circular(25))),
   ),
+  ShapeDecoration(image: DecorationImage(image: Img(img, 's2'), fit: BoxFit.fill), shape: CircleBorder(side: bs(0xFF000000, 2))),
 ];
 
 const List<double> ts = <double>[-0.5, 0, 0.25, 0.5, 0.75, 1, 1.5];
 const List<TextDirection?> tds = <TextDirection?>[TextDirection.ltr, TextDirection.rtl, null];
 
-String paintLog(Decoration dec, List<(Offset, Size)> calls, TextDirection? td) {
+String paintLog(Decoration dec, List<(Offset, Size)> calls, TextDirection? td, [List<TextDirection?>? tdPerCall]) {
   final BoxPainter painter = dec.createBoxPainter(() {});
   final out = <String>[];
-  for (final (Offset o, Size s) in calls) {
-    final rec = Rec(o & s);
+  final shaders = <Shader>[];
+  for (int i = 0; i < calls.length; i++) {
+    final (Offset o, Size s) = calls[i];
+    final rec = Rec(o & s, shaders);
+    final TextDirection? callTd = tdPerCall == null ? td : tdPerCall[i];
     out.add(tryS(() {
-      painter.paint(rec, o, ImageConfiguration(size: s, textDirection: td));
+      painter.paint(rec, o, ImageConfiguration(size: s, textDirection: callTd));
       return rec.log.join('\n');
     }));
   }
@@ -284,6 +309,7 @@ String hitGrid(Decoration dec, Size size, TextDirection? td) {
 
 void describe(Map<String, String> out, String key, Decoration dec, ui.Image img) {
   out['$key.str'] = tryS(() => '$dec');
+  out['$key.prop'] = tryS(() => DiagnosticsProperty<Decoration>('decoration', dec).toStringDeep());
   out['$key.deep'] = tryS(() => dec.toDiagnosticsNode().toStringDeep());
   out['$key.complex'] = '${dec.isComplex}';
   for (final TextDirection td in <TextDirection>[TextDirection.ltr, TextDirection.rtl]) {
@@ -331,6 +357,13 @@ void main() {
       for (final TextDirection? td in tds) {
         out['$k.paint.$td'] = paintLog(dec, calls, td);
       }
+      // One painter, the same rect, the text direction switching.
+      out['$k.paint.switch'] = paintLog(dec, <(Offset, Size)>[calls[0], calls[0], calls[0]], null,
+          <TextDirection?>[TextDirection.ltr, TextDirection.rtl, TextDirection.rtl]);
+      for (final double t in <double>[0, 0.3, 1]) {
+        out['$k.lerpNull.$t'] = tryS(() => '${Decoration.lerp(dec, null, t)}');
+        out['$k.nullLerp.$t'] = tryS(() => '${Decoration.lerp(null, dec, t)}');
+      }
     }
     // debugDisableShadows: outer shadows are clipped.
     debugDisableShadows = true;
@@ -351,6 +384,7 @@ void main() {
       for (final double f in <double>[-0.5, 0, 0.5, 2]) {
         out['box.$i.scale.$f'] = tryS(() => '${bx[i].scale(f)}');
       }
+      out['box.$i.scale.paint'] = paintLog(bx[i].scale(0.5), calls, TextDirection.ltr);
       out['box.$i.fromBox'] = tryS(() => '${ShapeDecoration.fromBoxDecoration(bx[i])}');
       out['box.$i.copy'] = tryS(() => '${bx[i].copyWith(shape: BoxShape.circle, color: const Color(0xFF010203))}');
       for (final double t in ts) {

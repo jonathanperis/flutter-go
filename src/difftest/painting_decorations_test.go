@@ -26,15 +26,27 @@ import (
 	"github.com/jonathanperis/flutter-go/src/dart"
 )
 
-func dePaintF(q *ui.Paint) string {
+// deShaderID numbers shaders in the order a painter first uses them (the
+// Dart side's shaderId).
+func deShaderID(sh ui.Shader, seen *[]ui.Shader) string {
+	if sh == nil {
+		return "noshader"
+	}
+	for i, x := range *seen {
+		if x == sh {
+			return fmt.Sprintf("shader#%d", i)
+		}
+	}
+	*seen = append(*seen, sh)
+	return fmt.Sprintf("shader#%d", len(*seen)-1)
+}
+
+func dePaintF(q *ui.Paint, seen *[]ui.Shader) string {
 	mf := "null"
 	if m := q.MaskFilter(); m != nil {
 		mf = m.String()
 	}
-	shader := "noshader"
-	if q.Shader() != nil {
-		shader = "shader"
-	}
+	shader := deShaderID(q.Shader(), seen)
 	return bdCol(q.Color()) + "/" + bd(q.StrokeWidth()) + "/" + q.Style().String() + "/" + q.BlendMode().String() + "/" +
 		mf + "/" + shader + "/" + q.FilterQuality().String() + "/" + fmt.Sprint(q.InvertColors()) + "/" +
 		fmt.Sprint(q.IsAntiAlias())
@@ -44,11 +56,14 @@ func dePaintF(q *ui.Paint) string {
 // made (positional arguments only, as Dart's noSuchMethod Invocation).
 type deRec struct {
 	*ft.TestRecordingCanvas
-	area ui.Rect
-	log  []string
+	area    ui.Rect
+	log     []string
+	shaders *[]ui.Shader
 }
 
-func newDeRec(area ui.Rect) *deRec { return &deRec{ft.NewTestRecordingCanvas(), area, nil} }
+func newDeRec(area ui.Rect, shaders *[]ui.Shader) *deRec {
+	return &deRec{ft.NewTestRecordingCanvas(), area, nil, shaders}
+}
 
 func (r *deRec) arg(a any) string {
 	switch x := a.(type) {
@@ -66,7 +81,7 @@ func (r *deRec) arg(a any) string {
 	case *ui.Path:
 		return bdPathSig(x, r.area, 7)
 	case *ui.Paint:
-		return dePaintF(x)
+		return dePaintF(x, r.shaders)
 	case ui.Offset:
 		return bdOff(x)
 	case float64:
@@ -226,7 +241,9 @@ func deBoxes(f deFixture, img *ui.Image) []*p.BoxDecoration {
 	bdir := func(s, e, t p.BorderSide) p.BoxBorder {
 		return p.NewBorderDirectional(p.BorderDirectionalOptions{Start: &s, End: &e, Top: &t})
 	}
-	top, left := deBS(0xFF0000FF, 5), deBS(0xFF00FF00, 3, p.BorderSideStrokeAlignOutside)
+	top, left := deBS(0xFF0000FF, 5), deBS(0xFF00FF00, 3)
+	s4 := deBS(0xFF000000, 4)
+	top2 := deBS(0xFF000000, 2)
 	cover, repeatX := p.BoxFitCover, p.ImageRepeatRepeatX
 	return []*p.BoxDecoration{
 		nb(),
@@ -255,6 +272,9 @@ func deBoxes(f deFixture, img *ui.Image) []*p.BoxDecoration {
 		nb(o{Image: p.NewDecorationImage(p.DecorationImageOptions{Image: newDeImg(img, "b"), Alignment: p.AlignmentDirectionalBottomEnd}),
 			BorderRadius: p.NewBorderRadiusAll(circ(10)), Border: p.NewBorderAll(p.BorderSideOptions{Width: ptr(2.0)})}),
 		nb(o{Image: p.NewDecorationImage(p.DecorationImageOptions{Image: newDeImg(img, "c"), Repeat: &repeatX, Scale: ptr(2.0)})}),
+		nb(o{Color: deCol(0xFF444444), BoxShadow: []p.BoxShadow{f.shadows2[0], f.shadows2[1]}}),
+		nb(o{Color: deCol(0xFF00FF88), Border: p.NewBorderDirectional(p.BorderDirectionalOptions{Top: &s4, Start: &s4, End: &s4, Bottom: &s4})}),
+		nb(o{Color: deCol(0xFF884488), Shape: p.BoxShapeCircle, Border: p.NewBorder(p.BorderOptions{Top: &top2})}),
 	}
 }
 
@@ -288,6 +308,8 @@ func deShapes(f deFixture, img *ui.Image) []*p.ShapeDecoration {
 		ns(o{Color: deCol(0xFFCCCCCC), Image: p.NewDecorationImage(p.DecorationImageOptions{Image: newDeImg(img, "t"),
 			Alignment: p.AlignmentDirectionalCenterStart}),
 			Shape: p.NewRoundedRectangleBorder(p.RRectBorderOptions{BorderRadius: p.BorderRadiusDirectional{TopEnd: circ(25)}})}),
+		ns(o{Image: p.NewDecorationImage(p.DecorationImageOptions{Image: newDeImg(img, "s2"), Fit: &fill}),
+			Shape: p.NewCircleBorder(p.CircleBorderOptions{Side: side(deBS(0xFF000000, 2))})}),
 	}
 }
 
@@ -305,14 +327,19 @@ func tdKey(td *ui.TextDirection) string {
 	return td.String()
 }
 
-func dePaintLog(dec p.Decoration, calls []deCall, td *ui.TextDirection) string {
+func dePaintLog(dec p.Decoration, calls []deCall, td *ui.TextDirection, tdPerCall ...*ui.TextDirection) string {
 	painter := dec.CreateBoxPainter(func() {})
 	var out []string
-	for _, c := range calls {
-		rec := newDeRec(c.o.And(c.s))
+	var shaders []ui.Shader
+	for i, c := range calls {
+		rec := newDeRec(c.o.And(c.s), &shaders)
 		s := c.s
+		callTd := td
+		if tdPerCall != nil {
+			callTd = tdPerCall[i]
+		}
 		out = append(out, deTry(func() string {
-			painter.Paint(rec, c.o, p.ImageConfiguration{Size: &s, TextDirection: td})
+			painter.Paint(rec, c.o, p.ImageConfiguration{Size: &s, TextDirection: callTd})
 			return rec.result()
 		}))
 	}
@@ -388,6 +415,9 @@ func paintingDecorationsCases(img *ui.Image) map[string]string {
 		byKey[e.key] = e.dec
 		k, dec := e.key, e.dec
 		out[k+".str"] = deTry(func() string { return dec.String() })
+		out[k+".prop"] = deTry(func() string {
+			return foundation.NewDiagnosticsProperty[p.Decoration]("decoration", dec).ToStringDeep()
+		})
 		out[k+".deep"] = deTry(func() string { return dec.ToDiagnosticsNode().ToStringDeep() })
 		out[k+".complex"] = fmt.Sprint(dec.IsComplex())
 		for _, td := range []ui.TextDirection{ltr, rtl} {
@@ -409,6 +439,12 @@ func paintingDecorationsCases(img *ui.Image) map[string]string {
 		for _, td := range tds {
 			out[k+".paint."+tdKey(td)] = dePaintLog(dec, calls, td)
 		}
+		// One painter, the same rect, the text direction switching.
+		out[k+".paint.switch"] = dePaintLog(dec, []deCall{calls[0], calls[0], calls[0]}, nil, &ltr, &rtl, &rtl)
+		for _, t := range []float64{0, 0.3, 1} {
+			out[k+".lerpNull."+bd(t)] = deTry(func() string { return deStr(p.DecorationLerp(dec, nil, t)) })
+			out[k+".nullLerp."+bd(t)] = deTry(func() string { return deStr(p.DecorationLerp(nil, dec, t)) })
+		}
 	}
 	p.DebugDisableShadows = true
 	for _, k := range []string{"box.5", "box.8", "box.13", "shape.3", "shape.4", "shape.5", "shape.6", "shape.7"} {
@@ -427,6 +463,7 @@ func paintingDecorationsCases(img *ui.Image) map[string]string {
 		for _, fct := range []float64{-0.5, 0, 0.5, 2} {
 			out[fmt.Sprintf("box.%d.scale.%s", i, bd(fct))] = deTry(func() string { return b.Scale(fct).String() })
 		}
+		out[fmt.Sprintf("box.%d.scale.paint", i)] = dePaintLog(b.Scale(0.5), calls, &ltr)
 		out[fmt.Sprintf("box.%d.fromBox", i)] = deTry(func() string { return p.NewShapeDecorationFromBoxDecoration(b).String() })
 		out[fmt.Sprintf("box.%d.copy", i)] = deTry(func() string {
 			return b.CopyWith(p.BoxDecorationCopyWithOptions{Shape: ptr(p.BoxShapeCircle), Color: deCol(0xFF010203)}).String()
