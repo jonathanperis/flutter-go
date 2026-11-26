@@ -14,23 +14,13 @@ import (
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/gestures"
 	r "github.com/jonathanperis/flutter-go/packages/flutter/lib/src/rendering"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/scheduler"
-	"github.com/jonathanperis/flutter-go/src/textedit"
+	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/services"
 	"github.com/jonathanperis/flutter-go/packages/flutter/lib/src/widgets"
 	"github.com/jonathanperis/flutter-go/src/async"
 	"github.com/jonathanperis/flutter-go/src/platform/metal"
 )
 
 func init() { runtime.LockOSThread() } // Cocoa needs the main thread.
-
-var keyMap = map[glfw.Key]textedit.Key{
-	glfw.KeyBackspace: textedit.KeyBackspace, glfw.KeyDelete: textedit.KeyDelete,
-	glfw.KeyLeft: textedit.KeyLeft, glfw.KeyRight: textedit.KeyRight,
-	glfw.KeyUp: textedit.KeyUp, glfw.KeyDown: textedit.KeyDown,
-	glfw.KeyHome: textedit.KeyHome, glfw.KeyEnd: textedit.KeyEnd,
-	glfw.KeyEnter: textedit.KeyEnter, glfw.KeyKPEnter: textedit.KeyEnter,
-	glfw.KeyTab: textedit.KeyTab, glfw.KeyA: textedit.KeyA, glfw.KeyC: textedit.KeyC,
-	glfw.KeyV: textedit.KeyV, glfw.KeyX: textedit.KeyX,
-}
 
 type glfwClipboard struct{ w *glfw.Window }
 
@@ -53,6 +43,10 @@ type Options struct {
 	// InjectText types this text into the focused widget after the first
 	// frame, for unattended runs.
 	InjectText string
+	// InjectKeys delivers these GLFW key events (and committed characters)
+	// after the first frame, as the key and char callbacks would, for
+	// unattended runs.
+	InjectKeys []InjectedKey
 	// InjectTaps synthesizes this many taps at InjectTapAt (logical px), one
 	// per frame, for unattended runs.
 	InjectTaps  int
@@ -61,8 +55,18 @@ type Options struct {
 	Window func(w *glfw.Window)
 }
 
+// InjectedKey is a GLFW key event (Char: the character GLFW's char
+// callback reports after it, 0 for none).
+type InjectedKey struct {
+	Key      glfw.Key
+	Scancode int
+	Action   glfw.Action
+	Mods     glfw.ModifierKey
+	Char     rune
+}
+
 // appBinding is the app's binding (partial WidgetsFlutterBinding:
-// BindingBase with GestureBinding, SchedulerBinding); its persistent frame
+// BindingBase with GestureBinding, SchedulerBinding, ServicesBinding); its persistent frame
 // callback draws the tree into the frame being produced, as
 // WidgetsBinding.drawFrame does, and its hit test finds the tree's gesture
 // targets, as RendererBinding.hitTestInView does.
@@ -70,14 +74,15 @@ type appBinding struct {
 	foundation.BindingBaseBase
 	gestures.GestureBindingMixin
 	scheduler.SchedulerBindingMixin
+	services.ServicesBindingMixin
 	// drawFrame is the rendering pipeline for the frame in progress.
 	drawFrame func()
 	// owner is the tree being shown.
 	owner *widgets.BuildOwner
 }
 
-func (b *appBinding) InitInstances()         { b.SchedulerBindingMixin.InitInstances() }
-func (b *appBinding) InitServiceExtensions() { b.SchedulerBindingMixin.InitServiceExtensions() }
+func (b *appBinding) InitInstances()         { b.ServicesBindingMixin.InitInstances() }
+func (b *appBinding) InitServiceExtensions() { b.ServicesBindingMixin.InitServiceExtensions() }
 func (b *appBinding) Unlocked()              { b.SchedulerBindingMixin.Unlocked() }
 
 func (b *appBinding) HitTestInView(result *gestures.HitTestResult, position ui.Offset, viewID int) {
@@ -94,7 +99,8 @@ func ensureBinding() *appBinding {
 		b := &appBinding{}
 		b.GestureBindingMixin.SetSelf(b)
 		b.SchedulerBindingMixin.SetSelf(b)
-		b.Construct(b, &b.GestureBindingMixin, &b.SchedulerBindingMixin)
+		b.ServicesBindingMixin.SetSelf(b)
+		b.Construct(b, &b.GestureBindingMixin, &b.SchedulerBindingMixin, &b.ServicesBindingMixin)
 		b.AddPersistentFrameCallback(func(time.Duration) {
 			if b.drawFrame != nil {
 				b.drawFrame()
@@ -154,22 +160,30 @@ func Run(root widgets.Widget, o Options) error {
 	defer ui.SetPlatformConfiguration(pc)()
 	b := ensureBinding()
 	loop := async.Current()
+	// ServicesBinding's channel handlers and keyboard sync complete in
+	// microtasks and posted engine replies.
+	loop.FlushMicrotasks()
+	loop.RunPosted()
+	loop.FlushMicrotasks()
 	owner := &widgets.BuildOwner{OnNeedsFrame: b.EnsureVisualUpdate}
 	epoch := time.Now().Add(-loop.Elapsed()) // frame timestamps and the loop's clock are measured from here
 	router := widgets.NewPointerRouter(owner)
 	owner.Platform = foundation.TargetPlatformMacOS
 	owner.Clipboard = glfwClipboard{win}
-	// Committed text (typing, and IME text once composition finishes).
-	win.SetCharCallback(func(_ *glfw.Window, ch rune) { owner.DispatchText(string(ch)) })
-	win.SetKeyCallback(func(_ *glfw.Window, k glfw.Key, _ int, a glfw.Action, m glfw.ModifierKey) {
-		if a == glfw.Release {
-			return
-		}
-		if key, ok := keyMap[k]; ok {
-			owner.DispatchKey(textedit.KeyEvent{Key: key,
-				Shift: m&glfw.ModShift != 0, Ctrl: m&glfw.ModControl != 0,
-				Alt: m&glfw.ModAlt != 0, Meta: m&glfw.ModSuper != 0})
-		}
+	// Keys reach the framework as the macOS embedder sends them (key data,
+	// then raw key messages); until widgets' focus system is ported, a
+	// keyMessageHandler hands them to the focused widget.
+	keyboard := &glfwKeyboard{manager: newKeyboardManager(pc)}
+	win.SetInputMode(glfw.LockKeyMods, glfw.True)
+	b.KeyEventManager().KeyMessageHandler = legacyKeyMessageHandler(owner.DispatchKey)
+	win.SetKeyCallback(func(_ *glfw.Window, k glfw.Key, scancode int, a glfw.Action, m glfw.ModifierKey) {
+		keyboard.onKey(k, scancode, a, m)
+	})
+	// Committed text (typing, and IME text once composition finishes). ENGINE
+	// GAP: there is no text input plugin; the text goes to the focused widget.
+	win.SetCharCallback(func(_ *glfw.Window, ch rune) {
+		keyboard.onChar(ch)
+		owner.DispatchText(string(ch))
 	})
 	b.owner = owner
 	router.TimeStamp = func() time.Duration { return time.Since(epoch) }
@@ -254,6 +268,16 @@ func Run(root widgets.Widget, o Options) error {
 				owner.DispatchText(o.InjectText)
 				o.InjectText = ""
 			}
+			for _, k := range o.InjectKeys {
+				keyboard.onKey(k.Key, k.Scancode, k.Action, k.Mods)
+				if k.Char != 0 {
+					keyboard.onChar(k.Char)
+					owner.DispatchText(string(k.Char))
+				}
+				keyboard.flush()
+				loop.FlushMicrotasks()
+			}
+			o.InjectKeys = nil
 			if o.InjectTaps > 0 {
 				o.InjectTaps--
 				pos := ui.Offset{Dx: o.InjectTapAt[0], Dy: o.InjectTapAt[1]}
@@ -272,6 +296,7 @@ func Run(root widgets.Widget, o Options) error {
 		} else {
 			glfw.WaitEvents()
 		}
+		keyboard.flush()       // a key press GLFW's char callback didn't follow
 		loop.FlushMicrotasks() // microtasks queued by input handlers
 	}
 	if rr := owner.RenderRoot(); rr != nil {
