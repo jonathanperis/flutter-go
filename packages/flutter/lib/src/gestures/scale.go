@@ -699,7 +699,6 @@ func (r *ScaleGestureRecognizer) reconfigure(pointer int) bool {
 	return true
 }
 
-
 func (r *ScaleGestureRecognizer) advanceStateMachine(shouldStartIfAccepted bool, event PointerEvent) {
 	if r.state == scaleStateReady {
 		r.state = scaleStatePossible
