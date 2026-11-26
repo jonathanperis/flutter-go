@@ -1547,3 +1547,70 @@ The standing goal is now full API parity with Flutter 3.50.1's Dart layer
   statics set at each step, createBinaryMessenger and
   handleAppLifecycleStateChanged chains (incl. through the lifecycle
   channel), and the 10 service extensions in registration order.
+
+### gestures (P4), with dart:ui's pointer.dart and key.dart
+- `packages/flutter/lib/src/gestures` ports the whole library (3.50.1),
+  one Go file per Dart file (hit_test.dart is `hittest.go`): events (all
+  PointerEvent classes and their transformed variants), converter,
+  hit test, pointer router, signal resolver, arena, team, recognizer
+  (GestureRecognizer/OneSequence/PrimaryPointer), eager, tap, multitap
+  (DoubleTap/MultiTap/SerialTap), long press, force press, monodrag
+  (Vertical/Horizontal/Pan), drag, drag details, multidrag, scale,
+  tap_and_drag, velocity tracker (+ iOS/macOS trackers), lsq solver,
+  resampler, gesture settings/details, constants, debug, and GestureBinding
+  (packet handling, hit tests kept per pointer, dispatch with each entry's
+  transform, close/sweep, cancelPointer, locking, signal resolution,
+  onHitTest, the touch resampler on the sampling clock,
+  FlutterErrorDetailsForPointerEventDispatcher). dart:ui: pointer.dart and
+  key.dart in full, PlatformDispatcher.onPointerDataPacket/onKeyData/
+  onHitTest, the engine's packet layout (`DispatchPointerDataPacket`,
+  `PackPointerDataPacket`), window.dart's GestureSettings and the view's
+  devicePixelRatio/gestureSettings (ENGINE GAP: no window metrics; an
+  embedder sets them with `UpdateViewGestureMetrics`). `src/dart`
+  Stopwatch; vector_math additions (perspectiveTransform, rows/columns).
+- Done with five forks in parallel worktrees (base layer; tap family;
+  drag family; scale; tap-and-drag + cross-family tests), each with an
+  exact difftest, then merged here; the binding, the recognizer bases and
+  the test helpers were ported first so the families could build on them.
+- flutter_test: `TestPointer` (test_pointer.dart), gesture_tester.dart's
+  `testGesture`/`GestureTester` (`RunTestGesture`), and the test binding's
+  `DebugSamplingClock` on the test's fake clock (the tester's loop, not an
+  inner FakeAsync's, as testWidgets' clock is).
+- **Migration:** widgets' ad-hoc `PointerRouter` arena and its
+  VelocityTracker/least-squares copy (`velocity.go`) are gone. The test
+  binding and src/app's binding (now BindingBase with GestureBinding,
+  SchedulerBinding) hit-test the tree through
+  `BuildOwner.HitTestGestures`, which adds the gesture targets a
+  RenderPointerListener would: a TapGestureRecognizer per tap region and a
+  VerticalDragGestureRecognizer per list, configured as ScrollableState
+  does (fling limits from the physics, the platform's velocity tracker,
+  hold on down, cancel → goBallistic(0), Scrollable's IgnorePointer while
+  a scroll activity runs, wheel events through the PointerSignalResolver).
+  `widgets.PointerRouter` is now a thin event source (TestPointer-like
+  events to `GestureBinding.handlePointerEvent`, microtasks flushed after
+  each event as flutter_test's awaits do). The tester's `Fling` ports
+  flingFrom's positions exactly (`Offset.lerp`, `offset.distance`).
+- **Result:** the drag-fling difftest, which differed by up to 2.6e-11,
+  is now **exact** and compares exactly (the real tracker's arithmetic
+  plus flingFrom's lerped positions); a new `scroll_gestures` difftest
+  drives real gestures on lists on Android, iOS and macOS (each
+  platform's tracker and fling limits, the bouncing motion-start
+  threshold with event time stamps, holds and cancels under a competing
+  outer tap, item taps) and matched on the first run.
+- **Found:** Dart dispatches `event.transformed(entry.transform)` to every
+  target, and the root entry's transform is the identity, not null, so
+  even untransformed targets receive `_TransformedPointerXEvent`s (they
+  still pass `is PointerDownEvent`); `_CombiningGestureArenaMember`
+  prints as `Instance of '_CombiningGestureArenaMember'` in arena
+  diagnostics; scale.dart in 3.50.1 has no pointer-scroll/scale signal
+  handling (trackpad scale only through pan/zoom events).
+- Difftests, all exact: `binding_composition` (58 lines), `gesture_binding`
+  (≈300 lines: dispatch/transforms/arena/cancel/locking/errors/signals/
+  resampling/base recognizers/teams/invokeCallback), `pointer_events`
+  (4,170 lines: every event class and transform, converter at several
+  DPRs, resampler, arena, router, resolver, hit test), `velocity_tracker`
+  (2,512 lines: all three trackers, lsq solver degrees 0–3),
+  `recognizers_tap` (1,051 lines, 37 scenes), `recognizers_drag` (10,132
+  lines, 319 scenes), `recognizers_scale` (607 lines, 27 scenes),
+  `recognizers_tap_and_drag`, `scroll_gestures`, and `drag_fling`
+  tightened to exact.
