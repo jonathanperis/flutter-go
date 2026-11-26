@@ -15,30 +15,31 @@ func Mod(a, b float64) float64 {
 	return r
 }
 
-// UnsupportedError is what Dart throws for an integer division whose result
-// isn't a finite 64-bit integer.
+// UnsupportedError is dart:core's UnsupportedError(message).
 type UnsupportedError struct{ Message string }
 
 func (e UnsupportedError) Error() string { return "Unsupported operation: " + e.Message }
 
 // TruncDiv is Dart's double ~/ operator converted back with toDouble():
-// the VM's `(a / b).truncate()`, an int. It panics with UnsupportedError
-// ("Infinity or NaN toInt") when the quotient is infinite or NaN, as Dart
-// throws; a quotient outside int64 clamps to it (the VM's toInt), and a
-// zero is +0.0 (an int has no sign).
+// the quotient truncated toward zero, as the int the VM makes of it. An
+// infinite or NaN quotient panics with UnsupportedError("Infinity or NaN
+// toInt"), as the VM throws; a finite quotient outside int64 saturates to
+// int64's bounds (9223372036854775807 converts back to 2^63), as the VM's
+// toInt clamps (checked against the 3.50.1 VM, unoptimized and optimized).
+// An int has no -0, so a zero quotient is +0.0.
 func TruncDiv(a, b float64) float64 {
-	q := a / b
-	if math.IsNaN(q) || math.IsInf(q, 0) {
-		panic(UnsupportedError{"Infinity or NaN toInt"})
-	}
-	q = math.Trunc(q)
+	q := math.Trunc(a / b)
 	switch {
+	case math.IsNaN(q) || math.IsInf(q, 0):
+		panic(UnsupportedError{"Infinity or NaN toInt"})
 	case q >= 9223372036854775808.0:
-		return float64(math.MaxInt64)
-	case q < -9223372036854775808.0:
-		return float64(math.MinInt64)
+		return 9223372036854775808.0
+	case q <= -9223372036854775808.0:
+		return -9223372036854775808.0
+	case q == 0:
+		return 0 // (-0.5 ~/ 1).toDouble() is 0.0
 	}
-	return float64(int64(q))
+	return q
 }
 
 // UnimplementedError is dart:core's UnimplementedError(message).
