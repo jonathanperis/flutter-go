@@ -50,12 +50,18 @@ type PlatformConfiguration struct {
 	// platform_message.go
 	pendingResponses map[int]PlatformMessageResponse
 	nextResponseID   int
+
+	// metrics are the views' metrics (platform_dispatcher_views.go).
+	metrics map[int]ViewportMetrics
 }
 
 // NewPlatformConfiguration creates the configuration of an engine whose
 // client is client.
 func NewPlatformConfiguration(client PlatformConfigurationClient) *PlatformConfiguration {
-	return &PlatformConfiguration{client: client}
+	// The engine adds the implicit view before the isolate runs
+	// (RuntimeController::LaunchRootIsolate), with default metrics until
+	// the platform reports them.
+	return &PlatformConfiguration{client: client, metrics: map[int]ViewportMetrics{kImplicitViewID: NewViewportMetrics()}}
 }
 
 var currentPlatformConfiguration *PlatformConfiguration

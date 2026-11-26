@@ -1840,3 +1840,123 @@ The standing goal is now full API parity with Flutter 3.50.1's Dart layer
   exactly (the engine's dynamic font manager lowercases ASCII names); the
   builder's impeller flag is always set (it selects the painting path
   only).
+
+### dart:ui finished (P1): compositing, views and metrics, plugins, isolates
+
+- **Scope.** Every remaining dart:ui declaration: compositing.dart
+  (SceneBuilder with every push*/add* method, Scene with toImage/
+  toImageSync, EngineLayer and the eleven typed layers with the debug
+  checks of retained layers and their exact messages), window.dart and
+  platform_dispatcher.dart (FlutterView's full API, Display, ViewPadding/
+  WindowPadding, ViewConstraints, DisplayFeature(+Type/State),
+  DisplayCornerRadii, GestureSettings, ViewFocusEvent/State/Direction,
+  PlatformDispatcher's views/displays/onMetricsChanged/onViewFocusChange/
+  requestViewFocusChange/engineId, locales and computePlatformResolvedLocale,
+  the user settings with their callbacks, scaleFontSize with the
+  platform's nonlinear scaling, onError/ErrorCallback, defaultRouteName,
+  the isolate natives, SystemColor/SystemColorPalette, the deprecated
+  window in full), hooks.dart's entry points (as PlatformConfiguration
+  methods, with the engine's ViewportMetrics/DisplayData), plugins.dart,
+  isolate_name_server.dart, natives.dart's DartPluginRegistrant,
+  platform_isolate.dart, annotations.dart. dart:ui parity 158/195 →
+  194/194 (apiparity no longer counts hooks.dart's `void Function(Uri)`
+  return type as a declaration named `Function`). New: `src/isolate`
+  (dart:isolate's SendPort/ReceivePort on async.Loop), `dart.Pragma`,
+  `impeller.DisplayList.Retain`.
+- **How it maps to the engine.** SceneBuilder's natives build the
+  engine's flow layer tree, ported to Go (`compositing_layers.go`):
+  Container/Transform/ClipShape(Rect, RRect, RSuperellipse, Path)/Opacity/
+  ColorFilter/ImageFilter/BackdropFilter/ShaderMask/DisplayList/Texture/
+  PlatformView/PerformanceOverlay layers with Preroll (paint bounds,
+  renderable-state flags) and Paint, and LayerStateStack, which defers
+  opacity and filters to children that can apply them and otherwise saves
+  a layer (the delegate is dart:ui's Canvas, i.e. the SDK's
+  DisplayListBuilder). LayerTree::Flatten paints into a display list;
+  Scene.toImage renders it offscreen as Picture.toImage does. A picture
+  layer retains the picture's display list (SDK refcount), so disposing
+  the picture after addPicture is safe, as in the engine. The SDK doesn't
+  expose a display list's bounds or can_apply_group_opacity, so pictures
+  are "unbounded" and never inherit opacity: no culling, and saveLayers
+  are unbounded when the bounds are unknown — Impeller collapses an
+  opacity saveLayer whose content can take it, so the pixels match.
+- **Views.** The implicit view exists from the start (the engine adds it
+  before main) with default metrics; embedders report metrics with
+  `UpdateViewMetrics` and displays with `UpdateDisplays`, which run
+  hooks.dart's decoding (padding = max(0, viewPadding − viewInsets),
+  display features scaled by 1/dpr, unset touch slop/corner radii → null,
+  the inconsistent-radii ArgumentError). The interim
+  `UpdateViewGestureMetrics` and `ui.EngineDevicePixelRatio` are gone:
+  gestures read the view's metrics, drawShadow the engine's metrics for
+  view 0 (canvas.cc). FlutterView.render goes through
+  PlatformConfigurationNativeApi::Render/RuntimeController::Render (no
+  metrics for the view: the frame is dropped) to the client's optional
+  `PlatformConfigurationRenderClient`.
+- **src/app (G7).** The runner reports the display (GLFW video mode ×
+  content scale, refresh rate) and the implicit view's metrics: physical
+  size = framebuffer size, device pixel ratio = framebuffer/window width
+  (the backing scale factor), tight constraints; again on resize and on
+  content-scale changes. Each frame is composited as RenderView does: the
+  tree is recorded in logical pixels, put in a scene under the root
+  transform (dpr), shown with FlutterView.render, and the engine side
+  flattens the layer tree and presents it. `go run ./src/cmd/counter
+  -frames 60 -taps 3` ran (window opened, exit 0); this machine's display
+  is a 1920×1080 non-Retina screen, so the live device pixel ratio was 1.0
+  (as reported by the view and the display); the 2.0 case is covered by
+  `src/app/metrics_test.go`.
+- **Difftests (exact).** window_api (26 groups: flutter_tester's implicit
+  view, display and dispatcher state — the Go side installs an engine
+  configured as tester_main.cc's ConfigureShell, incl. its en_US/zh_CN
+  locales —, the deprecated window, 11 ViewConstraints with toString/
+  isTight/isSatisfiedBy/÷2/÷3/÷0/==, DisplayFeature/CornerRadii/
+  GestureSettings/ViewFocusEvent/enums, SystemColor errors, plugins,
+  IsolateNameServer, platform isolates, keepToString): matched on the
+  first run. compositing_api (every typed layer through the retained-layer
+  rules: used-once and previously-used-as-oldLayer messages with the hash
+  masked, dispose twice, disposed layers as oldLayer/retained; matrix and
+  Clip.none asserts, leaves, use after build/dispose, render outside a
+  frame): matched on the first run. Findings from the reference: after
+  `build()`/`Scene.dispose()` every native call throws the "native peer
+  has been collected" StateError (so "Scene has been disposed." is
+  unreachable from Dart); `FlutterView.render(disposedScene)` crashes
+  flutter_tester (segfault; not compared); flutter_tester enables
+  platform isolates and runs the UI on the platform thread
+  (isRunningOnPlatformThread is true; Go does the same).
+- **Difftest (pixels).** compositing_pixels, 39 scenes on Impeller: 35
+  within 1 (30 bit-exact, 5 blurs within 1: transforms incl. a zero matrix
+  and a w=2 projective one, hard and
+  anti-aliased rect clips, clip save layers, opacity nested (directly and
+  around a picture)/offset/0/alpha 300 wrapping to 44, color filters with commuting and
+  non-commuting opacity, blur/dilate/matrix image filters incl. offset and
+  opacity, backdrop blur/matrix with and without children and over the whole
+  frame (the mirror tile mode), shader masks
+  incl. under opacity, retained layers, texture/platform-view/overlay
+  leaves); clipRRect and clipPath.oval differ by one MSAA sample on edge
+  pixels (as their draws in painting_pixels); clipRSuperellipse by ≤2
+  samples (the SDK has no superellipse clip: dart:ui's path stands in);
+  "complex" ≤4 on 5 pixels of a skewed circle.
+- **Tests ported.** compositing_test.dart (all 6 tests, the 9 sharing
+  rules × 16 push functions), window_test.dart (all but the zone test),
+  platform_dispatcher_test.dart (ViewConstraints ×3; warm-up frame was
+  already ported), gesture_settings_test.dart, platform_view_test.dart,
+  plugin_utilities_test.dart, isolate_name_server_test.dart (the
+  multi-isolate test with a goroutine as the isolate), plus Go tests of
+  the hooks (views, metrics decoding, displays, focus, locales, user
+  settings incl. copyWith's keep-the-old-family quirk, scaleFontSize's
+  configuration-id path and cache), LayerStateStack decisions, and G7.
+- **Mutations.** 52 (SceneBuilder's debug checks and natives, the layer
+  tree and LayerStateStack, hooks decoding, user settings, scaleFontSize,
+  natives, IsolateNameServer, PluginUtilities, src/app's metrics): 4 first
+  didn't compile (rewritten), 36 caught, 12 missed; 9 of those were caught
+  after adding cases (pixel scenes: opacity directly nested, a w=2
+  matrix, a full-frame backdrop for the mirror tile mode; unit checks of
+  the default clip behavior, opacity bounds offset, overlap disabling
+  opacity inheritance, culling of an empty clip, a right inset larger than
+  its padding, the textScaleFactor 1 identity with a configuration id).
+  3 are equivalent: dropping Clip.antiAliasWithSaveLayer's saveLayer (the
+  children's applyState then saves the same layer, since pictures never
+  inherit opacity here), clipping a zero-radius rrect as an rrect instead
+  of a rect (same pixels), and the "()-" check of callback names (method
+  values and expressions always have a second dot in their names).
+  A mishap to note: the shared scratchpad held another agent's mut2.sh,
+  which was run once by name collision against that agent's worktree for
+  one mutation before being stopped; its file was verified restored.

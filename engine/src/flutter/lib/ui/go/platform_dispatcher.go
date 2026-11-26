@@ -56,19 +56,44 @@ type PlatformDispatcher struct {
 	initialLifecycleStateAccessed bool
 	semantics                     platformDispatcherSemantics // platform_dispatcher_semantics.go
 	input                         platformDispatcherInput     // pointer_dispatch.go
+	views                         platformDispatcherViews     // platform_dispatcher_views.go
+	settings                      platformDispatcherSettings  // platform_dispatcher_settings.go
 }
 
-// platformConfiguration is _PlatformConfiguration (the fields ported so far)
-// with its defaults.
+// platformConfiguration is _PlatformConfiguration; newPlatformConfiguration
+// gives its defaults. Nullable fields are pointers.
 type platformConfiguration struct {
-	platformBrightness    Brightness
-	accessibilityFeatures AccessibilityFeatures
-	semanticsEnabled      bool
+	accessibilityFeatures         AccessibilityFeatures
+	alwaysUse24HourFormat         bool
+	semanticsEnabled              bool
+	platformBrightness            Brightness
+	textScaleFactor               float64
+	locales                       []Locale
+	defaultRouteName              *string
+	systemFontFamily              *string
+	configurationID               *int
+	lineHeightScaleFactorOverride *float64
+	letterSpacingOverride         *float64
+	wordSpacingOverride           *float64
+	paragraphSpacingOverride      *float64
 }
 
-var platformDispatcherInstance = &PlatformDispatcher{
-	configuration: platformConfiguration{platformBrightness: BrightnessLight},
-	frameData:     FrameData{FrameNumber: -1},
+// newPlatformConfiguration is const _PlatformConfiguration().
+func newPlatformConfiguration() platformConfiguration {
+	return platformConfiguration{platformBrightness: BrightnessLight, textScaleFactor: 1.0, locales: []Locale{}}
+}
+
+var platformDispatcherInstance = newPlatformDispatcher()
+
+// newPlatformDispatcher is PlatformDispatcher._().
+func newPlatformDispatcher() *PlatformDispatcher {
+	p := &PlatformDispatcher{
+		configuration: newPlatformConfiguration(),
+		frameData:     FrameData{FrameNumber: -1},
+	}
+	p.views = newPlatformDispatcherViews(p)
+	p.settings.brieflyShowPassword = true
+	return p
 }
 
 // PlatformDispatcherInstance is PlatformDispatcher.instance, the singleton.
