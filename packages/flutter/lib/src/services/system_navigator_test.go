@@ -159,3 +159,36 @@ func TestBrowserContextMenuAssertsOffTheWeb(t *testing.T) {
 		t.Fatal("disabled")
 	}
 }
+
+// Own test (no upstream test file): SensitiveContentService's calls and
+// results.
+func TestSensitiveContentService(t *testing.T) {
+	ensureInitialized()
+	var reply any
+	var calls []services.MethodCall
+	messenger().SetMockMethodCallHandler(services.SystemChannels.SensitiveContent, func(call services.MethodCall) async.Future[any] {
+		calls = append(calls, call)
+		return async.FutureValue(reply)
+	})
+	defer messenger().SetMockMethodCallHandler(services.SystemChannels.SensitiveContent, nil)
+	defer foundation.SetDebugDefaultTargetPlatformOverride(nil)
+	runAsync(t, func() {
+		service := services.NewSensitiveContentService()
+		service.SetContentSensitivity(services.ContentSensitivitySensitive).Await()
+		expect(len(calls) == 1 && isMethodCall(calls[0], "SensitiveContent.setContentSensitivity", 1), "calls %v", calls)
+		reply = 2
+		expect(service.GetContentSensitivity().Await() == services.ContentSensitivityNotSensitive, "get")
+		reply = 3
+		_, unsupported := awaitError(service.GetContentSensitivity()).(dart.UnsupportedError)
+		expect(unsupported, "unknown mode")
+		reply = true
+		ios := foundation.TargetPlatformIOS
+		foundation.SetDebugDefaultTargetPlatformOverride(&ios)
+		n := len(calls)
+		expect(!service.IsSupported().Await() && len(calls) == n, "iOS")
+		android := foundation.TargetPlatformAndroid
+		foundation.SetDebugDefaultTargetPlatformOverride(&android)
+		expect(service.IsSupported().Await() && len(calls) == n+1, "android")
+		expect(services.ContentSensitivityAutoSensitive.String() == "ContentSensitivity.autoSensitive", "name")
+	})
+}
