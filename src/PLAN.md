@@ -1311,3 +1311,102 @@ The standing goal is now full API parity with Flutter 3.50.1's Dart layer
   lerped curves (field-wise ==).
 - Parity: 265 → 302 of 2,889 exposed, 200 → 238 tested; animation
   17 → 54 of 54 (all tested).
+### semantics (P2), with dart:ui's semantics.dart
+- `packages/flutter/lib/src/semantics` ports binding, debug, semantics
+  (in four files: semantics.go, semantics_node.go, semantics_owner.go,
+  semantics_configuration.go), semantics_event and semantics_service
+  (3.50.1): semantics 0 → 36 of 36. The debug role checks, merging
+  (getSemanticsData), the traversal sort (vertical groups, horizontal
+  groups, knots, sort-key groups), traversal grafting (traversal
+  parent/child identifiers and the traversal transform), dirty tracking
+  and sendSemanticsUpdate, action routing through merged nodes and by
+  position, the configuration absorb/compatibility rules and the debug
+  output (toStringDeep in both dump orders, SemanticsData.toString/toJson)
+  are all ported. Flutter's quirk that `onMoveCursorForwardByWord=` /
+  `onMoveCursorBackwardByWord=` store the handler in the *character*
+  getters is kept.
+- **dart:ui** `ui/go/semantics.go` ports semantics.dart in full
+  (SemanticsAction, SemanticsFlag(s), CheckedState, Tristate, roles,
+  input types, validation results, hit-test behavior, StringAttribute and
+  subclasses, SemanticsUpdateBuilder/SemanticsUpdate) with the engine's
+  `testing/dart/semantics_test.dart` (4/4). `platform_dispatcher_semantics.go`
+  adds Locale, SemanticsActionEvent, AccessibilityFeatures, a minimal
+  FlutterView (implicit view, id 0; updateSemantics), the dispatcher's
+  semantics/accessibility callbacks and the engine entry points
+  (`PlatformConfiguration.UpdateSemanticsEnabled/UpdateAccessibilityFeatures/
+  DispatchSemanticsAction`); `text.go` adds TextDirection, TextAffinity,
+  TextPosition, TextRange. **ENGINE GAP:** no accessibility bridge: the
+  native builder records every call and `ui.EngineSemanticsUpdateOf`
+  returns it; setSemanticsTreeEnabled/updateSemantics reach an embedder
+  client implementing `PlatformConfigurationSemanticsClient`, and are
+  recorded (`ui.SemanticsTreeEnabled`).
+- **Dependencies ported (partial, outside semantics):** package:vector_math
+  2.4.4 Matrix4/Vector3/Vector4 subset in `src/pub/vector_math` (pinned
+  2.4.3 is not in the pub cache; the code used is unchanged between them);
+  painting's MatrixUtils subset, debugDescribeTransform, TransformProperty;
+  services' TextSelection (full), StandardMessageCodec (full, maps as
+  ordered `[]dart.MapEntry`), BinaryMessenger, BasicMessageChannel and
+  `SystemChannels.Accessibility`. ServicesBinding is not ported: a channel
+  without a messenger uses `services.DefaultBinaryMessenger` (nil: the
+  send fails, as without a binding in Flutter). `src/dart` gains
+  `ListSort` (the VM's Sort.sort: insertion sort up to 33 elements,
+  dual-pivot quicksort above; its tie order decides traversal order),
+  `CompareDoubles`, `CompareStrings` (UTF-16), `DoubleTryParse`, checked
+  against Dart output.
+- **Shared fixes:** foundation's EnumProperty/describeEnum printed
+  `TextDirection.ltr` for dart:ui/scheduler-style enums (whose `String()`
+  is Dart's toString); enums with a `Name()` now print the name (and
+  `dartToString` no longer doubles the type). `DiagnosticsProperty.Level`
+  now calls an overriding `IsInteresting` through self
+  (AttributedStringProperty overrides it).
+- **Design notes:** order-observable Sets/Maps keep insertion order
+  (slices / ordered entries; see API_MAPPING). Stacking SchedulerBinding and
+  SemanticsBinding in one Go binding needs the forwarding pattern in
+  API_MAPPING (embedding both mixins makes the BindingBase methods
+  ambiguous): an open design question for RendererBinding/WidgetsBinding.
+- **Flutter's tests:** semantics_test 45/48 test cases ported (skipped:
+  the RenderProxyBox/pumpFrame one; memory events via
+  FlutterMemoryAllocations instead of leak_tracker; tags test uses a
+  local tag instead of RenderViewport's), custom_semantics_action_test
+  1/1, semantics_binding_test 3/6 (3 need widgets), both
+  set_semantics_tree_enabled tests, semantics_node_send_event_test 1/1,
+  semantics_service_test 1/1 (adapted to a mock messenger and the implicit
+  view). Skipped entirely (they pump widgets): semantics_owner_test (5),
+  semantics_update_test (5), traversal_order_test (1); their behaviors
+  (merged custom-action routing, traversal grafting, hit-test filtering)
+  are in the difftest. message_codecs_test's StandardMessageCodec group
+  4/4; matrix_utils_test getAsTranslation (adapted). Own tests for the
+  binding's action dispatch, accessibility features, events, Locale,
+  flags, the builder record, sort/compare/parse.
+- **Difftest** (`difftest/semantics_test.go` +
+  `flutter/test/semantics_test.dart`, ~300 log entries, ~1800 lines,
+  identical on the first run, hashes masked): attributed strings (UTF-16
+  offsets), Locale, TextSelection, custom action ids, flag/action/role
+  orders, label builder, every event's toMap and its StandardMessageCodec
+  bytes, codec edge values; grid/knot/rtl/sort-key/40-child quicksort
+  traversal orders, rotated/scaled children; a deep merge (labels across
+  text directions, tags, controlsNodes, validation, hint overrides, custom
+  actions, blocked actions) with toStringDeep at hidden, data and toJson;
+  configuration absorb, copy and 15 compatibility pairs; an owner sending
+  updates (every SemanticsUpdateBuilder.updateNode/updateCustomAction
+  argument logged through a spy builder the binding returns), dirty
+  propagation from merged leaves, detach/reattach; traversal grafting with
+  translated/scaled/rotated transforms; 41 debug role check cases; error
+  messages; action arguments routed through a merge boundary.
+- Mutations: 97 on the semantics, dart:ui, services, painting, vector_math
+  and src/dart ports (driver: each replaced once, go vet, the package tests
+  plus the semantics difftest). 94 caught, 3 equivalent: the
+  common-ancestor walk with `>` instead of `>=` (both sides still climb the
+  same nodes in the same order), the `attached` filter on grafted traversal
+  children (detached nodes are always removed from the traversal sets
+  first) and DoubleTryParse's empty-exponent check (strconv rejects "1e"
+  anyway). Caught only after adding cases: toStrings' isFocusable, flag
+  merging of one-sided booleans, Locale's '' vs null country (both ways),
+  SemanticsData == on rect, identity transforms stored as null, a knot edge
+  in (pi/2, 3pi/4), overlapping hit-test siblings, absorb with a
+  direction-less child label / heading levels / traversal identifiers, the
+  deprecated flags bitmask, the platform's single semantics handle, action
+  listeners removed mid-dispatch, the int32 codec boundary, a projective
+  matrix inverse, child reordering marking dirty.
+- Parity: 265 → 334 of 2889 exposed (tested 200 → 246): semantics 0 → 36
+  (24 tested), dart:ui 28 → 51, services 4 → 11, painting 0 → 3.

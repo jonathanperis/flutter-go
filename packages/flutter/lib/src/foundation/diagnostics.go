@@ -224,7 +224,7 @@ func DescribeIdentity(object any) string {
 // first dot, and panics if there is none.
 func DescribeEnum(enumEntry any) string {
 	if isEnum(enumEntry) {
-		return enumEntry.(fmt.Stringer).String()
+		return enumName(enumEntry)
 	}
 	description := dartToString(enumEntry)
 	indexOfDot := strings.IndexByte(description, '.')
@@ -276,6 +276,9 @@ func dartToString(v any) string {
 		return dartDurationString(x)
 	case fmt.Stringer:
 		if isEnum(v) {
+			if _, named := v.(enumNamer); named {
+				return x.String() // already Dart's "Type.name"
+			}
 			// Dart's Enum.toString is "Type.name"; a Go enum's String() is the name.
 			return dartTypeName(reflect.TypeOf(v)) + "." + x.String()
 		}
@@ -331,6 +334,20 @@ func dartToString(v any) string {
 		return closure
 	}
 	return "Instance of '" + dartRuntimeType(v) + "'"
+}
+
+// enumNamer is a Go enum whose Name() is Dart's enum name and whose
+// String() is Dart's toString ("Type.name"), as the dart:ui, scheduler and
+// semantics enums are; foundation's own enums print the bare name from
+// String().
+type enumNamer interface{ Name() string }
+
+// enumName is Dart's enum .name of a Go enum.
+func enumName(v any) string {
+	if n, ok := v.(enumNamer); ok {
+		return n.Name()
+	}
+	return v.(fmt.Stringer).String()
 }
 
 // isEnum reports whether v is a Go enum per API_MAPPING: a named integer

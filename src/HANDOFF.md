@@ -68,6 +68,19 @@ Start here when continuing flutter-go in a new session.
      AnimatedBox lerps the flutter-go `rendering.Color` by hand (move it to
      `ColorTween`/`SizeTween` with ui.Color when rendering switches).
   5. Split `widgets` (gestures code) and `services` (text-editing model
+  5. Done: semantics, 36/36 (SemanticsNode/Owner/Configuration/Data,
+     SemanticsBinding, events, SemanticsService) with dart:ui's
+     semantics.dart in full (ENGINE GAP: no accessibility bridge; built
+     updates are inspectable). Partial dependencies it brought:
+     `src/pub/vector_math` (Matrix4 subset), painting's MatrixUtils subset
+     and TransformProperty, services' TextSelection, StandardMessageCodec,
+     BasicMessageChannel and SystemChannels.accessibility (no
+     ServicesBinding yet: `services.DefaultBinaryMessenger` stands in).
+     Next for it: port ServicesBinding (default messenger, channel
+     buffers), the rest of MatrixUtils/Matrix4, and the semantics tests
+     that pump widgets once rendering/widgets exist; decide the Go pattern
+     for bindings stacking several mixins (see API_MAPPING).
+  6. Split `widgets` (gestures code) and `services` (text-editing model
      under non-Flutter names) by library.
 
 ## Environment
