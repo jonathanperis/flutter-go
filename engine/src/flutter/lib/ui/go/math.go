@@ -5,13 +5,18 @@
 // Ported from engine/src/flutter/lib/ui (Flutter 3.50.1).
 package ui
 
-import "math"
+import (
+	"math"
+
+	"github.com/jonathanperis/flutter-go/src/dart"
+)
 
 // ClampDouble is dart:ui's clampDouble: x limited to [min, max], with NaN
 // mapped to max. Unlike math.Max/math.Min it never returns NaN.
 func ClampDouble(x, min, max float64) float64 {
+	// assert(min <= max && !max.isNaN && !min.isNaN), always on in Go.
 	if !(min <= max) || math.IsNaN(max) || math.IsNaN(min) {
-		panic("ui: ClampDouble needs min <= max, neither NaN")
+		panic(dart.NewAssertionError("min <= max && !max.isNaN && !min.isNaN"))
 	}
 	if x < min {
 		return min
