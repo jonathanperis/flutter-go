@@ -107,12 +107,22 @@ func ensureBinding() *appBinding {
 
 // engine is the embedder's side of dart:ui's PlatformConfiguration: the
 // framework's frame requests (PlatformDispatcher.scheduleFrame) set
-// needsFrame, and the run loop produces the frame at the next vsync.
-type engine struct{ needsFrame bool }
+// needsFrame, and the run loop produces the frame at the next vsync; the
+// scene FlutterView.render hands over (the layer tree) is presented after
+// the frame.
+type engine struct {
+	needsFrame bool
+	layerTree  *ui.EngineLayerTree
+}
 
 func (e *engine) ScheduleFrame()             { e.needsFrame = true }
 func (e *engine) EndWarmUpFrame()            {}
 func (e *engine) SetNeedsReportTimings(bool) {} // ENGINE GAP: no frame timings are collected
+
+// Render receives the scene of the implicit view (the only one).
+func (e *engine) Render(viewID int, tree *ui.EngineLayerTree, devicePixelRatio float64) {
+	e.layerTree = tree
+}
 
 // Run shows root in a window until it is closed.
 //
@@ -152,6 +162,24 @@ func Run(root widgets.Widget, o Options) error {
 	eng := &engine{}
 	pc := ui.NewPlatformConfiguration(eng)
 	defer ui.SetPlatformConfiguration(pc)()
+	// The platform's metrics: the display, and the implicit view's size and
+	// device pixel ratio (the backing scale factor, 2.0 on Retina).
+	reportDisplay := func() {
+		if mon := glfw.GetPrimaryMonitor(); mon != nil {
+			if mode := mon.GetVideoMode(); mode != nil {
+				sx, _ := mon.GetContentScale()
+				pc.UpdateDisplays([]ui.DisplayData{displayData(mode.Width, mode.Height, mode.RefreshRate, float64(sx))})
+			}
+		}
+	}
+	reportMetrics := func() {
+		ww, wh := win.GetSize()
+		fw, fh := win.GetFramebufferSize()
+		pc.UpdateViewMetrics(0, viewportMetrics(ww, wh, fw, fh, float64(layer.Scale())))
+	}
+	reportDisplay()
+	reportMetrics()
+	view := ui.PlatformDispatcherInstance().ImplicitView()
 	b := ensureBinding()
 	loop := async.Current()
 	owner := &widgets.BuildOwner{OnNeedsFrame: b.EnsureVisualUpdate}
@@ -174,7 +202,7 @@ func Run(root widgets.Widget, o Options) error {
 	b.owner = owner
 	router.TimeStamp = func() time.Duration { return time.Since(epoch) }
 	router.AfterEvent = func() { loop.FlushMicrotasks() }
-	owner.DevicePixelRatio = float64(layer.Scale())
+	owner.DevicePixelRatio = view.DevicePixelRatio()
 	ww, wh := win.GetSize()
 	owner.SetViewSize(ui.Size{Width: float64(ww), Height: float64(wh)})
 	owner.RunApp(root)
@@ -204,9 +232,19 @@ func Run(root widgets.Widget, o Options) error {
 		x, y := w.GetCursorPos()
 		router.Scroll(ui.Offset{Dx: x, Dy: y}, -yoff*WheelPixelsPerLine)
 	})
-	// A resize needs a frame at the new size even if frames are disabled
+	// A resize (or a move to a screen of another scale) changes the view's
+	// metrics and needs a frame at the new size even if frames are disabled
 	// (Flutter's handleMetricsChanged: scheduleForcedFrame).
-	win.SetSizeCallback(func(*glfw.Window, int, int) { b.ScheduleForcedFrame() })
+	win.SetSizeCallback(func(*glfw.Window, int, int) {
+		reportMetrics()
+		b.ScheduleForcedFrame()
+	})
+	win.SetContentScaleCallback(func(*glfw.Window, float32, float32) {
+		reportDisplay()
+		reportMetrics()
+		owner.DevicePixelRatio = view.DevicePixelRatio()
+		b.ScheduleForcedFrame()
+	})
 	// The window system asks for a redraw when the window is first shown,
 	// uncovered, or changes screens. Without this, a frame drawn before the
 	// window was visible is never replaced. The tree itself is unchanged, so
@@ -220,28 +258,44 @@ func Run(root widgets.Widget, o Options) error {
 		if eng.needsFrame {
 			eng.needsFrame = false
 			start := time.Now()
-			w, h := win.GetSize()
-			scale := float64(layer.Scale())
-			ui.EngineDevicePixelRatio = scale
-			// The frame is recorded with dart:ui's PictureRecorder/Canvas
-			// (an Impeller display list), in physical pixels.
-			rec := ui.NewPictureRecorder()
-			canvas := ui.NewCanvas(rec)
-			canvas.Scale(scale, scale)
+			dpr := view.DevicePixelRatio()
+			size := view.PhysicalSize()
+			logical := ui.Size{Width: size.Width / dpr, Height: size.Height / dpr}
+			// The frame is painted as RenderView composites it: the tree is
+			// recorded with dart:ui's PictureRecorder/Canvas in logical
+			// pixels, put in a scene under the root transform (device pixel
+			// ratio), and shown with FlutterView.render.
 			b.drawFrame = func() {
-				owner.DrawFrame(ui.Size{Width: float64(w), Height: float64(h)}, NewCanvas(canvas))
+				rec := ui.NewPictureRecorder()
+				canvas := ui.NewCanvas(rec)
+				owner.DrawFrame(logical, NewCanvas(canvas))
+				pic := rec.EndRecording()
+				sb := ui.NewSceneBuilder()
+				sb.PushTransform(rootTransform(dpr))
+				sb.AddPicture(ui.Offset{}, pic)
+				sb.Pop()
+				scene := sb.Build()
+				view.Render(scene)
+				scene.Dispose()
+				pic.Dispose()
 			}
 			frameNumber++
 			b.EnsureFrameCallbacksRegistered() // a refresh can come before the framework asked for a frame
+			eng.layerTree = nil
 			pc.BeginFrame(start.Sub(epoch), frameNumber)
 			b.drawFrame = nil
-			pic := rec.EndRecording()
 			cpu := time.Since(start)
-			err := layer.Present(ctx.Handle(), ui.EnginePictureDisplayList(pic).Handle())
-			pic.Dispose()
-			if err != nil {
-				log.Print(err)
+			if tree := eng.layerTree; tree != nil {
+				// The rasterizer: the layer tree flattened into a display
+				// list, presented with Impeller.
+				dl := tree.Flatten()
+				if err := layer.Present(ctx.Handle(), dl.Handle()); err != nil {
+					log.Print(err)
+				}
+				dl.Release()
+				eng.layerTree = nil
 			}
+			w, h := int(logical.Width), int(logical.Height)
 			frames++
 			if o.OnFrame != nil {
 				o.OnFrame(frames, cpu)

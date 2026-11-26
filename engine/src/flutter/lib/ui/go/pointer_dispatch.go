@@ -6,17 +6,14 @@ package ui
 // onKeyData on the flutter/keydata channel with _unpackKeyData), the
 // engine entry point _dispatchPointerDataPacket (here
 // PlatformConfiguration.DispatchPointerDataPacket), and window.dart's
-// GestureSettings with FlutterView's devicePixelRatio/gestureSettings.
+// GestureSettings.
 //
-// ENGINE GAP: views have no metrics yet (_updateWindowMetrics comes with
-// the rendering port): a view's devicePixelRatio is 1.0 and its gesture
-// settings are empty until an embedder sets them with
-// PlatformConfiguration.UpdateViewGestureMetrics.
+// A view's devicePixelRatio and gestureSettings come from its metrics
+// (PlatformConfiguration.UpdateViewMetrics; see window.go).
 
 import (
 	"encoding/binary"
 	"math"
-	"strconv"
 	"time"
 
 	"github.com/jonathanperis/flutter-go/src/dart"
@@ -323,37 +320,4 @@ func nullableDoubleString(v *float64) string {
 func (g GestureSettings) String() string {
 	return "GestureSettings(physicalTouchSlop: " + nullableDoubleString(g.PhysicalTouchSlop) +
 		", physicalDoubleTapSlop: " + nullableDoubleString(g.PhysicalDoubleTapSlop) + ")"
-}
-
-// viewGestureMetrics are the view metrics gestures use, by view id.
-var viewGestureMetrics = map[int]struct {
-	devicePixelRatio float64
-	gestureSettings  GestureSettings
-}{}
-
-// DevicePixelRatio is the number of device pixels for each logical pixel
-// of the view (1.0 until the embedder reports it; see the file comment).
-func (v *FlutterView) DevicePixelRatio() float64 {
-	if m, ok := viewGestureMetrics[v.viewID]; ok {
-		return m.devicePixelRatio
-	}
-	return 1.0
-}
-
-// GestureSettings are the view's gesture settings.
-func (v *FlutterView) GestureSettings() GestureSettings {
-	return viewGestureMetrics[v.viewID].gestureSettings
-}
-
-// UpdateViewGestureMetrics is the part of the engine's window metrics
-// update (hooks.dart's _updateWindowMetrics) gestures read: the view's
-// device pixel ratio and gesture settings.
-func (pc *PlatformConfiguration) UpdateViewGestureMetrics(viewID int, devicePixelRatio float64, settings GestureSettings) {
-	if devicePixelRatio <= 0 {
-		panic(dart.NewArgumentErrorValue(devicePixelRatio, "devicePixelRatio", "must be positive ("+strconv.Itoa(viewID)+")"))
-	}
-	viewGestureMetrics[viewID] = struct {
-		devicePixelRatio float64
-		gestureSettings  GestureSettings
-	}{devicePixelRatio, settings}
 }

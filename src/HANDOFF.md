@@ -122,8 +122,7 @@ Start here when continuing flutter-go in a new session.
      codecs and decoding (Go decoders), FragmentProgram/FragmentShader
      (impellerc runtime stages). src/app records frames with
      ui.PictureRecorder/ui.Canvas and presents with dart:ui's Impeller
-     context. Next for it: compositing.dart (Scene, SceneBuilder,
-     EngineLayers; text.dart is done, item 11); then move rendering off its interim
+     context. compositing.dart is done (item 12) and text.dart (item 11); next: move rendering off its interim
      `rendering.Canvas` onto ui.Canvas (painting library: BoxPainter,
      decorations, image providers). ENGINE GAPs to revisit: Path.combine
      (Skia PathOps — the Flutter SDK's prebuilt libpath_ops.dylib exposes
@@ -146,6 +145,28 @@ Start here when continuing flutter-go in a new session.
      painting agent), then drop rendering's interim text engine;
      loadFontFromList's family names are case-sensitive (the engine
      lowercases them; see API_MAPPING).
+
+  12. Done (P1): dart:ui in full (194/194): compositing.dart (SceneBuilder,
+     Scene with toImage/toImageSync, EngineLayer and the typed layers with
+     the retained-layer debug checks) over a Go port of the engine's layer
+     tree (flow/layers + LayerStateStack, `compositing_layers.go`), the
+     views and metrics of window.dart/platform_dispatcher.dart (FlutterView
+     full API, Display, ViewPadding, ViewConstraints, DisplayFeature,
+     DisplayCornerRadii, view focus, locales, user settings, scaleFontSize,
+     onError, SystemColor, the deprecated window) with hooks.dart's entry
+     points as `PlatformConfiguration` methods, plugins.dart,
+     isolate_name_server.dart (on the new `src/isolate`), natives.dart's
+     DartPluginRegistrant, platform_isolate.dart, annotations.dart. src/app
+     reports real metrics (G7: the backing scale factor is the view's
+     device pixel ratio, so gestures and drawShadow see 2.0 on Retina) and
+     presents frames through SceneBuilder → FlutterView.render →
+     `EngineLayerTree.Flatten`. Next for it: a real RenderView in
+     rendering (its TransformLayer/OffsetLayer/PictureLayer tree →
+     SceneBuilder, `addToScene`) replacing src/app's one-picture scene;
+     route src/app's mouse/keys through PlatformDispatcher's packets;
+     ENGINE GAPs to revisit: picture bounds (needed for culling and exact
+     saveLayer bounds), texture registry, platform views, performance
+     overlay, superellipse clips (path approximation, ≤2 MSAA samples).
 
 ## Environment
 
