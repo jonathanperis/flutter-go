@@ -533,9 +533,24 @@ type FlutterErrorDetailsForPointerEventDispatcher struct {
 
 // NewFlutterErrorDetailsForPointerEventDispatcher creates the details.
 func NewFlutterErrorDetailsForPointerEventDispatcher(exception any, opts FlutterErrorDetailsForPointerEventDispatcherOptions) *FlutterErrorDetailsForPointerEventDispatcher {
-	return &FlutterErrorDetailsForPointerEventDispatcher{
+	d := &FlutterErrorDetailsForPointerEventDispatcher{
 		FlutterErrorDetails: foundation.NewFlutterErrorDetails(exception, opts.FlutterErrorDetailsOptions),
 		Event:               opts.Event,
 		HitTestEntry:        opts.HitTestEntry,
 	}
+	pointerEventDispatcherDetails[d.FlutterErrorDetails] = d
+	return d
+}
+
+// pointerEventDispatcherDetails maps the FlutterErrorDetails reported
+// (FlutterError.reportError takes the embedded *FlutterErrorDetails) back
+// to the dispatcher details that embed them.
+var pointerEventDispatcherDetails = map[*foundation.FlutterErrorDetails]*FlutterErrorDetailsForPointerEventDispatcher{}
+
+// AsFlutterErrorDetailsForPointerEventDispatcher is Dart's
+// `details is FlutterErrorDetailsForPointerEventDispatcher` on details
+// received by FlutterError.onError: the dispatcher details embedding them,
+// or nil.
+func AsFlutterErrorDetailsForPointerEventDispatcher(details *foundation.FlutterErrorDetails) *FlutterErrorDetailsForPointerEventDispatcher {
+	return pointerEventDispatcherDetails[details]
 }

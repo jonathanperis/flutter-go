@@ -267,8 +267,7 @@ func InvokeCallback[T any](r GestureRecognizer, name string, callback Recognizer
 				Context:              foundation.NewErrorDescription("while handling a gesture"),
 				InformationCollector: collector,
 			}))
-			var zero T
-			result = zero
+			// result keeps T's zero value (Dart's null).
 		}
 	}()
 	if foundation.KDebugMode && DebugPrintRecognizerCallbacksTrace {
