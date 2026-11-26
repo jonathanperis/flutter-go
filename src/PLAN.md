@@ -2189,3 +2189,79 @@ The standing goal is now full API parity with Flutter 3.50.1's Dart layer
 - **Process note:** workers share the scratchpad; one overwrote another's
   generic `mut.sh` and a mutation ran against the wrong worktree. Use
   unique script names per worker.
+### apiparity counts members, constructors and parameters
+
+`src/cmd/apiparity` measured top-level names only, with a hand parser. It now
+measures every public member and parameter, by API_MAPPING's rules:
+
+- **Dart side: the analyzer.** `src/cmd/apiparity/dart/bin/dump.dart` (pub
+  package `apiparity_dump`: analyzer 14.3.0, the version the checkout's own
+  pubspec.lock pins, plus `flutter: sdk: flutter`, so `flutter pub get
+  --offline` resolves everything from the pub cache) loads each library by
+  URI and walks its export namespace. A name belongs to the library whose
+  `src/<lib>/` declares it (dart:ui: `dart:ui`; foundation also gets
+  package:listen, `--reexport listen=foundation`). For each class, mixin,
+  enum and extension it lists the declared public members (constructors
+  except implicit defaults, fields, getters, setters, methods, operators,
+  enum values; not enums' synthetic `values`, not inherited members) and
+  every parameter (name, named/positional, required/optional). dart:ui
+  comes from the SDK's `sky_engine` copy, byte-identical to
+  `engine/src/flutter/lib/ui` at the pin (checked with diff).
+- **The hand parser was inexact.** Cross-checking the analyzer's top-level
+  names against the old parser's: the old one missed every top-level
+  variable with a lowercase type (`bool debugPrintBeginFrameBanner`,
+  `int? debugDoublePrecision`...) and generic functions
+  (`binarySearch<T>`): 50 names in all (2888 → 2938 declarations). Nothing
+  it found is missing from the analyzer's list.
+- **Go side: go/packages.** The whole repository with tests, type-checked
+  once (~25 s). A Dart member maps to Go by the rules (match.go cites the
+  API_MAPPING section of each): `NewX`/`NewXName`, a struct literal when
+  all fields are exported, an abstract class's base set up by
+  `Construct`/`InitX` (or just implemented when it has no state); getters
+  as methods or fields, setters `SetX` or a field, settable fields need
+  both; statics `ClassMember`, `Member` when it contains the class name, a
+  struct variable's field or method, or (re-exported packages) the port's
+  package; static setters a variable or `SetFooBar`/`FooSetBar`; operators
+  by the table, `==`/`hashCode` as `Equal` or a comparable value type;
+  `toString` as `String`, `ToString` or `Error`; generic methods as
+  generic functions; Go initialisms and snake_case → MixedCaps. Parameters:
+  by name, else in order; named ones as option fields (a struct named
+  `...Options`, or any struct holding named parameters and not itself
+  named like a positional parameter); required named may be positional;
+  optional positional may be variadic or options; of several candidate Go
+  declarations (an interface's method and its base's), the one exposing
+  the most parameters. Two rules were implicit and are now written in
+  API_MAPPING (initialisms, snake_case, static setters, constructors of
+  abstract classes).
+- **Divergence table.** `src/docs/api_divergences.json`: 30 entries (renames
+  and Go impossibilities), each citing an API_MAPPING section, all from
+  "Known divergences", "Libraries", "Types" or "Futures". The tool fails on
+  an entry whose rename doesn't resolve, that the rules already cover, or
+  that names no Dart declaration, so the table can't go stale or grow
+  padding. Not entered, because API_MAPPING doesn't document a Go form:
+  `[]`/`[]=` (BitField/PersistentHashMap `Get`/`Set`, UniformArray `At`),
+  `OffsetBase` (an interface in Go), `asStream` ("not ported").
+- **Tested** is now resolved: a member counts when a `_test.go` file refers
+  to its Go declaration (by position, so a package's in-package test
+  variant counts); a class also counts through its members; an alias's
+  target counts (port tests). The name-mention heuristic remains only for
+  test packages that don't type-check (none today).
+- **Worklists:** `src/docs/parity/<lib>.md` list each library's missing
+  declarations, missing members (by class), missing parameters of exposed
+  callables, divergences and untested members.
+- **Tests:** a Dart fixture (`testdata/fixture_dart.json`) against a Go
+  fixture package (plus a "port" package and an ill-typed one): every rule,
+  the parameter matcher, the divergence table's checks, counts and reports.
+  **Mutations:** 66 on match.go, divergences.go, main.go and goapi.go; all
+  caught after adding fixtures for the misses (struct holding named
+  parameters vs a positional of the same name, Init<Class>, concrete
+  Construct, static setter variables, alias targets, a required named
+  parameter with a positional Go parameter left, member renames). One was
+  equivalent (a variadic slot's `taken` flag: step 3 never reads it) and
+  the code was simplified so it no longer exists.
+- **Numbers** (top-level 944/2888 → 960/2938; the 50 new names are 16
+  exposed): members 5552/31668 exposed, 3313 tested; parameters 3654/23066.
+  The "100%" libraries: dart:ui 1323/1328 members, 1017/1024 parameters;
+  foundation 461/474, 469/482; physics 58/59, 70/70; scheduler 81/82, 40/41;
+  semantics 517/517, 213/213; animation 303/303, 181/181; services
+  1965/1968, 728/737; gestures 628/630, 761/771.

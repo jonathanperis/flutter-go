@@ -1,0 +1,13 @@
+name: apiparity_dump
+description: Lists Flutter's public API with the Dart analyzer for src/cmd/apiparity.
+publish_to: none
+environment:
+  sdk: ^3.11.0
+dependencies:
+  # The analyzer version the pinned Flutter checkout's own tools use (its
+  # pubspec.lock), so `flutter pub get --offline` finds it in the pub cache.
+  analyzer: 14.3.0
+  # package:flutter and dart:ui (sky_engine) of the checkout, so the analyzer
+  # resolves them.
+  flutter:
+    sdk: flutter

@@ -1,0 +1,231 @@
+[
+ {
+  "library": "dart:ui",
+  "dart": "channelBuffers",
+  "kind": "rename",
+  "go": "ChannelBuffersInstance",
+  "rule": "Known divergences: dart:ui channel buffers",
+  "note": "the type ChannelBuffers has the variable's Go name"
+ },
+ {
+  "library": "dart:ui",
+  "dart": "TextDecoration.combine",
+  "kind": "rename",
+  "go": "TextDecorationCombine",
+  "rule": "Known divergences: dart:ui text (text.dart)"
+ },
+ {
+  "library": "foundation",
+  "dart": "Listenable.merge",
+  "kind": "rename",
+  "go": "ListenableMerge",
+  "rule": "Libraries: third-party packages Flutter re-exports",
+  "note": "foundation's wrapper of package:listen's factory"
+ },
+ {
+  "library": "foundation",
+  "dart": "SynchronousFuture.then",
+  "kind": "impossible",
+  "go": "src/async:Then",
+  "rule": "Futures",
+  "note": "Go methods can't take type parameters: then<R> is async.Then/ThenOrError/ThenFuture over the interface's ThenAny"
+ },
+ {
+  "library": "scheduler",
+  "dart": "TickerFuture.then",
+  "kind": "impossible",
+  "go": "src/async:Then",
+  "rule": "Futures",
+  "note": "Go methods can't take type parameters: then<R> is async.Then/ThenOrError/ThenFuture over the interface's ThenAny"
+ },
+ {
+  "library": "foundation",
+  "dart": "consolidateHttpClientResponseBytes(autoUncompress)",
+  "kind": "rename",
+  "go": "ConsolidateHttpClientResponseBytesOptions.DisableAutoUncompress",
+  "rule": "Known divergences: foundation consolidateHttpClientResponseBytes",
+  "note": "default true, so the option is negated"
+ },
+ {
+  "library": "foundation",
+  "dart": "CachingIterable.iterator",
+  "kind": "rename",
+  "go": "CachingIterable.All",
+  "rule": "Types: Iterable<T> is iter.Seq[T] (methods named All() return it)"
+ },
+ {
+  "library": "foundation",
+  "dart": "ObserverList.iterator",
+  "kind": "rename",
+  "go": "ObserverList.All",
+  "rule": "Types: Iterable<T> is iter.Seq[T] (methods named All() return it)"
+ },
+ {
+  "library": "foundation",
+  "dart": "HashedObserverList.iterator",
+  "kind": "rename",
+  "go": "HashedObserverList.All",
+  "rule": "Types: Iterable<T> is iter.Seq[T] (methods named All() return it)"
+ },
+ {
+  "library": "foundation",
+  "dart": "CachingIterable.toList(growable)",
+  "kind": "impossible",
+  "rule": "Types: List<T> is []T",
+  "note": "a Go slice can always grow; there is no fixed-length list"
+ },
+ {
+  "library": "foundation",
+  "dart": "ObserverList.toList(growable)",
+  "kind": "impossible",
+  "rule": "Types: List<T> is []T",
+  "note": "a Go slice can always grow; there is no fixed-length list"
+ },
+ {
+  "library": "foundation",
+  "dart": "HashedObserverList.toList(growable)",
+  "kind": "impossible",
+  "rule": "Types: List<T> is []T",
+  "note": "a Go slice can always grow; there is no fixed-length list"
+ },
+ {
+  "library": "animation",
+  "dart": "AnimationLazyListenerMixin.didStartListening",
+  "kind": "rename",
+  "go": "LazyListenerSelf.DidStartListening",
+  "rule": "Known divergences: animation listener mixins",
+  "note": "abstract in the mixin: the object it is mixed into provides it, reached through SetSelf"
+ },
+ {
+  "library": "animation",
+  "dart": "AnimationLazyListenerMixin.didStopListening",
+  "kind": "rename",
+  "go": "LazyListenerSelf.DidStopListening",
+  "rule": "Known divergences: animation listener mixins",
+  "note": "abstract in the mixin: the object it is mixed into provides it, reached through SetSelf"
+ },
+ {
+  "library": "animation",
+  "dart": "AnimationLocalListenersMixin.didRegisterListener",
+  "kind": "rename",
+  "go": "ListenerRegistrationSelf.DidRegisterListener",
+  "rule": "Known divergences: animation listener mixins",
+  "note": "abstract in the mixin: the object it is mixed into provides it, reached through SetSelf"
+ },
+ {
+  "library": "animation",
+  "dart": "AnimationLocalListenersMixin.didUnregisterListener",
+  "kind": "rename",
+  "go": "ListenerRegistrationSelf.DidUnregisterListener",
+  "rule": "Known divergences: animation listener mixins",
+  "note": "abstract in the mixin: the object it is mixed into provides it, reached through SetSelf"
+ },
+ {
+  "library": "animation",
+  "dart": "AnimationLocalStatusListenersMixin.didRegisterListener",
+  "kind": "rename",
+  "go": "ListenerRegistrationSelf.DidRegisterListener",
+  "rule": "Known divergences: animation listener mixins",
+  "note": "abstract in the mixin: the object it is mixed into provides it, reached through SetSelf"
+ },
+ {
+  "library": "animation",
+  "dart": "AnimationLocalStatusListenersMixin.didUnregisterListener",
+  "kind": "rename",
+  "go": "ListenerRegistrationSelf.DidUnregisterListener",
+  "rule": "Known divergences: animation listener mixins",
+  "note": "abstract in the mixin: the object it is mixed into provides it, reached through SetSelf"
+ },
+ {
+  "library": "animation",
+  "dart": "AnimationWithParentMixin.parent",
+  "kind": "rename",
+  "go": "ParentSelf.Parent",
+  "rule": "Known divergences: animation listener mixins",
+  "note": "abstract in the mixin: the object it is mixed into provides it, reached through SetSelf"
+ },
+ {
+  "library": "semantics",
+  "dart": "SemanticsNode.toStringDeep(childOrder)",
+  "kind": "rename",
+  "go": "SemanticsNode.ToStringDeepInOrder",
+  "rule": "Known divergences: semantics toStringDeep/toDiagnosticsNode/debugDescribeChildren",
+  "note": "the DiagnosticableTree signature stays; the InOrder method takes the order"
+ },
+ {
+  "library": "semantics",
+  "dart": "SemanticsNode.toDiagnosticsNode(childOrder)",
+  "kind": "rename",
+  "go": "SemanticsNode.ToDiagnosticsNodeInOrder",
+  "rule": "Known divergences: semantics toStringDeep/toDiagnosticsNode/debugDescribeChildren",
+  "note": "the DiagnosticableTree signature stays; the InOrder method takes the order"
+ },
+ {
+  "library": "semantics",
+  "dart": "SemanticsNode.debugDescribeChildren(childOrder)",
+  "kind": "rename",
+  "go": "SemanticsNode.DebugDescribeChildrenInOrder",
+  "rule": "Known divergences: semantics toStringDeep/toDiagnosticsNode/debugDescribeChildren",
+  "note": "the DiagnosticableTree signature stays; the InOrder method takes the order"
+ },
+ {
+  "library": "services",
+  "dart": "platformViewsRegistry",
+  "kind": "rename",
+  "go": "PlatformViewsRegistryInstance",
+  "rule": "Known divergences: services (platform views)"
+ },
+ {
+  "library": "services",
+  "dart": "CachingAssetBundle.loadStructuredData",
+  "kind": "impossible",
+  "go": "CachingAssetBundle.LoadStructuredDataAny",
+  "rule": "Known divergences: services (assets)",
+  "note": "Go methods can't take type parameters: the erased method, plus the function AssetBundleLoadStructuredData[T]"
+ },
+ {
+  "library": "services",
+  "dart": "CachingAssetBundle.loadStructuredBinaryData",
+  "kind": "impossible",
+  "go": "CachingAssetBundle.LoadStructuredBinaryDataAny",
+  "rule": "Known divergences: services (assets)",
+  "note": "Go methods can't take type parameters: the erased method, plus the function AssetBundleLoadStructuredBinaryData[T]"
+ },
+ {
+  "library": "services",
+  "dart": "AssetBundle.loadString(cache)",
+  "kind": "rename",
+  "go": "LoadStringOptions.NoCache",
+  "rule": "Known divergences: services (assets)",
+  "note": "default true, so the option is negated"
+ },
+ {
+  "library": "services",
+  "dart": "CachingAssetBundle.loadString(cache)",
+  "kind": "rename",
+  "go": "LoadStringOptions.NoCache",
+  "rule": "Known divergences: services (assets)",
+  "note": "default true, so the option is negated"
+ },
+ {
+  "library": "services",
+  "dart": "IOSSystemContextMenuItemData.==",
+  "kind": "rename",
+  "go": "IOSSystemContextMenuItemDataEqual",
+  "rule": "Known divergences: services (text input)"
+ },
+ {
+  "library": "services",
+  "dart": "IOSSystemContextMenuItemDataCustom.==",
+  "kind": "rename",
+  "go": "IOSSystemContextMenuItemDataEqual",
+  "rule": "Known divergences: services (text input)"
+ },
+ {
+  "library": "services",
+  "dart": "RawKeyEvent.fromMessage",
+  "kind": "rename",
+  "go": "RawKeyEventFromMessage",
+  "rule": "Known divergences: services (raw keyboard, deprecated)"
+ }
+]

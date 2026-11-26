@@ -214,6 +214,31 @@ Start here when continuing flutter-go in a new session.
      ran against the dart:ui worktree while that run was in progress, so
      those results are unreliable. Re-run them on master. Agents now
      prefix scratch files uniquely (rule added to the shared brief).
+  15. Done: `cmd/apiparity` counts members, constructors and parameters
+     (Dart analyzer via `src/cmd/apiparity/dart`, go/packages on the Go
+     side, API_MAPPING's rules, resolved test uses). Worklists per library
+     in `src/docs/parity/<lib>.md`; documented renames and Go
+     impossibilities in `src/docs/api_divergences.json` (each cites its
+     API_MAPPING section; the tool fails on stale or unneeded entries, so
+     add one with every new documented divergence the rules don't reach).
+     Gaps left in the "100%" libraries (see the worklists): dart:ui
+     `OffsetBase` (constructor, `==`, `hashCode`, `toString`: an interface
+     in Go), `UniformArray[]` (Go `At`, undocumented),
+     `instantiateImageCodec`/`instantiateImageCodecFromBuffer`/
+     `decodeImageFromPixels`'s `allowUpscaling`; foundation `BitField`
+     `[]`/`[]=` and `PersistentHashMap[]` (Go `Get`/`Set`, undocumented),
+     `CachingIterable`'s Iterable overrides (`map`, `where`, `expand`,
+     `take`, `takeWhile`, `skip`, `skipWhile`), `Key.empty`,
+     `ObjectEvent()`, `SynchronousFuture.asStream`; scheduler
+     `TickerFuture.asStream`; physics `Simulation.toString` (SimulationBase
+     has no `String`); services `KeyEvent()`/`RawKeyEvent()` (no base
+     set-up for subclasses), `TextInput.scribbleInProgress` (an instance
+     getter of a private singleton); gestures `PointerSignalEvent()`,
+     `PositionedGestureDetails()`, `BaseTapAndDragGestureRecognizer`'s
+     `eagerVictoryOnDrag` constructor parameter. Either port them or
+     document their Go form in API_MAPPING (then a divergence entry). The
+     larger gap is tests: ~40% of exposed members of these libraries no Go
+     test refers to (services' generated key constants account for most).
 
 ## Environment
 
