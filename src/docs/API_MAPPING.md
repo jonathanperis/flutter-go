@@ -921,8 +921,8 @@ Each divergence is listed here when it is introduced.
   `NewShapeDecorationFromBoxDecoration`; `identical` in their lerps is
   pointer identity. `ShapeDecoration.CreateBoxPainter(nil)` panics with
   Dart's TypeError, as `onChanged!` throws. `FlutterLogoDecoration` is
-  `NewFlutterLogoDecoration(...)`; its "Flutter" label (horizontal/stacked
-  styles) waits for TextPainter.
+  `NewFlutterLogoDecoration(...)`; its painter's `Dispose` disposes of the
+  label's TextPainter.
 - painting (images): `ImageProvider` is not generic (every Flutter
   consumer uses `ImageProvider<Object>`): an interface with `any` keys plus
   `ImageProviderBase` (`SetSelf`); keys compare with `KeysEqual` (an
@@ -938,7 +938,71 @@ Each divergence is listed here when it is introduced.
   and `_network_image_io.dart` is `network_image_io.go` (Go ignores files
   starting with `_`). Assets load through services' AssetBundle (see
   "services (assets)").
-- painting (text, partial): `TextScaler` is an interface plus
+- painting (text styles): `TextStyle` and `StrutStyle` are Diagnosticable
+  pointers built with `NewTextStyle(TextStyleOptions{...})` /
+  `NewStrutStyle(StrutStyleOptions{...})` whose exported fields are Dart's
+  (nil is null; `Inherit` nil is true; a nil slice is a null list, an
+  empty one an empty list; `FontFamily` already carries the
+  `packages/<package>/` prefix); `fontFamilyFallback` is the method
+  `FontFamilyFallback()` (prefixed). `==` is `Equal` (paints by identity;
+  nil receivers allowed); no `hashCode`. `copyWith` takes
+  `TextStyleCopyWithOptions` (= `TextStyleOptions`, nil: keep), `apply`
+  `TextStyleApplyOptions` (nil factors are 1.0, zero deltas 0),
+  `getTextStyle`/`getParagraphStyle` `TextStyleGetTextStyleOptions`/
+  `TextStyleGetParagraphStyleOptions` (nil TextScaler: noScaling);
+  `TextStyle.lerp` is `TextStyleLerp` (`identical` is pointer identity),
+  `lerpFontVariations` `LerpFontVariations` (the axes past the first
+  mismatch come in the iteration order of Dart's `HashSet<String>`, which
+  it reproduces). `debugFillProperties(properties, {prefix})` is
+  `DebugFillPropertiesWithPrefix`. `StrutStyle.disabled` is
+  `StrutStyleDisabled` (TextPainter matches it with `Equal`, as Dart's
+  constant pattern uses `==`); `StrutStyle.fromTextStyle` is
+  `NewStrutStyleFromTextStyle(style, opts)`.
+- painting (spans): `InlineSpan` is an interface plus `InlineSpanBase`
+  (`InitInlineSpan(self, style)`; overridable methods through `self`);
+  `PlaceholderSpan` an interface plus `PlaceholderSpanBase`
+  (`InitPlaceholderSpan(self, PlaceholderSpanOptions{...})`, nil alignment:
+  bottom; its `DebugAssertIsValid` panics, as Dart asserts false, so a
+  concrete placeholder overrides it). The @protected members are exported
+  (`ComputeToPlainText`, `ComputeSemanticsInformation`,
+  `GetSpanForPositionVisitor`, `CodeUnitAtVisitor`); Dart's `StringBuffer`
+  is a `*strings.Builder`, the semantics collector a
+  `*[]InlineSpanSemanticsInformation`; `toPlainText`'s named parameters are
+  `ToPlainTextOptions` (nil: true), `build`'s `InlineSpanBuildOptions`
+  (nil TextScaler: noScaling). `TextSpan` is a pointer built with
+  `NewTextSpan(TextSpanOptions{...})` (a type extending it calls
+  `Construct(self, opts)`); `Text`, `Children`, `Recognizer`,
+  `MouseCursor`, `SemanticsLabel`... are fields, `onEnter`/`onExit` the
+  `OnEnter()`/`OnExit()` methods MouseTrackerAnnotation needs; its extra
+  `computeSemanticsInformation({inheritedLocale, inheritedSpellOut})` is
+  `ComputeSemanticsInformationInherited`. Dart's `runtimeType ==` checks
+  compare Go dynamic types; callbacks compare with `dart.FunctionsEqual`,
+  recognizers by identity. `InlineSpanSemanticsInformation` is a value
+  with `Equal` (`NewInlineSpanSemanticsInformation(text, opts)`,
+  `.placeholder` → `InlineSpanSemanticsInformationPlaceholder`),
+  `combineSemanticsInfo` is `CombineSemanticsInfo`, `Accumulator` a pointer
+  (`NewAccumulator(value...)`), `placeholderCodeUnit`
+  `PlaceholderSpanPlaceholderCodeUnit`.
+- painting (TextPainter): a pointer built with
+  `NewTextPainter(TextPainterOptions{...})` (nil `TextAlign`: start; nil
+  `TextScaler`: Dart's private `_UnspecifiedTextScaler`, i.e.
+  `linear(TextScaleFactor)`); properties are getter/setter pairs
+  (`SetText`, `SetTextAlign`, nullable ones by pointer).
+  `layout({minWidth, maxWidth})` is `Layout(TextPainterLayoutOptions{MinWidth,
+  MaxWidth *float64})` (nil: infinity); `getBoxesForSelection`'s named
+  parameters are `GetBoxesForSelectionOptions`; `wordBoundaries` is
+  `WordBoundaries() *WordBoundary` and `moveByWordBoundary` its
+  `MoveByWordBoundary()`; statics are `TextPainterComputeWidth(text,
+  textDirection, TextPainterComputeOptions{...})`,
+  `TextPainterComputeMaxIntrinsicWidth`, `TextPainterIsHighSurrogate`,
+  `TextPainterIsLowSurrogate`; `debugPaintTextLayoutBoxes` is the field
+  `DebugPaintTextLayoutBoxes`. `PlaceholderDimensions` is a value with
+  `Equal` (`PlaceholderDimensionsEmpty`). Dart's null checks (`!`) panic
+  with `dart.TypeError` ("Null check operator used on a null value").
+  dart:ui fix found by the TextPainter difftest: a zero-size placeholder's
+  `getGlyphInfoAt` is Rect.zero, (0, 0), rtl as in the engine (the bridge
+  read uninitialized memory).
+- painting (text scaler): `TextScaler` is an interface plus
   `TextScalerBase` (the default `Clamp`; `SetSelf`); `TextScaler.linear`
   is `NewTextScalerLinear`, `noScaling` is `TextScalerNoScaling`;
   `clamp`'s named parameters are `TextScalerClampOptions` (nil: 0 and

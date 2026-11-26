@@ -459,6 +459,28 @@ func paintingTextPainterLines(t *testing.T) []string {
 	p.Dispose()
 	add("debugDisposed " + strconv.FormatBool(p.DebugDisposed()))
 
+	centerAlign := ui.TextAlignCenter
+	cp := NewTextPainter(TextPainterOptions{Text: text("centered", &black), TextDirection: &ltr, TextAlign: &centerAlign})
+	add("center pref " + d2s(cp.PreferredLineHeight()))
+	cp.Layout()
+	cp.SetText(text("centered", &red))
+	add("center paint " + tpErr(func() any {
+		rc := flutter_test.NewTestRecordingCanvas()
+		cp.Paint(rc, ui.OffsetZero)
+		var offs []string
+		for _, inv := range rc.Invocations {
+			offs = append(offs, tpStr(inv.Invocation.PositionalArguments[1]))
+		}
+		return "[" + strings.Join(offs, ", ") + "]"
+	}) + " " + cp.Size().String())
+	size20 := 20.0
+	cs := "centered"
+	cp.SetText(NewTextSpan(TextSpanOptions{Text: &cs, Style: NewTextStyle(TextStyleOptions{FontSize: &size20, Color: &red})}))
+	add("center pref2 " + d2s(cp.PreferredLineHeight()))
+	cp.Layout(TextPainterLayoutOptions{MaxWidth: f(300)})
+	add("center relayout " + cp.Size().String() + " " + cp.GetOffsetForCaret(ui.NewTextPosition(3), ui.RectZero).String())
+	cp.Dispose()
+
 	for _, max := range []float64{math.Inf(1), 50, 20} {
 		t := text("compute me now", nil)
 		add("compute " + d2s(max) + " " +

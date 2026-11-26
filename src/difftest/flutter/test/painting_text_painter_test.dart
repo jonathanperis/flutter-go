@@ -330,6 +330,25 @@ void main() {
     p.dispose();
     out.add('debugDisposed ${p.debugDisposed}');
 
+    final TextPainter c = TextPainter(
+      text: const TextSpan(text: 'centered', style: TextStyle(fontSize: 10, color: Color(0xFF000000))),
+      textDirection: TextDirection.ltr,
+      textAlign: TextAlign.center,
+    );
+    out.add('center pref ${c.preferredLineHeight}');
+    c.layout();
+    c.text = const TextSpan(text: 'centered', style: TextStyle(fontSize: 10, color: Color(0xFFFF0000)));
+    out.add('center paint ${err(() {
+      final TestRecordingCanvas rc = TestRecordingCanvas();
+      c.paint(rc, Offset.zero);
+      return rc.invocations.map((RecordedInvocation i) => i.invocation.positionalArguments[1]).toList();
+    })} ${c.size}');
+    c.text = const TextSpan(text: 'centered', style: TextStyle(fontSize: 20, color: Color(0xFFFF0000)));
+    out.add('center pref2 ${c.preferredLineHeight}');
+    c.layout(maxWidth: 300);
+    out.add('center relayout ${c.size} ${c.getOffsetForCaret(const TextPosition(offset: 3), Rect.zero)}');
+    c.dispose();
+
     for (final double max in <double>[double.infinity, 50, 20]) {
       const TextSpan t = TextSpan(text: 'compute me now', style: TextStyle(fontSize: 10));
       out.add('compute $max ${TextPainter.computeWidth(text: t, textDirection: TextDirection.ltr, maxWidth: max)} '

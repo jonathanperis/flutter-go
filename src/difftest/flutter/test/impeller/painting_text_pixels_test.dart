@@ -119,6 +119,17 @@ Map<String, void Function(Canvas c)> scenes() {
       PlaceholderDimensions(size: Size(20, 8), alignment: ui.PlaceholderAlignment.middle),
       PlaceholderDimensions(size: Size(6, 20), alignment: ui.PlaceholderAlignment.bottom),
     ]),
+    'color.change': (Canvas c) {
+      final TextPainter p = TextPainter(
+        text: const TextSpan(text: 'recolored', style: TextStyle(fontSize: 12, color: Color(0xFF000000))),
+        textDirection: TextDirection.ltr,
+        textAlign: TextAlign.center,
+      );
+      p.layout();
+      p.text = const TextSpan(text: 'recolored', style: TextStyle(fontSize: 12, color: Color(0xFFFF0000)));
+      p.paint(c, const Offset(8, 8));
+      p.dispose();
+    },
     'logo.horizontal': logo(const FlutterLogoDecoration(style: FlutterLogoStyle.horizontal), Offset.zero, const Size(128, 64)),
     'logo.stacked': logo(const FlutterLogoDecoration(style: FlutterLogoStyle.stacked, textColor: Color(0xFF8000C0)),
         const Offset(32, 0), const Size(64, 64)),

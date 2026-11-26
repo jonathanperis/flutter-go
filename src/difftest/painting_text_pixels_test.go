@@ -120,6 +120,16 @@ func paintingTextPixelScenes() map[string]func(c ui.Canvas) {
 			{Size: ui.NewSize(20, 8), Alignment: ui.PlaceholderAlignmentMiddle},
 			{Size: ui.NewSize(6, 20), Alignment: ui.PlaceholderAlignmentBottom},
 		}}),
+		"color.change": func(cv ui.Canvas) {
+			text := "recolored"
+			centerAlign, ltr := ui.TextAlignCenter, ui.TextDirectionLtr
+			p := NewTextPainter(TextPainterOptions{Text: span(TextSpanOptions{Text: &text,
+				Style: NewTextStyle(TextStyleOptions{FontSize: f(12), Color: c(0xFF000000)})}), TextDirection: &ltr, TextAlign: &centerAlign})
+			p.Layout()
+			p.SetText(span(TextSpanOptions{Text: &text, Style: NewTextStyle(TextStyleOptions{FontSize: f(12), Color: c(0xFFFF0000)})}))
+			p.Paint(cv, ui.NewOffset(8, 8))
+			p.Dispose()
+		},
 		"logo.horizontal": ptpLogo(horizontal, ui.OffsetZero, ui.NewSize(128, 64)),
 		"logo.stacked": ptpLogo(NewFlutterLogoDecoration(FlutterLogoDecorationOptions{Style: FlutterLogoStyleStacked,
 			TextColor: c(0xFF8000C0)}), ui.NewOffset(32, 0), ui.NewSize(64, 64)),
