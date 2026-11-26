@@ -1614,3 +1614,39 @@ The standing goal is now full API parity with Flutter 3.50.1's Dart layer
   lines, 319 scenes), `recognizers_scale` (607 lines, 27 scenes),
   `recognizers_tap_and_drag`, `scroll_gestures`, and `drag_fling`
   tightened to exact.
+  (`recognizers_tap_and_drag`: ≈14,000 lines, 455 scenes.) Every one
+  matched Flutter on its first run once its scenes were written; the
+  scenes added for mutations matched too.
+- Flutter's tests (packages/flutter/test/gestures): arena 11/11,
+  debug 5/5, events 25/25, hit_test 3/3, lsq_solver 5/5, pointer_router
+  9/9, pointer_signal_resolver 5/5, resampler 10/10, velocity_tracker
+  11/11, recognizer 7/7, gesture_binding 20/20, locking 1/1,
+  gesture_binding_resample_event 1/1, team 2/2, tap 34/34, double_tap
+  23/23, multitap 2/2, serial_tap 16/16, long_press 27/27, force_press
+  9/9, drag 43/43, monodrag 5/6, multidrag 5/5, scale 15/15,
+  tap_and_drag 30/30, transformed_scale 1/1 (adapted: the hit test's
+  transform is put on the event). Skipped because they pump widgets
+  (GestureDetector/Listener/Scrollable not ported): monodrag's
+  "CustomScrollView" test, transformed_tap 0/3, transformed_double_tap
+  0/2, transformed_long_press 0/3, transformed_monodrag 0/8 (a
+  non-widget slop-under-scale test stands in), gesture_config_regression
+  0/2, gesture_binding_resample_event_on_widget 0/1. Plus
+  `foundation/binding_mixins_test.go` and own tests (arena default win,
+  stopped boundary, perspective assert, pack/unpack, KeyData,
+  GestureSettings, router up-elsewhere).
+- Mutations: 334 valid, 309 caught, 25 equivalent (the binding pattern
+  and GestureBinding/recognizer bases 47/46/1, the widgets bridge 11/9/2,
+  base layer 66/63/3, tap family 45/44/1, drag family 68/63/5, scale
+  42/36/6, tap-and-drag 55/48/7; each fork's equivalents are argued in
+  its report: e.g. a second resolve of an already-resolved arena entry is
+  a no-op, a NaN-free `max`'s -0.0 rule, the iOS bouncing drag start
+  always resetting the motion-stop state so its time stamp never
+  matters, the bridge adding no transforms so tap local = global).
+  Caught only after adding scenes: arena close/sweep through hit-test
+  targets, cancelPointer's microtask, a pointer held down across
+  resampling, the velocity trackers on the binding's clock, filters on
+  device kind vs buttons separately, the deadline at exactly its
+  duration, an up beyond the slop, a team's captain winning, the bouncing
+  min fling velocity, holds under a competing outer tap.
+- Parity: 400 → 603 of 2889 exposed (tested 309 → 432); gestures 0 →
+  188/188, dart:ui 60 → 75.

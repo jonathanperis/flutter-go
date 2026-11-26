@@ -1,7 +1,7 @@
 package gestures_test
 
 // Port of packages/flutter/test/gestures/gesture_binding_test.dart and
-// locking_test.dart (Flutter 3.50.1): all 21 + 1 tests. Each Dart file
+// locking_test.dart (Flutter 3.50.1): all 20 + 1 tests. Each Dart file
 // has its own isolate and binding; here each file is one top-level test
 // run in a child process (isolated), whose subtests are the Dart tests.
 // The platform_views mock handler of the Dart file is not installed (no

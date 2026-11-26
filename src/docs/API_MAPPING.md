@@ -764,3 +764,27 @@ Each divergence is listed here when it is introduced.
   named parameters as options); `TestGesture` is not. The gesture tests'
   helper `testGesture`/`GestureTester` (test/gestures/gesture_tester.dart)
   is `flutter_test.RunTestGesture`/`GestureTester`.
+- gestures (recognizers): tap, long press and tap-and-drag details are
+  Diagnosticable pointers built with `NewXDetails(XDetailsOptions)`;
+  positions are methods, other fields struct fields, nullable values
+  pointers (`*ui.PointerDeviceKind`, `*time.Duration`, `*float64`).
+  `BaseTapGestureRecognizer`'s handlers take positional parameters
+  (`HandleTapUp(down, up)`). `DragGestureRecognizer` and
+  `BaseTapAndDragGestureRecognizer` (sealed in Dart) are interfaces plus
+  `...Base` structs whose private abstract members are unexported
+  interface methods; the `_TapStatusTrackerMixin` members belong to the
+  tap-and-drag Base. Fling limits, `maxConsecutiveTap`,
+  `dragUpdateThrottleFrequency` and `DelayedMultiDragGestureRecognizer`'s
+  `Delay` are pointer fields/options (nil: null). `GestureVelocityTrackerBuilder`
+  returns `*VelocityTracker` (an iOS/macOS tracker's embedded pointer).
+  `Drag` is an interface plus `DragBase`; a nil `Drag` from
+  `GestureMultiDragStartCallback` is null. `MultiDragPointerState` is an
+  interface plus a Base (`Construct(self, initialPosition, kind, settings)`).
+  LongPress's nil post-accept slop is its Dart default (null).
+- widgets (until GestureDetector/Scrollable are ported): the test binding
+  and src/app hit-test through `BuildOwner.HitTestGestures`, which adds a
+  TapGestureRecognizer per tap region and a VerticalDragGestureRecognizer
+  per list; `widgets.PointerRouter` only builds pointer events for
+  `GestureBinding.HandlePointerEvent` (it moves the pointer to where it is
+  lifted first, as the engine synthesizes that move). src/app sends touch
+  events for the mouse.
