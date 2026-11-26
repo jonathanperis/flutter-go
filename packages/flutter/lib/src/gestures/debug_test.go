@@ -1,12 +1,7 @@
 // Port of packages/flutter/test/gestures/debug_test.dart (Flutter 3.50.1):
-// 1 of 5 tests, partially.
-//
-// Skipped (needs GestureBinding and the recognizers, which the parent
-// ports): debugPrintGestureArenaDiagnostics, debugPrintRecognizerCallbacks-
-// Trace, both together, and "TapGestureRecognizer _sentTapDown toString".
-// "Gesture details debugFillProperties" is ported for the drag details
-// (drag_details.dart); the force press, long press, serial tap, scale, tap
-// and tap-and-drag details come with their recognizers.
+// "Gesture details debugFillProperties" (the details of the recognizers
+// ported so far; the tap-and-drag details come with tap_and_drag.dart).
+// The other four tests are in debug_recognizers_test.go.
 package gestures_test
 
 import (
