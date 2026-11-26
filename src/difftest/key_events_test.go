@@ -336,6 +336,11 @@ func dartJSON(entries []dart.MapEntry[string, any]) string {
 }
 
 func TestKeyEventsMatchFlutter(t *testing.T) {
+	// Its own process, as `flutter test` runs each file: the frame time stamp
+	// raw key events carry is the binding's, which other tests advance.
+	if !isolated(t) {
+		return
+	}
 	t.Setenv("FLUTTER_TEST", "true")
 	l := &keyEventsLog{}
 	for _, mode := range services.KeyDataTransitModeValues {
