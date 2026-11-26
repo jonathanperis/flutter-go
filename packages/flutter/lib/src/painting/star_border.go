@@ -30,8 +30,10 @@ type StarBorder struct {
 	// Points is the number of points in this star (or sides of the
 	// polygon); fractional values are allowed.
 	Points float64
-	// innerRadiusRatio nil: a polygon (cos(pi / points)).
-	innerRadiusRatio *float64
+	// innerRadiusRatio is Dart's _innerRadiusRatio; polygon is its null
+	// (a polygon: cos(pi / points)).
+	innerRadiusRatio float64
+	polygon          bool
 	// PointRounding is the amount of rounding on the points (0..1).
 	PointRounding float64
 	// ValleyRounding is the amount of rounding of the valleys (0..1).
@@ -92,8 +94,7 @@ func newStarBorder(side BorderSide, points, innerRadiusRatio, pointRounding, val
 	starAssert(innerRadiusRatio >= 0, "innerRadiusRatio >= 0")
 	starAssert(innerRadiusRatio <= 1, "innerRadiusRatio <= 1")
 	starAssert(points >= 2, "points >= 2")
-	r := innerRadiusRatio
-	return StarBorder{Side: side, Points: points, innerRadiusRatio: &r, PointRounding: pointRounding,
+	return StarBorder{Side: side, Points: points, innerRadiusRatio: innerRadiusRatio, PointRounding: pointRounding,
 		ValleyRounding: valleyRounding, rotationRadians: rotation * kDegToRad, Squash: squash}
 }
 
@@ -123,15 +124,15 @@ func NewStarBorderPolygon(opts ...StarBorderPolygonOptions) StarBorder {
 	starAssert(o.PointRounding >= 0, "pointRounding >= 0")
 	starAssert(o.PointRounding <= 1, "pointRounding <= 1")
 	starAssert(sides >= 2, "sides >= 2")
-	return StarBorder{Side: sideOrNone(o.Side), Points: sides, PointRounding: o.PointRounding,
+	return StarBorder{Side: sideOrNone(o.Side), Points: sides, polygon: true, PointRounding: o.PointRounding,
 		rotationRadians: o.Rotation * kDegToRad, Squash: o.Squash}
 }
 
 // InnerRadiusRatio is the ratio of the inner radius of a star to its
 // outer radius (for a polygon, cos(pi / points)).
 func (s StarBorder) InnerRadiusRatio() float64 {
-	if s.innerRadiusRatio != nil {
-		return *s.innerRadiusRatio
+	if !s.polygon {
+		return s.innerRadiusRatio
 	}
 	return dart.Cos(dartPiValue / s.Points)
 }
@@ -336,18 +337,6 @@ func (s StarBorder) Paint(canvas ui.Canvas, rect ui.Rect, textDirection *ui.Text
 	}
 	adjustedRect := rect.Inflate(s.Side.StrokeOffset() / 2)
 	canvas.DrawPath(s.generator().generate(adjustedRect), s.Side.ToPaint())
-}
-
-// Equal is Dart's == (Go's == also compares the innerRadiusRatio pointer).
-func (s StarBorder) Equal(other ShapeBorder) bool {
-	o, ok := other.(StarBorder)
-	if !ok {
-		return false
-	}
-	ratioEqual := (o.innerRadiusRatio == nil) == (s.innerRadiusRatio == nil) &&
-		(o.innerRadiusRatio == nil || *o.innerRadiusRatio == *s.innerRadiusRatio)
-	return o.Side == s.Side && o.Points == s.Points && ratioEqual && o.PointRounding == s.PointRounding &&
-		o.ValleyRounding == s.ValleyRounding && o.rotationRadians == s.rotationRadians && o.Squash == s.Squash
 }
 
 func (s StarBorder) String() string {
